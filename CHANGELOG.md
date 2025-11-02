@@ -15,12 +15,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented by adding `MouseWheelUp` and `MouseWheelDown` event types to the event system
   - Terminal now converts crossterm's `ScrollUp` and `ScrollDown` events to internal event types
 
+- **Window Closing Support**: Non-modal windows can now be properly closed
+  - Click close button on non-modal windows to remove them from desktop
+  - Modal dialogs: close button converts `CM_CLOSE` to `CM_CANCEL`
+  - Non-modal windows: close button sets `SF_CLOSED` flag, removed by Desktop on next frame
+  - Matches Borland's `TWindow::handleEvent()` behavior (twindow.cc lines 124-138)
+  - Added `SF_CLOSED` flag (0x1000) to mark windows for removal
+  - Desktop automatically removes closed windows after event handling
+
+### Fixed
+- **TextView Indicator**: Indicator now updates properly when scrolling with mouse wheel or keyboard
+
 ### Technical Details
-This implements modern mouse wheel support that wasn't present in the original Borland Turbo Vision (which predated mouse wheels). The implementation follows the framework's event-driven architecture:
+**Scroll Wheel**: This implements modern mouse wheel support that wasn't present in the original Borland Turbo Vision (which predated mouse wheels). The implementation follows the framework's event-driven architecture:
 - Added event type constants `EV_MOUSE_WHEEL_UP` (0x0010) and `EV_MOUSE_WHEEL_DOWN` (0x0020)
 - Updated `EV_MOUSE` mask to 0x003F to include wheel events
 - Each scrollable component checks mouse position before handling wheel events
 - Wheel events are cleared after handling to prevent propagation
+
+**Window Closing**: Adapts Borland's architecture for Rust's ownership model:
+- Borland uses `CLY_destroy(this)` to remove views from owner
+- Rust uses `SF_CLOSED` flag since views can't remove themselves from parent Vec
+- `Window::handle_event()` sets flag on `CM_CLOSE` (non-modal) or converts to `CM_CANCEL` (modal)
+- `Desktop::remove_closed_windows()` removes flagged windows after event handling
+- `Group::remove()` handles child removal and focus tracking
 
 ## [0.1.2] - 2025-11-02
 

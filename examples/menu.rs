@@ -159,7 +159,7 @@ fn show_message(app: &mut Application, title: &str, message: &str) {
     dialog.add(Box::new(button));
     dialog.set_initial_focus();
 
-    dialog.execute(&mut app.terminal);
+    dialog.execute(app);
 }
 
 fn show_about(app: &mut Application) {
@@ -193,5 +193,5 @@ fn show_about(app: &mut Application) {
     dialog.add(Box::new(button));
     dialog.set_initial_focus();
 
-    dialog.execute(&mut app.terminal);
+    dialog.execute(app);
 }

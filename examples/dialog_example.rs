@@ -45,7 +45,7 @@ fn main() -> std::io::Result<()> {
     dialog.set_initial_focus();
 
     // Execute the dialog and get the result
-    let result = dialog.execute(&mut app.terminal);
+    let result = dialog.execute(&mut app);
 
     // Print the result (after terminal is shut down)
     drop(app);

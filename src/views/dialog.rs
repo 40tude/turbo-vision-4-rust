@@ -48,7 +48,7 @@ impl Dialog {
         self.window.child_at_mut(index)
     }
 
-    pub fn execute(&mut self, terminal: &mut Terminal) -> CommandId {
+    pub fn execute(&mut self, app: &mut crate::app::Application) -> CommandId {
         use crate::core::state::SF_MODAL;
 
         self.result = CM_CANCEL;
@@ -60,15 +60,27 @@ impl Dialog {
 
         loop {
             // Set dialog as the active view for F11 dumps
-            terminal.set_active_view_bounds(self.shadow_bounds());
+            app.terminal.set_active_view_bounds(self.shadow_bounds());
 
-            // Draw
-            self.draw(terminal);
-            self.update_cursor(terminal);
-            let _ = terminal.flush();
+            // Draw desktop first (background), then dialog on top
+            // This matches Borland's pattern where TProgram::getEvent() triggers full screen redraw
+            //
+            // **Architecture Note**: In Borland TV, there is ONE event loop in TProgram, and
+            // TGroup::execView() just calls p->execute() which returns immediately. The modal
+            // flag blocks events from reaching views behind the modal view, but drawing happens
+            // at the TProgram level.
+            //
+            // In our Rust implementation, Dialog::execute() has its own event loop for simplicity
+            // (Rust ownership makes it difficult to have TProgram handle modal execution).
+            // Therefore, we must draw the desktop here to match Borland's behavior and prevent
+            // trails when the dialog moves.
+            app.desktop.draw(&mut app.terminal);
+            self.draw(&mut app.terminal);
+            self.update_cursor(&mut app.terminal);
+            let _ = app.terminal.flush();
 
             // Get event
-            if let Ok(Some(mut event)) = terminal.poll_event(Duration::from_millis(50)) {
+            if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
                 // Double ESC closes the dialog
                 if event.what == EventType::Keyboard && event.key_code == KB_ESC_ESC {
                     self.result = CM_CANCEL;

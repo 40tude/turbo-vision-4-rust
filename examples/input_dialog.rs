@@ -93,7 +93,7 @@ fn main() -> std::io::Result<()> {
     dialog.set_initial_focus();
 
     // Execute the dialog
-    let result = dialog.execute(&mut app.terminal);
+    let result = dialog.execute(&mut app);
 
     // Clean up terminal before printing
     drop(app);

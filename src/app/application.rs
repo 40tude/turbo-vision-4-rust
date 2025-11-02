@@ -12,6 +12,7 @@ pub struct Application {
     pub status_line: Option<StatusLine>,
     pub desktop: Desktop,
     pub running: bool,
+    needs_redraw: bool,  // Track if full redraw is needed
     // Note: Command set is now stored in thread-local static (command_set module)
     // This matches Borland's architecture where TView::curCommandSet is static
 }
@@ -33,6 +34,7 @@ impl Application {
             status_line: None,
             desktop,
             running: false,
+            needs_redraw: true,  // Initial draw needed
         })
     }
 
@@ -86,26 +88,56 @@ impl Application {
 
         while self.running {
             // Handle events first
-            if let Ok(Some(mut event)) = self.terminal.poll_event(Duration::from_millis(50)) {
+            let had_event = if let Ok(Some(mut event)) = self.terminal.poll_event(Duration::from_millis(50)) {
                 self.handle_event(&mut event);
-            }
+                true
+            } else {
+                false
+            };
 
             // Idle processing - broadcast command set changes
             // Matches Borland: TProgram::idle() called during event loop
             self.idle();
 
+            // Remove closed windows (those with SF_CLOSED flag)
+            // In Borland, views call CLY_destroy() to remove themselves
+            // In Rust, views set SF_CLOSED and parent removes them
+            let had_closed_windows = self.desktop.remove_closed_windows();
+            if had_closed_windows {
+                self.needs_redraw = true;  // Window removal requires full redraw
+            }
+
             // Check for moved windows and redraw affected areas (Borland's drawUnderRect pattern)
             // Matches Borland: TView::locate() checks for movement and calls drawUnderRect
-            // This must happen BEFORE the full draw to avoid double-drawing
-            self.desktop.handle_moved_windows(&mut self.terminal);
+            // This optimized redraw only redraws the union of old + new position
+            let had_moved_windows = self.desktop.handle_moved_windows(&mut self.terminal);
 
             // Update active view bounds for F11 dumps
             self.update_active_view_bounds();
 
-            // Draw everything AFTER handling events
-            // This ensures we display the updated state immediately
-            self.draw();
-            let _ = self.terminal.flush();
+            // Optimized drawing strategy (matches Borland's approach):
+            // - For moved windows: only redraw union rect (already done in handle_moved_windows)
+            // - For content changes: full redraw when events occur
+            // - No redraw on idle frames (significant performance improvement)
+            //
+            // This prevents redrawing every frame (60 FPS) when nothing is happening
+            // Borland only redraws when views explicitly request it via draw() or on events
+            if self.needs_redraw {
+                // Explicit redraw requested (window closed, resize, etc.)
+                self.draw();
+                self.needs_redraw = false;
+                let _ = self.terminal.flush();
+            } else if had_moved_windows {
+                // Window movement: partial redraw already done via draw_under_rect
+                // Just flush the terminal buffer
+                let _ = self.terminal.flush();
+            } else if had_event {
+                // Event occurred: do full redraw for content changes
+                // This could be optimized further by tracking which views changed
+                self.draw();
+                let _ = self.terminal.flush();
+            }
+            // If no event, no movement, no close: no redraw (idle frame)
         }
     }
 

@@ -76,7 +76,10 @@ impl Desktop {
     /// Check for moved windows and redraw affected areas
     /// Matches Borland: TProgram::idle() checks for moved views and calls drawUnderRect
     /// This is called after event handling to redraw areas exposed by window movement
-    pub fn handle_moved_windows(&mut self, terminal: &mut Terminal) {
+    /// Returns true if any windows were moved and redrawn
+    pub fn handle_moved_windows(&mut self, terminal: &mut Terminal) -> bool {
+        let mut had_movement = false;
+
         // Check each window (skip background at index 0)
         // We iterate in reverse because we need to check from front to back (z-order)
         for i in 1..self.children.len() {
@@ -89,8 +92,12 @@ impl Desktop {
 
                 // Clear the movement tracking after redrawing
                 self.children.child_at_mut(i).clear_move_tracking();
+
+                had_movement = true;
             }
         }
+
+        had_movement
     }
 }
 
@@ -105,6 +112,30 @@ impl Desktop {
         } else {
             None
         }
+    }
+
+    /// Remove closed windows (those with SF_CLOSED flag)
+    /// In Borland, views call CLY_destroy() which removes them from the owner
+    /// In Rust, views set SF_CLOSED flag and the parent removes them
+    /// This is called after event handling in the main loop
+    /// Returns true if any windows were removed
+    pub fn remove_closed_windows(&mut self) -> bool {
+        use crate::core::state::SF_CLOSED;
+
+        let mut had_removals = false;
+
+        // Remove windows marked as closed (skip background at index 0)
+        // We need to iterate in reverse to avoid index shifting issues
+        let mut i = self.children.len();
+        while i > 1 {  // Don't remove background at index 0
+            i -= 1;
+            if (self.children.child_at(i).state() & SF_CLOSED) != 0 {
+                self.children.remove(i);
+                had_removals = true;
+            }
+        }
+
+        had_removals
     }
 }
 

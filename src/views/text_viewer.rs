@@ -169,7 +169,12 @@ impl TextViewer {
         self.delta.x = x.max(0).min(max_x.max(0));
         self.delta.y = y.max(0).min(max_y.max(0));
 
+        // Update cursor to match scroll position (for indicator display)
+        self.cursor.x = self.delta.x;
+        self.cursor.y = self.delta.y;
+
         self.update_scrollbars();
+        self.update_indicator();
     }
 }
 

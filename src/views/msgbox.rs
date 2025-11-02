@@ -1,6 +1,6 @@
 use crate::core::command::{CommandId, CM_OK, CM_CANCEL};
 use crate::core::geometry::Rect;
-use crate::terminal::Terminal;
+use crate::app::Application;
 use super::dialog::Dialog;
 use super::button::Button;
 use super::static_text::StaticText;
@@ -30,7 +30,7 @@ pub const CM_YES: CommandId = 100;
 pub const CM_NO: CommandId = 101;
 
 /// Display a message box with the given message and options
-pub fn message_box(terminal: &mut Terminal, message: &str, options: u16) -> CommandId {
+pub fn message_box(app: &mut Application, message: &str, options: u16) -> CommandId {
     // Calculate dialog size based on message
     let msg_width = message.lines().map(|l| l.len()).max().unwrap_or(20);
     let msg_height = message.lines().count().max(1);
@@ -39,17 +39,17 @@ pub fn message_box(terminal: &mut Terminal, message: &str, options: u16) -> Comm
     let height = msg_height + 6;
 
     // Center on screen
-    let (screen_w, screen_h) = terminal.size();
+    let (screen_w, screen_h) = app.terminal.size();
     let x = (screen_w as i16 - width as i16) / 2;
     let y = (screen_h as i16 - height as i16) / 2;
 
     let bounds = Rect::new(x, y, x + width as i16, y + height as i16);
 
-    message_box_rect(terminal, bounds, message, options)
+    message_box_rect(app, bounds, message, options)
 }
 
 /// Display a message box at a specific location
-pub fn message_box_rect(terminal: &mut Terminal, bounds: Rect, message: &str, options: u16) -> CommandId {
+pub fn message_box_rect(app: &mut Application, bounds: Rect, message: &str, options: u16) -> CommandId {
     // Determine title based on message type
     let title = match options & 0x03 {
         MF_WARNING => "Warning",
@@ -96,28 +96,28 @@ pub fn message_box_rect(terminal: &mut Terminal, bounds: Rect, message: &str, op
     }
 
     dialog.set_initial_focus();
-    dialog.execute(terminal)
+    dialog.execute(app)
 }
 
 /// Display an input box that prompts the user for a string
-pub fn input_box(terminal: &mut Terminal, title: &str, label: &str, initial: &str, max_length: usize) -> Option<String> {
+pub fn input_box(app: &mut Application, title: &str, label: &str, initial: &str, max_length: usize) -> Option<String> {
     // Calculate dialog size
     let label_len = label.len();
     let width = (label_len + max_length + 12).min(60).max(30);
     let height = 7;
 
     // Center on screen
-    let (screen_w, screen_h) = terminal.size();
+    let (screen_w, screen_h) = app.terminal.size();
     let x = (screen_w as i16 - width as i16) / 2;
     let y = (screen_h as i16 - height as i16) / 2;
 
     let bounds = Rect::new(x, y, x + width as i16, y + height as i16);
 
-    input_box_rect(terminal, bounds, title, label, initial, max_length)
+    input_box_rect(app, bounds, title, label, initial, max_length)
 }
 
 /// Display an input box at a specific location
-pub fn input_box_rect(terminal: &mut Terminal, bounds: Rect, title: &str, label: &str, initial: &str, max_length: usize) -> Option<String> {
+pub fn input_box_rect(app: &mut Application, bounds: Rect, title: &str, label: &str, initial: &str, max_length: usize) -> Option<String> {
     let mut dialog = Dialog::new(bounds, title);
 
     // Create shared data for input line
@@ -148,7 +148,7 @@ pub fn input_box_rect(terminal: &mut Terminal, bounds: Rect, title: &str, label:
 
     dialog.set_initial_focus();
 
-    let result = dialog.execute(terminal);
+    let result = dialog.execute(app);
 
     if result == CM_OK {
         Some(data.borrow().clone())

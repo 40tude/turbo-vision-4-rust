@@ -1,6 +1,7 @@
 use crate::core::geometry::{Rect, Point};
 use crate::core::event::{Event, EventType};
-use crate::core::state::{StateFlags, SF_SHADOW, SF_DRAGGING, SHADOW_ATTR};
+use crate::core::command::{CM_CLOSE, CM_CANCEL};
+use crate::core::state::{StateFlags, SF_SHADOW, SF_DRAGGING, SF_MODAL, SF_CLOSED, SHADOW_ATTR};
 use crate::core::palette::colors;
 use crate::terminal::Terminal;
 use super::view::{View, draw_shadow};
@@ -175,6 +176,26 @@ impl View for Window {
         if !frame_dragging && self.drag_offset.is_some() {
             self.drag_offset = None;
             self.state &= !SF_DRAGGING;
+        }
+
+        // Handle CM_CLOSE command (Borland: twindow.cc lines 124-138)
+        // Frame generates CM_CLOSE when close button is clicked
+        if event.what == EventType::Command && event.command == CM_CLOSE {
+            // Check if this window is modal
+            if (self.state & SF_MODAL) != 0 {
+                // Modal window: convert CM_CLOSE to CM_CANCEL
+                // Borland: event.message.command = cmCancel; putEvent(event);
+                *event = Event::command(CM_CANCEL);
+                // Don't clear event - let it propagate to dialog's execute loop
+            } else {
+                // Non-modal window: mark for removal
+                // In Borland, this calls close() which calls CLY_destroy(this)
+                // In Rust, we can't remove ourselves, so set SF_CLOSED flag
+                // The parent (Desktop) will remove us on next update
+                self.state |= SF_CLOSED;
+                event.clear();
+            }
+            return;
         }
 
         // Then let the interior handle it (if not already handled)

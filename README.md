@@ -96,9 +96,26 @@ Currently implements:
 - ✅ ListBoxes
 - ✅ Memo (multi-line text editor)
 - ✅ Mouse support (buttons, menus, status bar, close buttons, hover effects, listbox clicks, scroll wheel)
+- ✅ Window closing (non-modal windows close with close button, modal dialogs convert to cancel)
 - ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
 - ✅ ANSI Dump for debugging (dump screen/views to text files with colors)
 - ❌ Full text editor with search/replace (basic editing available)
+
+## Project Statistics
+
+```
+===============================================================================
+ Language            Files        Lines         Code     Comments       Blanks
+===============================================================================
+ Rust                   53        10255         7908          879         1468
+ Markdown                6         1578            0         1142          436
+ TOML                    1           35           32            0            3
+===============================================================================
+ Total                  60        11868         7940         2021         1907
+===============================================================================
+```
+
+Generated with [tokei](https://github.com/XAMPPRocky/tokei)
 
 ## License
 

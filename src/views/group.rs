@@ -117,6 +117,24 @@ impl Group {
         new_index
     }
 
+    /// Remove a child at the specified index
+    /// Matches Borland: TGroup::remove(TView *p) or TGroup::shutDown()
+    pub fn remove(&mut self, index: usize) {
+        if index < self.children.len() {
+            self.children.remove(index);
+
+            // Update focused index if needed
+            if self.focused >= index && self.focused > 0 {
+                self.focused -= 1;
+            }
+
+            // If we removed the last child, clear focus
+            if self.children.is_empty() {
+                self.focused = 0;
+            }
+        }
+    }
+
     /// Draw views starting from a specific index
     /// Used for Borland's drawUnderRect pattern where we only redraw views
     /// that come after (on top of) a moved view
