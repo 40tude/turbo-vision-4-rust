@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-11-02
+
+### Added
+- **Scroll Wheel Support**: Mouse wheel scrolling now works in ListBox, Memo, and TextView components
+  - Wheel up scrolls content upward (moves selection/cursor up)
+  - Wheel down scrolls content downward (moves selection/cursor down)
+  - Only responds when mouse is within the component's bounds
+  - Implemented by adding `MouseWheelUp` and `MouseWheelDown` event types to the event system
+  - Terminal now converts crossterm's `ScrollUp` and `ScrollDown` events to internal event types
+
+### Technical Details
+This implements modern mouse wheel support that wasn't present in the original Borland Turbo Vision (which predated mouse wheels). The implementation follows the framework's event-driven architecture:
+- Added event type constants `EV_MOUSE_WHEEL_UP` (0x0010) and `EV_MOUSE_WHEEL_DOWN` (0x0020)
+- Updated `EV_MOUSE` mask to 0x003F to include wheel events
+- Each scrollable component checks mouse position before handling wheel events
+- Wheel events are cleared after handling to prevent propagation
+
 ## [0.1.2] - 2025-11-02
 
 ### Added
@@ -98,6 +115,7 @@ The fix addresses a fundamental architectural issue where modal dialogs had thei
 ### Known Limitations
 - Full text editor with search/replace not yet implemented (basic editing available in Memo)
 
+[0.1.3]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.0

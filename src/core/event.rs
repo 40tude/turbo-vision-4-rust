@@ -71,6 +71,8 @@ pub enum EventType {
     MouseUp,
     MouseMove,
     MouseAuto,
+    MouseWheelUp,    // Mouse wheel scrolled up
+    MouseWheelDown,  // Mouse wheel scrolled down
     Command,
     Broadcast,
 }
@@ -81,8 +83,10 @@ pub const EV_MOUSE_DOWN: u16 = 0x0001;
 pub const EV_MOUSE_UP: u16 = 0x0002;
 pub const EV_MOUSE_MOVE: u16 = 0x0004;
 pub const EV_MOUSE_AUTO: u16 = 0x0008;
-pub const EV_MOUSE: u16 = 0x000F; // All mouse events
-pub const EV_KEYBOARD: u16 = 0x0010;
+pub const EV_MOUSE_WHEEL_UP: u16 = 0x0010;
+pub const EV_MOUSE_WHEEL_DOWN: u16 = 0x0020;
+pub const EV_MOUSE: u16 = 0x003F; // All mouse events (including wheel)
+pub const EV_KEYBOARD: u16 = 0x0040;
 pub const EV_COMMAND: u16 = 0x0100;
 pub const EV_BROADCAST: u16 = 0x0200;
 pub const EV_MESSAGE: u16 = 0xFF00; // Command | Broadcast

@@ -278,44 +278,67 @@ impl View for TextViewer {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        if event.what == EventType::Keyboard {
-            let content_area = self.get_content_area();
+        match event.what {
+            EventType::Keyboard => {
+                let content_area = self.get_content_area();
 
-            match event.key_code {
-                KB_UP => {
+                match event.key_code {
+                    KB_UP => {
+                        self.scroll_to(self.delta.x, self.delta.y - 1);
+                        event.clear();
+                    }
+                    KB_DOWN => {
+                        self.scroll_to(self.delta.x, self.delta.y + 1);
+                        event.clear();
+                    }
+                    KB_LEFT => {
+                        self.scroll_to(self.delta.x - 1, self.delta.y);
+                        event.clear();
+                    }
+                    KB_RIGHT => {
+                        self.scroll_to(self.delta.x + 1, self.delta.y);
+                        event.clear();
+                    }
+                    KB_PGUP => {
+                        self.scroll_to(self.delta.x, self.delta.y - content_area.height());
+                        event.clear();
+                    }
+                    KB_PGDN => {
+                        self.scroll_to(self.delta.x, self.delta.y + content_area.height());
+                        event.clear();
+                    }
+                    KB_HOME => {
+                        self.scroll_to(0, self.delta.y);
+                        event.clear();
+                    }
+                    KB_END => {
+                        self.scroll_to(self.max_line_length(), self.delta.y);
+                        event.clear();
+                    }
+                    _ => {}
+                }
+            }
+            EventType::MouseWheelUp => {
+                let mouse_pos = event.mouse.pos;
+                let content_area = self.get_content_area();
+                // Check if mouse is within the text viewer content area
+                if mouse_pos.x >= content_area.a.x && mouse_pos.x < content_area.b.x &&
+                   mouse_pos.y >= content_area.a.y && mouse_pos.y < content_area.b.y {
                     self.scroll_to(self.delta.x, self.delta.y - 1);
                     event.clear();
                 }
-                KB_DOWN => {
+            }
+            EventType::MouseWheelDown => {
+                let mouse_pos = event.mouse.pos;
+                let content_area = self.get_content_area();
+                // Check if mouse is within the text viewer content area
+                if mouse_pos.x >= content_area.a.x && mouse_pos.x < content_area.b.x &&
+                   mouse_pos.y >= content_area.a.y && mouse_pos.y < content_area.b.y {
                     self.scroll_to(self.delta.x, self.delta.y + 1);
                     event.clear();
                 }
-                KB_LEFT => {
-                    self.scroll_to(self.delta.x - 1, self.delta.y);
-                    event.clear();
-                }
-                KB_RIGHT => {
-                    self.scroll_to(self.delta.x + 1, self.delta.y);
-                    event.clear();
-                }
-                KB_PGUP => {
-                    self.scroll_to(self.delta.x, self.delta.y - content_area.height());
-                    event.clear();
-                }
-                KB_PGDN => {
-                    self.scroll_to(self.delta.x, self.delta.y + content_area.height());
-                    event.clear();
-                }
-                KB_HOME => {
-                    self.scroll_to(0, self.delta.y);
-                    event.clear();
-                }
-                KB_END => {
-                    self.scroll_to(self.max_line_length(), self.delta.y);
-                    event.clear();
-                }
-                _ => {}
             }
+            _ => {}
         }
 
         // Let scrollbars handle events too

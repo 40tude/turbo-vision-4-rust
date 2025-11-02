@@ -324,6 +324,17 @@ impl Terminal {
     fn convert_mouse_event(&mut self, mouse: event::MouseEvent) -> Option<Event> {
         let pos = Point::new(mouse.column as i16, mouse.row as i16);
 
+        // Handle scroll wheel events separately
+        match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                return Some(Event::mouse(EventType::MouseWheelUp, pos, 0, false));
+            }
+            MouseEventKind::ScrollDown => {
+                return Some(Event::mouse(EventType::MouseWheelDown, pos, 0, false));
+            }
+            _ => {}
+        }
+
         // Convert button state to our format
         let buttons = match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => MB_LEFT_BUTTON,
@@ -331,7 +342,7 @@ impl Terminal {
             MouseEventKind::Down(MouseButton::Middle) | MouseEventKind::Drag(MouseButton::Middle) => MB_MIDDLE_BUTTON,
             MouseEventKind::Up(_) => 0, // No buttons pressed on release
             MouseEventKind::Moved => self.last_mouse_buttons, // Maintain button state during move
-            _ => return None, // Ignore scroll events for now
+            _ => return None,
         };
 
         // Determine event type

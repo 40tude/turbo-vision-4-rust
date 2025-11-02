@@ -292,6 +292,24 @@ impl View for ListBox {
                     }
                 }
             }
+            EventType::MouseWheelUp => {
+                let mouse_pos = event.mouse.pos;
+                // Check if mouse is within the listbox bounds
+                if mouse_pos.x >= self.bounds.a.x && mouse_pos.x < self.bounds.b.x &&
+                   mouse_pos.y >= self.bounds.a.y && mouse_pos.y < self.bounds.b.y {
+                    self.select_prev();
+                    event.clear();
+                }
+            }
+            EventType::MouseWheelDown => {
+                let mouse_pos = event.mouse.pos;
+                // Check if mouse is within the listbox bounds
+                if mouse_pos.x >= self.bounds.a.x && mouse_pos.x < self.bounds.b.x &&
+                   mouse_pos.y >= self.bounds.a.y && mouse_pos.y < self.bounds.b.y {
+                    self.select_next();
+                    event.clear();
+                }
+            }
             _ => {}
         }
     }

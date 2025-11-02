@@ -633,114 +633,141 @@ impl View for Memo {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        if event.what == EventType::Keyboard {
-            // Only handle keyboard events if focused
-            if !self.focused {
-                return;
+        match event.what {
+            EventType::Keyboard => {
+                // Only handle keyboard events if focused
+                if !self.focused {
+                    return;
+                }
+
+                let shift_pressed = false; // TODO: Track shift state
+
+                match event.key_code {
+                    KB_UP => {
+                        self.move_cursor(0, -1, shift_pressed);
+                        event.clear();
+                    }
+                    KB_DOWN => {
+                        self.move_cursor(0, 1, shift_pressed);
+                        event.clear();
+                    }
+                    KB_LEFT => {
+                        self.move_cursor(-1, 0, shift_pressed);
+                        event.clear();
+                    }
+                    KB_RIGHT => {
+                        self.move_cursor(1, 0, shift_pressed);
+                        event.clear();
+                    }
+                    KB_HOME => {
+                        self.cursor.x = 0;
+                        self.selection_start = None;
+                        self.ensure_cursor_visible();
+                        event.clear();
+                    }
+                    KB_END => {
+                        let line_len = self.lines[self.cursor.y as usize].chars().count() as i16;
+                        self.cursor.x = line_len;
+                        self.selection_start = None;
+                        self.ensure_cursor_visible();
+                        event.clear();
+                    }
+                    KB_PGUP => {
+                        let height = self.get_content_area().height();
+                        self.move_cursor(0, -height, shift_pressed);
+                        event.clear();
+                    }
+                    KB_PGDN => {
+                        let height = self.get_content_area().height();
+                        self.move_cursor(0, height, shift_pressed);
+                        event.clear();
+                    }
+                    KB_ENTER => {
+                        self.insert_newline();
+                        event.clear();
+                    }
+                    KB_BACKSPACE => {
+                        if self.has_selection() {
+                            self.delete_selection();
+                        } else {
+                            self.backspace();
+                        }
+                        event.clear();
+                    }
+                    KB_DEL => {
+                        if self.has_selection() {
+                            self.delete_selection();
+                        } else {
+                            self.delete_char();
+                        }
+                        event.clear();
+                    }
+                    KB_TAB => {
+                        self.insert_tab();
+                        event.clear();
+                    }
+                    KB_CTRL_A => {
+                        self.select_all();
+                        event.clear();
+                    }
+                    KB_CTRL_C => {
+                        // Copy to clipboard
+                        if let Some(selection) = self.get_selection() {
+                            clipboard::set_clipboard(&selection);
+                        }
+                        event.clear();
+                    }
+                    KB_CTRL_X => {
+                        // Cut to clipboard
+                        if let Some(selection) = self.get_selection() {
+                            clipboard::set_clipboard(&selection);
+                            self.delete_selection();
+                        }
+                        event.clear();
+                    }
+                    KB_CTRL_V => {
+                        // Paste from clipboard
+                        let clipboard_text = clipboard::get_clipboard();
+                        if !clipboard_text.is_empty() {
+                            self.insert_text(&clipboard_text);
+                        }
+                        event.clear();
+                    }
+                    key_code => {
+                        // Regular character input
+                        if (32..127).contains(&key_code) {
+                            let ch = key_code as u8 as char;
+                            self.insert_char(ch);
+                            event.clear();
+                        }
+                    }
+                }
             }
-
-            let shift_pressed = false; // TODO: Track shift state
-
-            match event.key_code {
-                KB_UP => {
+            EventType::MouseWheelUp => {
+                let mouse_pos = event.mouse.pos;
+                let content_area = self.get_content_area();
+                // Check if mouse is within the memo content area
+                if mouse_pos.x >= content_area.a.x && mouse_pos.x < content_area.b.x &&
+                   mouse_pos.y >= content_area.a.y && mouse_pos.y < content_area.b.y {
+                    // Scroll up by moving cursor up (which automatically adjusts delta)
+                    let shift_pressed = false;
                     self.move_cursor(0, -1, shift_pressed);
                     event.clear();
                 }
-                KB_DOWN => {
+            }
+            EventType::MouseWheelDown => {
+                let mouse_pos = event.mouse.pos;
+                let content_area = self.get_content_area();
+                // Check if mouse is within the memo content area
+                if mouse_pos.x >= content_area.a.x && mouse_pos.x < content_area.b.x &&
+                   mouse_pos.y >= content_area.a.y && mouse_pos.y < content_area.b.y {
+                    // Scroll down by moving cursor down (which automatically adjusts delta)
+                    let shift_pressed = false;
                     self.move_cursor(0, 1, shift_pressed);
                     event.clear();
                 }
-                KB_LEFT => {
-                    self.move_cursor(-1, 0, shift_pressed);
-                    event.clear();
-                }
-                KB_RIGHT => {
-                    self.move_cursor(1, 0, shift_pressed);
-                    event.clear();
-                }
-                KB_HOME => {
-                    self.cursor.x = 0;
-                    self.selection_start = None;
-                    self.ensure_cursor_visible();
-                    event.clear();
-                }
-                KB_END => {
-                    let line_len = self.lines[self.cursor.y as usize].chars().count() as i16;
-                    self.cursor.x = line_len;
-                    self.selection_start = None;
-                    self.ensure_cursor_visible();
-                    event.clear();
-                }
-                KB_PGUP => {
-                    let height = self.get_content_area().height();
-                    self.move_cursor(0, -height, shift_pressed);
-                    event.clear();
-                }
-                KB_PGDN => {
-                    let height = self.get_content_area().height();
-                    self.move_cursor(0, height, shift_pressed);
-                    event.clear();
-                }
-                KB_ENTER => {
-                    self.insert_newline();
-                    event.clear();
-                }
-                KB_BACKSPACE => {
-                    if self.has_selection() {
-                        self.delete_selection();
-                    } else {
-                        self.backspace();
-                    }
-                    event.clear();
-                }
-                KB_DEL => {
-                    if self.has_selection() {
-                        self.delete_selection();
-                    } else {
-                        self.delete_char();
-                    }
-                    event.clear();
-                }
-                KB_TAB => {
-                    self.insert_tab();
-                    event.clear();
-                }
-                KB_CTRL_A => {
-                    self.select_all();
-                    event.clear();
-                }
-                KB_CTRL_C => {
-                    // Copy to clipboard
-                    if let Some(selection) = self.get_selection() {
-                        clipboard::set_clipboard(&selection);
-                    }
-                    event.clear();
-                }
-                KB_CTRL_X => {
-                    // Cut to clipboard
-                    if let Some(selection) = self.get_selection() {
-                        clipboard::set_clipboard(&selection);
-                        self.delete_selection();
-                    }
-                    event.clear();
-                }
-                KB_CTRL_V => {
-                    // Paste from clipboard
-                    let clipboard_text = clipboard::get_clipboard();
-                    if !clipboard_text.is_empty() {
-                        self.insert_text(&clipboard_text);
-                    }
-                    event.clear();
-                }
-                key_code => {
-                    // Regular character input
-                    if (32..127).contains(&key_code) {
-                        let ch = key_code as u8 as char;
-                        self.insert_char(ch);
-                        event.clear();
-                    }
-                }
             }
+            _ => {}
         }
     }
 
