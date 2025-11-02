@@ -66,7 +66,7 @@ impl Application {
 
     /// Execute a modal dialog
     /// Matches Borland: TGroup::execView() (tgroup.cc:203-239)
-    pub fn exec_dialog(&mut self, mut dialog: crate::views::dialog::Dialog) -> CommandId {
+    pub fn exec_dialog(&mut self, dialog: crate::views::dialog::Dialog) -> CommandId {
         // Add to desktop as a view
         self.desktop.add(Box::new(dialog));
 
