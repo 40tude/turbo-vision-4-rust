@@ -4,11 +4,22 @@ version = "0.1.0"
 edition = "2021"
 authors = ["enzinol@gmail.com"]
 license = "MIT"
-repository = "https://github.com/aovestdipaperino/turbo-vision"
+repository = "https://github.com/aovestdipaperino/turbo-vision-4-rust"
+homepage = "https://github.com/aovestdipaperino/turbo-vision-4-rust"
 description = "A Rust implementation of the classic Borland Turbo Vision text-mode UI framework"
 keywords = ["tui", "terminal", "ui", "turbo-vision", "text-mode"]
 categories = ["command-line-interface", "gui"]
 readme = "README.md"
+exclude = [
+    "local-only/*",
+    "docs/*",
+    ".claude/*",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    ".DS_Store",
+]
 
 [lib]
 name = "turbo_vision"

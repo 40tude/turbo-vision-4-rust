@@ -1,6 +1,8 @@
 # Turbo Vision - Rust TUI Library
 
-![Turbo Vision Logo](logo.png)
+![Turbo Vision Logo](https://raw.githubusercontent.com/aovestdipaperino/turbo-vision-4-rust/main/logo.png)
+
+## WARNING: WORK IN PROGRESS
 
 A Rust implementation of the classic Borland Turbo Vision text user interface framework.
 
@@ -93,4 +95,3 @@ Currently implements:
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-# turbo-vision-4-rust
