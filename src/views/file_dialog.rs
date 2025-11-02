@@ -55,7 +55,7 @@
 
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType};
-use crate::core::command::{CM_OK, CM_CANCEL};
+use crate::core::command::{CM_OK, CM_CANCEL, CM_FILE_FOCUSED};
 use crate::terminal::Terminal;
 use super::dialog::Dialog;
 use super::input_line::InputLine;
@@ -188,10 +188,13 @@ impl FileDialog {
                     return None;
                 }
 
-                // Track ListBox navigation events to maintain selection state
-                self.track_listbox_events(&event);
-
+                // Let the dialog (and its children) handle the event first
                 self.dialog.handle_event(&mut event);
+
+                // After event is processed, check if ListBox selection changed
+                // Matches Borland: TFileList::focusItem() broadcasts cmFileFocused when selection changes
+                // We read the ListBox selection after it has processed navigation events
+                self.sync_inputline_with_listbox();
 
                 // Check if dialog should close
                 if event.what == EventType::Command {
@@ -200,12 +203,25 @@ impl FileDialog {
                             // Get file name from input field
                             let file_name = self.file_name_data.borrow().clone();
                             if !file_name.is_empty() {
+                                // Matches Borland: TFileDialog::valid() checks wildcards and directories
+                                // (tfiledia.cc:98-124)
+
+                                // Check if input contains wildcards
+                                if self.contains_wildcards(&file_name) {
+                                    // Update wildcard filter and reload list
+                                    self.wildcard = file_name.clone();
+                                    self.read_directory();
+                                    self.rebuild_and_redraw(terminal);
+                                    // Stay open - don't return
+                                    continue;
+                                }
+
                                 // Check if it's a directory navigation request or file selection
                                 if let Some(path) = self.handle_selection(&file_name, terminal) {
                                     // File selected - return it
                                     return Some(path);
                                 }
-                                // Directory navigation - continue loop
+                                // Directory navigation - continue loop (handle_selection returns None)
                             }
                             // If input is empty, do nothing (don't close dialog)
                             // This effectively disables the OK button when input is empty
@@ -215,18 +231,22 @@ impl FileDialog {
                         }
                         CMD_FILE_SELECTED => {
                             // User double-clicked or pressed Enter on a file in the list
-                            if self.selected_file_index < self.files.len() {
-                                let selected = self.files[self.selected_file_index].clone();
+                            // Matches Borland: cmFileDoubleClicked is converted to cmOK,
+                            // which triggers valid() that reads from the input field
 
-                                // Update the input line with the selected file
-                                *self.file_name_data.borrow_mut() = selected.clone();
+                            // The input field has ALREADY been updated by the cmFileFocused broadcast
+                            // when the item was focused (see track_listbox_events)
+                            // So we just read what's already there and handle it
+                            let file_name = self.file_name_data.borrow().clone();
 
+                            if !file_name.is_empty() {
                                 // Handle the selection (navigate dirs or return file)
-                                if let Some(path) = self.handle_selection(&selected, terminal) {
+                                // Matches Borland: TFileDialog::valid() reads from input field
+                                if let Some(path) = self.handle_selection(&file_name, terminal) {
                                     // File selected - return it
                                     return Some(path);
                                 }
-                                // Directory navigation - continue loop
+                                // Directory navigation - continue loop (valid() returns False)
                             }
                         }
                         _ => {}
@@ -236,81 +256,80 @@ impl FileDialog {
         }
     }
 
-    /// Track keyboard and mouse events to maintain ListBox selection state
-    fn track_listbox_events(&mut self, event: &Event) {
-        use crate::core::event::{KB_UP, KB_DOWN, KB_HOME, KB_END, KB_PGUP, KB_PGDN};
+    /// Sync the InputLine with the current ListBox selection
+    /// Matches Borland: TFileList::focusItem() broadcasts cmFileFocused when selection changes
+    /// We read the ListBox selection after it has processed events
+    fn sync_inputline_with_listbox(&mut self) {
+        // Get the current selection from the ListBox
+        if CHILD_LISTBOX >= self.dialog.child_count() {
+            return;
+        }
 
-        match event.what {
-            EventType::Keyboard => {
-                match event.key_code {
-                    KB_UP => {
-                        if self.selected_file_index > 0 {
-                            self.selected_file_index -= 1;
-                        }
-                    }
-                    KB_DOWN => {
-                        if self.selected_file_index + 1 < self.files.len() {
-                            self.selected_file_index += 1;
-                        }
-                    }
-                    KB_HOME => {
-                        self.selected_file_index = 0;
-                    }
-                    KB_END => {
-                        if !self.files.is_empty() {
-                            self.selected_file_index = self.files.len() - 1;
-                        }
-                    }
-                    KB_PGUP => {
-                        // Page size is roughly the height of the listbox
-                        // This is an approximation
-                        let page_size = 10;
-                        self.selected_file_index = self.selected_file_index.saturating_sub(page_size);
-                    }
-                    KB_PGDN => {
-                        // Page down
-                        let page_size = 10;
-                        if !self.files.is_empty() {
-                            self.selected_file_index = (self.selected_file_index + page_size).min(self.files.len() - 1);
-                        }
-                    }
-                    _ => {}
-                }
+        let listbox = self.dialog.child_at(CHILD_LISTBOX);
+        let new_selection = listbox.get_list_selection();
+
+        // Only update if selection actually changed
+        if new_selection != self.selected_file_index {
+            self.selected_file_index = new_selection;
+
+            // Get the selected item text
+            if self.selected_file_index < self.files.len() {
+                let selected = self.files[self.selected_file_index].clone();
+
+                // Format the input field text based on selection type
+                // Matches Borland: TFileInputLine::handleEvent() (tfileinp.cc:35-45)
+                let display_text = if selected.starts_with('[') && selected.ends_with(']') {
+                    // Directory selected - show "dirname/*.txt" format
+                    let dir_name = &selected[1..selected.len() - 1];
+                    format!("{}/{}", dir_name, self.wildcard)
+                } else if selected == ".." {
+                    // Parent directory - just show ".."
+                    selected.clone()
+                } else {
+                    // Regular file - show just the filename
+                    selected.clone()
+                };
+
+                // Update the shared data field directly (Borland pattern)
+                // InputLine will observe this change via its broadcast handler
+                *self.file_name_data.borrow_mut() = display_text;
+
+                // Broadcast to notify InputLine to update its display
+                // Matches Borland: message(owner, evBroadcast, cmFileFocused, this)
+                // InputLine will only update display if NOT focused (prevents interrupting typing)
+                let mut broadcast = Event::broadcast(CM_FILE_FOCUSED);
+                self.dialog.handle_event(&mut broadcast);
             }
-            EventType::MouseDown => {
-                // The ListBox will handle the click and update its selection
-                // We need to sync our state with it
-                // Calculate if the click is within the ListBox bounds
-                let mouse_pos = event.mouse.pos;
-
-                // ListBox is at position (2, 6) relative to dialog interior
-                // and has height (bounds.height() - 6)
-                let dialog_bounds = self.dialog.bounds();
-                let listbox_y_start = dialog_bounds.a.y + 6;
-                let listbox_y_end = dialog_bounds.b.y - 6;
-                let listbox_x_start = dialog_bounds.a.x + 2;
-                let listbox_x_end = dialog_bounds.b.x - 4;
-
-                if mouse_pos.x >= listbox_x_start && mouse_pos.x < listbox_x_end &&
-                   mouse_pos.y >= listbox_y_start && mouse_pos.y < listbox_y_end {
-
-                    // Calculate which item was clicked
-                    let relative_y = (mouse_pos.y - listbox_y_start) as usize;
-                    if relative_y < self.files.len() {
-                        self.selected_file_index = relative_y;
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
     fn handle_selection(&mut self, file_name: &str, terminal: &mut Terminal) -> Option<PathBuf> {
+        // Check if input contains directory/wildcard format (e.g., "dirname/*.txt")
+        // Matches Borland: TFileDialog::valid() parsing (tfiledia.cc:98-124)
+        if let Some(slash_pos) = file_name.rfind('/') {
+            let dir_part = &file_name[..slash_pos];
+            let file_part = &file_name[slash_pos + 1..];
+
+            // Navigate to the directory
+            if !dir_part.is_empty() {
+                self.current_path.push(dir_part);
+            }
+
+            // Update wildcard if file_part contains wildcards
+            if self.contains_wildcards(file_part) {
+                self.wildcard = file_part.to_string();
+            }
+
+            // rebuild_and_redraw will call read_directory() internally
+            self.rebuild_and_redraw(terminal);
+            return None;
+        }
+
         if file_name == ".." {
             // Go to parent directory
             if let Some(parent) = self.current_path.parent() {
                 self.current_path = parent.to_path_buf();
-                self.read_directory();
+                // rebuild_and_redraw will call read_directory() internally
                 self.rebuild_and_redraw(terminal);
             }
             None
@@ -318,7 +337,7 @@ impl FileDialog {
             // Directory selected - navigate into it
             let dir_name = &file_name[1..file_name.len() - 1];
             self.current_path.push(dir_name);
-            self.read_directory();
+            // rebuild_and_redraw will call read_directory() internally
             self.rebuild_and_redraw(terminal);
             None
         } else {
@@ -350,17 +369,47 @@ impl FileDialog {
         *self = Self::new(old_bounds, old_title, &self.wildcard.clone(), Some(self.current_path.clone())).build();
 
         // Reset focus to listbox after directory navigation
-        // Clear all focus first
-        for i in 0..self.dialog.child_count() {
-            self.dialog.child_at_mut(i).set_focus(false);
-        }
-        // Set focus to listbox (child index 4)
+        // Matches Borland: fileList->select() calls owner->setCurrent(this, normalSelect)
+        // (tfiledia.cc:275,287 and tview.cc:658-664)
+        // This properly updates both the Group's focused index AND the child's focus state
         if CHILD_LISTBOX < self.dialog.child_count() {
-            self.dialog.child_at_mut(CHILD_LISTBOX).set_focus(true);
+            self.dialog.set_focus_to_child(CHILD_LISTBOX);
+            // Also ensure listbox selection is at index 0
+            self.dialog.child_at_mut(CHILD_LISTBOX).set_list_selection(0);
         }
 
         // Reset selection index
         self.selected_file_index = 0;
+
+        // CRITICAL: Broadcast initial selection after directory navigation
+        // Matches Borland: TFileList::readDirectory() broadcasts cmFileFocused after newList()
+        // (tfilelis.cc:588-595) and TFileList::setState() broadcasts on focus (tfilelis.cc:146-149)
+        if !self.files.is_empty() {
+            let first_item = self.files[0].clone();
+
+            // Format the display text for the input field
+            let display_text = if first_item.starts_with('[') && first_item.ends_with(']') {
+                // Directory selected - show "dirname/*.txt" format
+                let dir_name = &first_item[1..first_item.len() - 1];
+                format!("{}/{}", dir_name, self.wildcard)
+            } else if first_item == ".." {
+                // Parent directory - just show ".."
+                first_item.clone()
+            } else {
+                // Regular file - show just the filename
+                first_item.clone()
+            };
+
+            // Update the shared data field
+            *self.file_name_data.borrow_mut() = display_text;
+
+            // Broadcast to notify InputLine to update its display
+            let mut broadcast = Event::broadcast(CM_FILE_FOCUSED);
+            self.dialog.handle_event(&mut broadcast);
+        } else {
+            // No files - clear the input
+            *self.file_name_data.borrow_mut() = String::new();
+        }
     }
 
     fn read_directory(&mut self) {
@@ -394,6 +443,12 @@ impl FileDialog {
             self.files.extend(dirs);
             self.files.extend(regular_files);
         }
+    }
+
+    fn contains_wildcards(&self, name: &str) -> bool {
+        // Check if the name contains wildcard characters
+        // Matches Borland: IsWild() checks for '*' and '?' (tfiledia.cc:42-47)
+        name.contains('*') || name.contains('?')
     }
 
     fn matches_wildcard(&self, name: &str) -> bool {

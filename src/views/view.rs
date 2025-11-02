@@ -83,6 +83,18 @@ pub trait View {
     fn button_command(&self) -> Option<u16> {
         None
     }
+
+    /// Set the selection index for listbox views
+    /// Only implemented by ListBox, other views ignore this
+    fn set_list_selection(&mut self, _index: usize) {
+        // Default: do nothing (not a listbox)
+    }
+
+    /// Get the selection index for listbox views
+    /// Only implemented by ListBox, other views return 0
+    fn get_list_selection(&self) -> usize {
+        0
+    }
 }
 
 /// Helper to draw a line to the terminal

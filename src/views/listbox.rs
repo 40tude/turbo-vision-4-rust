@@ -303,6 +303,14 @@ impl View for ListBox {
     fn set_focus(&mut self, focused: bool) {
         self.focused = focused;
     }
+
+    fn set_list_selection(&mut self, index: usize) {
+        self.set_selection(index);
+    }
+
+    fn get_list_selection(&self) -> usize {
+        self.selected.unwrap_or(0)
+    }
 }
 
 #[cfg(test)]

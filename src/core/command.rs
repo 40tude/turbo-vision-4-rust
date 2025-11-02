@@ -16,6 +16,8 @@ pub const CM_RECEIVED_FOCUS: CommandId = 50;       // Borland: cmReceivedFocus
 pub const CM_RELEASED_FOCUS: CommandId = 51;       // Borland: cmReleasedFocus
 pub const CM_GRAB_DEFAULT: CommandId = 62;         // Borland: cmGrabDefault
 pub const CM_RELEASE_DEFAULT: CommandId = 63;      // Borland: cmReleaseDefault
+pub const CM_FILE_FOCUSED: CommandId = 64;         // Borland: cmFileFocused - file dialog selection changed
+pub const CM_FILE_DOUBLE_CLICKED: CommandId = 65;  // Borland: cmFileDoubleClicked - file double-clicked in list
 
 // Custom commands (user defined)
 pub const CM_ABOUT: CommandId = 100;

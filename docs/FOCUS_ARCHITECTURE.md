@@ -179,6 +179,39 @@ fn handle_event(&mut self, event: &mut Event) {
 - **Dialog** (`src/views/dialog.rs`) - Modal dialog with focus management
 - **View trait** (`src/views/view.rs`) - Defines `can_focus()` and `set_focus()`
 
+## Programmatic Focus Control
+
+### Setting Focus to Specific Child
+
+When a dialog needs to set focus to a specific child (e.g., after refreshing contents), use the `set_focus_to_child()` method:
+
+```rust
+// FileDialog after directory navigation
+self.dialog.set_focus_to_child(CHILD_LISTBOX);
+```
+
+This method properly:
+1. Clears focus from all children
+2. Updates the Group's internal `focused` index
+3. Calls `set_focus(true)` on the target child
+
+**⚠️ IMPORTANT:** Do NOT manually call `set_focus()` on individual children without updating the Group's `focused` index:
+
+```rust
+// ❌ BAD: Only sets visual focus, Group still thinks another child is focused
+self.dialog.child_at_mut(index).set_focus(true);
+
+// ✅ GOOD: Updates both Group state and child focus
+self.dialog.set_focus_to_child(index);
+```
+
+**Symptoms of improper focus management:**
+- Control appears focused (correct colors) but doesn't respond to keyboard
+- Need to press Tab before keyboard events work
+- Events go to wrong control
+
+This matches Borland's `fileList->select()` pattern which calls `owner->setCurrent(this, normalSelect)` to properly establish focus chain.
+
 ## Future Enhancements
 
 Possible improvements to the focus system:
@@ -186,5 +219,4 @@ Possible improvements to the focus system:
 1. **Shift+Tab** for reverse focus navigation
 2. **Focus indicators** - visual highlighting of focused control
 3. **Focus groups** - nested focus management within complex controls
-4. **Programmatic focus control** - `dialog.set_focus_to(control_id)`
-5. **Focus events** - callbacks when focus changes
+4. **Focus events** - callbacks when focus changes

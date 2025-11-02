@@ -377,7 +377,7 @@ The focus should be on UI components and user-facing features that provide value
 
 ## Recent Updates
 
-### FileDialog Implementation (2025-11-01)
+### FileDialog Implementation (2025-11-01 - Updated 2025-11-02)
 A fully functional FileDialog has been implemented with the following features:
 - Directory listing with wildcard filtering (*.ext patterns)
 - **Mouse support**: Click to select files, double-click to open
@@ -386,24 +386,33 @@ A fully functional FileDialog has been implemented with the following features:
 - Visual file browser with ListBox
 - Input field auto-populates when files are selected
 - Open/Cancel buttons
+- **Focus restoration after directory navigation** (Fixed 2025-11-02)
 
-**Implementation Approach:**
-- FileDialog intercepts events to track ListBox selection state
-- Maintains shadow selection index synchronized with ListBox
-- Updates InputLine when files are clicked or navigated with keyboard
+**Implementation Approach (Updated 2025-11-02):**
+- FileDialog allows ListBox to handle its own navigation events
+- After ListBox processes events, FileDialog reads the selection and updates InputLine
+- Eliminates double-processing of events for accurate navigation
+- Uses proper `set_focus_to_child()` to maintain focus after directory refresh
 
 **Architectural Improvements:**
 - Added `child_at_mut()` methods to Group, Window, and Dialog classes
-- Allows accessing and modifying child views after adding them to containers
-- Removes previous limitation where child views couldn't be accessed
-- Enables more sophisticated parent-child view interactions
+- Added `set_focus_to_child()` method to Dialog/Window/Group hierarchy
+- Added `get_list_selection()` to View trait for reading ListBox state
+- Proper focus chain management matching Borland's `owner->setCurrent()` pattern
+
+**Major Bug Fixes (2025-11-02):**
+1. **Double Event Processing** - Events were processed twice causing navigation to skip items
+2. **InputLine Not Updating** - Initial selection after directory change wasn't broadcast
+3. **Focus "Limbo" State** - ListBox appeared focused but didn't respond to keyboard
+   - Root cause: Manual `set_focus()` didn't update Group's internal `focused` index
+   - Solution: Use `set_focus_to_child()` to update both visual and logical focus
 
 **Known Limitations:**
 - No file info pane (size, date, attributes)
 - No directory tree view
 - Basic wildcard matching only (*.ext patterns)
 
-See `src/views/file_dialog.rs` for detailed documentation.
+See `src/views/file_dialog.rs` for detailed documentation and Borland Turbo Vision reference comments.
 
 ### Focus Management & Keyboard Navigation (2025-11-01)
 Enhanced focus management system to match original Turbo Vision behavior:

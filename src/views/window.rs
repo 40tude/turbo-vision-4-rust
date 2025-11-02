@@ -39,6 +39,15 @@ impl Window {
         self.interior.set_initial_focus();
     }
 
+    /// Set focus to a specific child by index
+    /// Matches Borland: owner->setCurrent(this, normalSelect)
+    pub fn set_focus_to_child(&mut self, index: usize) {
+        // Clear focus from all children first
+        self.interior.clear_all_focus();
+        // Set focus to the specified child (updates both focused index and focus state)
+        self.interior.set_focus_to(index);
+    }
+
     /// Get the number of child views in the interior
     pub fn child_count(&self) -> usize {
         self.interior.len()

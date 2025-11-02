@@ -179,6 +179,28 @@ impl View for InputLine {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
+        // Handle broadcasts even when not focused
+        if event.what == EventType::Broadcast {
+            use crate::core::command::CM_FILE_FOCUSED;
+
+            // Handle cmFileFocused broadcast from FileDialog
+            // Matches Borland: TFileInputLine::handleEvent() (tfileinp.cc:35-45)
+            if event.command == CM_FILE_FOCUSED {
+                // Only update display if user isn't currently typing
+                // Matches Borland: if( !(state & sfSelected) )
+                if !self.focused {
+                    // The data has already been updated by FileDialog
+                    // Just need to update our cursor position and clear selection
+                    self.cursor_pos = self.data.borrow().len();
+                    self.sel_start = 0;
+                    self.sel_end = 0;
+                    self.first_pos = 0;
+                    // Note: Event is NOT cleared - other views may need it
+                }
+            }
+            return;
+        }
+
         if !self.focused {
             return;
         }

@@ -27,6 +27,12 @@ impl Dialog {
         self.window.set_initial_focus();
     }
 
+    /// Set focus to a specific child by index
+    /// Matches Borland: owner->setCurrent(this, normalSelect)
+    pub fn set_focus_to_child(&mut self, index: usize) {
+        self.window.set_focus_to_child(index);
+    }
+
     /// Get the number of child views
     pub fn child_count(&self) -> usize {
         self.window.child_count()
