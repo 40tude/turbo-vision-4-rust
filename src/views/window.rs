@@ -14,6 +14,9 @@ pub struct Window {
     state: StateFlags,
     /// Drag start position (relative to mouse when drag started)
     drag_offset: Option<Point>,
+    /// Previous bounds (for calculating union rect for redrawing)
+    /// Matches Borland: TView::locate() calculates union of old and new bounds
+    prev_bounds: Option<Rect>,
 }
 
 impl Window {
@@ -31,6 +34,7 @@ impl Window {
             interior,
             state: SF_SHADOW, // Windows have shadows by default
             drag_offset: None,
+            prev_bounds: None,
         }
     }
 
@@ -64,6 +68,28 @@ impl Window {
     /// Get a mutable reference to a child view by index
     pub fn child_at_mut(&mut self, index: usize) -> &mut dyn View {
         self.interior.child_at_mut(index)
+    }
+
+    /// Get the union rect of current and previous bounds (for redrawing)
+    /// Matches Borland: TView::locate() calculates union rect
+    /// Returns None if window hasn't moved yet
+    pub fn get_redraw_union(&self) -> Option<Rect> {
+        self.prev_bounds.map(|prev| {
+            // Union of old and new bounds, including shadows
+            let mut union = prev.union(&self.bounds);
+
+            // Expand by 1 on right and bottom for shadow
+            // Matches Borland: TView::shadowSize
+            union.b.x += 1;
+            union.b.y += 1;
+
+            union
+        })
+    }
+
+    /// Clear the movement tracking (call after redraw)
+    pub fn clear_move_tracking(&mut self) {
+        self.prev_bounds = None;
     }
 }
 
@@ -125,6 +151,9 @@ impl View for Window {
                 // Calculate new position
                 let new_x = mouse_pos.x - offset.x;
                 let new_y = mouse_pos.y - offset.y;
+
+                // Save previous bounds for union rect calculation (Borland's locate pattern)
+                self.prev_bounds = Some(self.bounds);
 
                 // Update bounds (maintaining size)
                 let width = self.bounds.width();

@@ -49,7 +49,14 @@ impl Dialog {
     }
 
     pub fn execute(&mut self, terminal: &mut Terminal) -> CommandId {
+        use crate::core::state::SF_MODAL;
+
         self.result = CM_CANCEL;
+
+        // Set modal flag - dialogs with their own event loop are modal
+        // Matches Borland: TDialog::execute() is modal (tdialog.cc)
+        let old_state = self.state();
+        self.set_state(old_state | SF_MODAL);
 
         loop {
             // Set dialog as the active view for F11 dumps
@@ -82,6 +89,9 @@ impl Dialog {
                 }
             }
         }
+
+        // Restore previous state (clear modal flag)
+        self.set_state(old_state);
 
         self.result
     }
@@ -135,6 +145,14 @@ impl View for Dialog {
             }
             _ => {}
         }
+    }
+
+    fn state(&self) -> crate::core::state::StateFlags {
+        self.window.state()
+    }
+
+    fn set_state(&mut self, state: crate::core::state::StateFlags) {
+        self.window.set_state(state);
     }
 }
 

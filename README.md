@@ -9,10 +9,14 @@ A Rust implementation of the classic Borland Turbo Vision text user interface fr
 ## Features
 
 - **Complete UI Component Set**: Windows, dialogs, buttons, input fields, menus, status bars, scrollbars
+- **Z-Order Management**: Click any non-modal window to bring it to the front
+- **Modal Dialog Support**: Modal dialogs block interaction with background windows
+- **Borland-Accurate Styling**: Menu borders and shadows match original Borland Turbo Vision
 - **Scrollable Views**: Built-in scrollbar support with keyboard navigation
 - **Text Viewer**: Ready-to-use scrollable text viewer with line numbers
 - **Event-Driven Architecture**: Keyboard and command-based event routing
 - **Mouse Support**: Full mouse support for buttons, menus, status bar, and dialog close buttons
+- **Window Dragging**: Drag windows in all directions with proper redrawing
 - **Flexible Layout System**: Geometry primitives with absolute and relative positioning
 - **Color Support**: 16-color palette with attribute system
 - **Cross-Platform**: Built on crossterm for wide terminal compatibility

@@ -185,7 +185,7 @@ impl View for MenuBar {
 
         write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
 
-        // Draw dropdown if active
+        // Draw dropdown if active (with single-line border and shadow)
         if let Some(idx) = self.active_menu {
             if idx < self.menus.len() {
                 let menu = &self.menus[idx];
@@ -196,13 +196,41 @@ impl View for MenuBar {
                 };
                 let menu_y = self.bounds.a.y + 1;
 
+                // Calculate dropdown width (find longest item)
+                let mut max_width = 12; // Minimum width
+                for item in &menu.items {
+                    if let MenuItem::Regular { text, .. } = item {
+                        let text_len = text.replace('~', "").len();
+                        if text_len + 2 > max_width {
+                            max_width = text_len + 2; // +2 for padding
+                        }
+                    }
+                }
+
+                let dropdown_height = menu.items.len() as i16;
+                let dropdown_width = max_width;
+
+                // Draw top border with single-line box drawing
+                let mut top_buf = DrawBuffer::new(dropdown_width);
+                top_buf.put_char(0, '┌', colors::MENU_NORMAL); // Single top-left corner
+                for i in 1..dropdown_width - 1 {
+                    top_buf.put_char(i, '─', colors::MENU_NORMAL); // Single horizontal line
+                }
+                top_buf.put_char(dropdown_width - 1, '┐', colors::MENU_NORMAL); // Single top-right corner
+                write_line_to_terminal(terminal, menu_x, menu_y, &top_buf);
+
+                // Draw menu items with left and right borders
                 for (i, item) in menu.items.iter().enumerate() {
-                    let mut item_buf = DrawBuffer::new(30);
+                    let mut item_buf = DrawBuffer::new(dropdown_width);
 
                     match item {
                         MenuItem::Separator => {
-                            // Draw separator line
-                            item_buf.move_char(0, '─', colors::MENU_NORMAL, 30);
+                            // Draw separator line with proper box drawing characters
+                            item_buf.put_char(0, '├', colors::MENU_NORMAL); // Left junction
+                            for j in 1..dropdown_width - 1 {
+                                item_buf.put_char(j, '─', colors::MENU_NORMAL);
+                            }
+                            item_buf.put_char(dropdown_width - 1, '┤', colors::MENU_NORMAL); // Right junction
                         }
                         MenuItem::Regular { text, enabled, .. } => {
                             let attr = if i == self.selected_item && *enabled {
@@ -213,13 +241,22 @@ impl View for MenuBar {
                                 colors::MENU_NORMAL
                             };
 
-                            item_buf.move_char(0, ' ', attr, 30);
+                            // Left border
+                            item_buf.put_char(0, '│', colors::MENU_NORMAL);
 
-                            // Parse ~X~ for highlighting in menu items - everything between tildes is red
+                            // Fill with spaces
+                            for j in 1..dropdown_width - 1 {
+                                item_buf.put_char(j, ' ', attr);
+                            }
+
+                            // Parse ~X~ for highlighting in menu items
                             let mut x = 1;
                             let mut chars = text.chars();
                             #[allow(clippy::while_let_on_iterator)]
                             while let Some(ch) = chars.next() {
+                                if x >= dropdown_width - 1 {
+                                    break; // Don't overflow
+                                }
                                 if ch == '~' {
                                     // Read all characters until closing ~ in shortcut color
                                     let shortcut_attr = if i == self.selected_item && *enabled {
@@ -234,19 +271,46 @@ impl View for MenuBar {
                                         if shortcut_ch == '~' {
                                             break;  // Found closing tilde
                                         }
-                                        item_buf.put_char(x, shortcut_ch, shortcut_attr);
-                                        x += 1;
+                                        if x < dropdown_width - 1 {
+                                            item_buf.put_char(x, shortcut_ch, shortcut_attr);
+                                            x += 1;
+                                        }
                                     }
                                 } else {
                                     item_buf.put_char(x, ch, attr);
                                     x += 1;
                                 }
                             }
+
+                            // Right border
+                            item_buf.put_char(dropdown_width - 1, '│', colors::MENU_NORMAL);
                         }
                     }
 
-                    write_line_to_terminal(terminal, menu_x, menu_y + i as i16, &item_buf);
+                    write_line_to_terminal(terminal, menu_x, menu_y + 1 + i as i16, &item_buf);
                 }
+
+                // Draw bottom border
+                let mut bottom_buf = DrawBuffer::new(dropdown_width);
+                bottom_buf.put_char(0, '└', colors::MENU_NORMAL); // Single bottom-left corner
+                for i in 1..dropdown_width - 1 {
+                    bottom_buf.put_char(i, '─', colors::MENU_NORMAL);
+                }
+                bottom_buf.put_char(dropdown_width - 1, '┘', colors::MENU_NORMAL); // Single bottom-right corner
+                write_line_to_terminal(terminal, menu_x, menu_y + 1 + dropdown_height, &bottom_buf);
+
+                // Draw shadow (one cell to the right and bottom)
+                // Matches Borland: shadow is drawn at +1,+1 offset with dark gray
+                use crate::core::state::SHADOW_ATTR;
+                use super::view::draw_shadow;
+
+                let shadow_bounds = crate::core::geometry::Rect::new(
+                    menu_x,
+                    menu_y,
+                    menu_x + dropdown_width as i16,
+                    menu_y + dropdown_height + 2, // +2 for top and bottom borders
+                );
+                draw_shadow(terminal, shadow_bounds, SHADOW_ATTR);
             }
         }
     }
@@ -294,10 +358,23 @@ impl View for MenuBar {
                         let menu_y = self.bounds.a.y + 1;
                         let menu = &self.menus[menu_idx];
 
-                        // Check if click is within dropdown bounds
-                        if mouse_pos.x >= menu_x && mouse_pos.x < menu_x + 30
-                            && mouse_pos.y >= menu_y && mouse_pos.y < menu_y + menu.items.len() as i16 {
-                            let item_idx = (mouse_pos.y - menu_y) as usize;
+                        // Calculate dropdown width (same logic as in draw)
+                        let mut max_width = 12;
+                        for item in &menu.items {
+                            if let MenuItem::Regular { text, .. } = item {
+                                let text_len = text.replace('~', "").len();
+                                if text_len + 2 > max_width {
+                                    max_width = text_len + 2;
+                                }
+                            }
+                        }
+                        let dropdown_width = max_width as i16;
+
+                        // Check if click is within dropdown bounds (including borders)
+                        // Items start at menu_y + 1 (after top border)
+                        if mouse_pos.x >= menu_x && mouse_pos.x < menu_x + dropdown_width
+                            && mouse_pos.y > menu_y && mouse_pos.y <= menu_y + menu.items.len() as i16 {
+                            let item_idx = (mouse_pos.y - menu_y - 1) as usize;
 
                             if item_idx < menu.items.len() {
                                 let item = &menu.items[item_idx];
@@ -331,10 +408,23 @@ impl View for MenuBar {
                     let menu_y = self.bounds.a.y + 1;
                     let menu = &self.menus[menu_idx];
 
+                    // Calculate dropdown width (same logic as in draw)
+                    let mut max_width = 12;
+                    for item in &menu.items {
+                        if let MenuItem::Regular { text, .. } = item {
+                            let text_len = text.replace('~', "").len();
+                            if text_len + 2 > max_width {
+                                max_width = text_len + 2;
+                            }
+                        }
+                    }
+                    let dropdown_width = max_width as i16;
+
                     // Check if mouse is hovering over a menu item
-                    if mouse_pos.x >= menu_x && mouse_pos.x < menu_x + 30
-                        && mouse_pos.y >= menu_y && mouse_pos.y < menu_y + menu.items.len() as i16 {
-                        let item_idx = (mouse_pos.y - menu_y) as usize;
+                    // Items start at menu_y + 1 (after top border)
+                    if mouse_pos.x >= menu_x && mouse_pos.x < menu_x + dropdown_width
+                        && mouse_pos.y > menu_y && mouse_pos.y <= menu_y + menu.items.len() as i16 {
+                        let item_idx = (mouse_pos.y - menu_y - 1) as usize;
 
                         if item_idx < menu.items.len() && item_idx != self.selected_item {
                             // Update selection based on hover

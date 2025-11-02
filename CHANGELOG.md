@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-11-02
+
+### Added
+- **Z-Order Management**: Non-modal windows can now be brought to the front by clicking on them, matching Borland Turbo Vision's `TGroup::selectView()` behavior.
+- **Modal Window Support**: Modal dialogs (like `Dialog::execute()`) now properly block interaction with background windows. When a modal dialog is present, clicking background windows has no effect.
+- **Menu Borders and Shadows**: Dropdown menus now display with single-line borders and shadows, matching Borland's TMenuBox styling:
+  - Single-line box drawing characters (`┌─┐`, `│`, `└─┘`, `├─┤`)
+  - 2x1 shadow (2 cells wide on right, 1 cell tall on bottom)
+  - Verified against original Borland Turbo Vision source code
+- **Window Overlap Test**: New `window_modal_overlap_test` example demonstrating z-order management with three overlapping non-modal windows.
+
+### Fixed
+- **Mouse Event Z-Order**: Fixed mouse event handling to search in reverse z-order (top-most view first), preventing background views from capturing events intended for foreground windows.
+- **Upward Dragging**: Fixed issue where windows could not be dragged upward. Windows can now be dragged in all directions by sending mouse events to dragging windows even when the mouse moves outside their bounds.
+
+### Changed
+- **Group::bring_to_front()**: Added method to reorder children in z-order, automatically updating focused index.
+- **Desktop Event Handling**: Desktop now manages z-order changes on mouse clicks and enforces modal blocking when modal windows are present.
+- **Dialog Modal Flag**: `Dialog::execute()` now automatically sets and clears the `SF_MODAL` flag, making all executed dialogs modal by default.
+
+### Technical Details
+This release implements Borland Turbo Vision's window management architecture:
+- **Z-Order**: Children vector index represents z-order (higher index = on top)
+- **Modal Scope**: Top-most window with `SF_MODAL` flag captures all events
+- **Border Drawing**: Uses Borland's `frameChars` pattern for consistent styling
+- **Shadow Rendering**: Matches Borland's `shadowSize = {2, 1}` and rendering algorithm
+
 ## [0.1.1] - 2025-11-02
 
 ### Fixed
@@ -71,5 +98,6 @@ The fix addresses a fundamental architectural issue where modal dialogs had thei
 ### Known Limitations
 - Full text editor with search/replace not yet implemented (basic editing available in Memo)
 
+[0.1.2]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aovestdipaperino/turbo-vision-4-rust/releases/tag/v0.1.0

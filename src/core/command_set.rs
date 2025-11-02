@@ -339,9 +339,13 @@ mod tests {
     }
 
     #[test]
-    fn test_high_commands_always_enabled() {
+    fn test_commands_default_disabled() {
+        // New command set has all commands disabled by default
         let cs = CommandSet::new();
-        assert!(cs.has(65536));
-        assert!(cs.has(70000));
+        assert!(!cs.has(0));
+        assert!(!cs.has(100));
+        assert!(!cs.has(1000));
+        assert!(!cs.has(60000));
+        assert!(!cs.has(65535)); // Maximum u16 value
     }
 }

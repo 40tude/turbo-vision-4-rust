@@ -90,6 +90,52 @@ impl Group {
         }
     }
 
+    /// Bring a child view to the front (top of z-order)
+    /// Matches Borland: TGroup::selectView() which reorders views
+    /// Returns the new index of the moved child
+    pub fn bring_to_front(&mut self, index: usize) -> usize {
+        if index >= self.children.len() || index == self.children.len() - 1 {
+            // Already at front or invalid index
+            return index;
+        }
+
+        // Remove the view from its current position
+        let view = self.children.remove(index);
+
+        // Add it to the end (front of z-order)
+        self.children.push(view);
+
+        // Update focused index if necessary
+        let new_index = self.children.len() - 1;
+        if self.focused == index {
+            self.focused = new_index;
+        } else if self.focused > index {
+            // Focused view shifted down by one
+            self.focused -= 1;
+        }
+
+        new_index
+    }
+
+    /// Draw views starting from a specific index
+    /// Used for Borland's drawUnderRect pattern where we only redraw views
+    /// that come after (on top of) a moved view
+    /// Matches Borland: TGroup::drawSubViews(TView *p, TView *bottom)
+    pub fn draw_sub_views(&mut self, terminal: &mut Terminal, start_index: usize, clip: Rect) {
+        // Set clip region to the affected area
+        terminal.push_clip(clip);
+
+        // Draw all children from start_index onwards that intersect the clip region
+        for i in start_index..self.children.len() {
+            let child_bounds = self.children[i].bounds();
+            if clip.intersects(&child_bounds) {
+                self.children[i].draw(terminal);
+            }
+        }
+
+        terminal.pop_clip();
+    }
+
     /// Get a reference to the currently focused child view, if any
     pub fn focused_child(&self) -> Option<&dyn View> {
         if self.focused < self.children.len() {
@@ -229,13 +275,26 @@ impl View for Group {
         }
 
         // Mouse events: send to the child under the mouse
+        // Search in REVERSE order (top-most child first) - matches Borland's z-order
+        // Matches Borland: TGroup::handleEvent() processes mouse events from front to back
         if event.what == EventType::MouseDown || event.what == EventType::MouseMove || event.what == EventType::MouseUp {
             let mouse_pos = event.mouse.pos;
 
-            // First pass: find which child contains the mouse and needs focus
+            // For MouseMove and MouseUp, check if the focused child is dragging
+            // If so, send the event to it even if mouse is outside its bounds
+            // This allows dragging beyond window boundaries (matches Borland behavior)
+            if (event.what == EventType::MouseMove || event.what == EventType::MouseUp) && self.focused < self.children.len() {
+                // Check if focused child is in dragging state (has SF_DRAGGING flag)
+                if (self.children[self.focused].state() & crate::core::state::SF_DRAGGING) != 0 {
+                    self.children[self.focused].handle_event(event);
+                    return;
+                }
+            }
+
+            // First pass: find which child contains the mouse (search in reverse z-order)
             let mut clicked_child_index: Option<usize> = None;
-            for (i, child) in self.children.iter().enumerate() {
-                let child_bounds = child.bounds();
+            for i in (0..self.children.len()).rev() {
+                let child_bounds = self.children[i].bounds();
                 if child_bounds.contains(mouse_pos) {
                     clicked_child_index = Some(i);
                     break;

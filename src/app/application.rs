@@ -94,6 +94,11 @@ impl Application {
             // Matches Borland: TProgram::idle() called during event loop
             self.idle();
 
+            // Check for moved windows and redraw affected areas (Borland's drawUnderRect pattern)
+            // Matches Borland: TView::locate() checks for movement and calls drawUnderRect
+            // This must happen BEFORE the full draw to avoid double-drawing
+            self.desktop.handle_moved_windows(&mut self.terminal);
+
             // Update active view bounds for F11 dumps
             self.update_active_view_bounds();
 

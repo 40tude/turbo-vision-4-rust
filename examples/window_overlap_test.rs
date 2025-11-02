@@ -17,7 +17,7 @@
 
 use turbo_vision::app::Application;
 use turbo_vision::core::geometry::Rect;
-use turbo_vision::views::{View, window::Window, static_text::StaticText};
+use turbo_vision::views::{window::Window, static_text::StaticText};
 
 fn main() -> std::io::Result<()> {
     let mut app = Application::new()?;

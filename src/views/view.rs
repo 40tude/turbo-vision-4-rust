@@ -95,6 +95,20 @@ pub trait View {
     fn get_list_selection(&self) -> usize {
         0
     }
+
+    /// Get the union rect of previous and current bounds for redrawing
+    /// Matches Borland: TView::locate() calculates union of old and new bounds
+    /// Returns None if the view hasn't moved since last redraw
+    /// Used by Desktop to implement Borland's drawUnderRect pattern
+    fn get_redraw_union(&self) -> Option<Rect> {
+        None // Default: no movement tracking
+    }
+
+    /// Clear movement tracking after redrawing
+    /// Matches Borland: Called after drawUnderRect completes
+    fn clear_move_tracking(&mut self) {
+        // Default: do nothing (no movement tracking)
+    }
 }
 
 /// Helper to draw a line to the terminal

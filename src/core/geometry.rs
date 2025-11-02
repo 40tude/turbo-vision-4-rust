@@ -96,6 +96,16 @@ impl Rect {
         !(self.b.x <= other.a.x || self.a.x >= other.b.x ||
           self.b.y <= other.a.y || self.a.y >= other.b.y)
     }
+
+    /// Calculate the union of this rectangle with another
+    /// Returns the smallest rectangle that contains both rectangles
+    /// Matches Borland: Used in TView::locate() to calculate redraw region
+    pub fn union(&self, other: &Rect) -> Rect {
+        Rect {
+            a: Point::new(self.a.x.min(other.a.x), self.a.y.min(other.a.y)),
+            b: Point::new(self.b.x.max(other.b.x), self.b.y.max(other.b.y)),
+        }
+    }
 }
 
 impl Default for Rect {
