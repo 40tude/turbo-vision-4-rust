@@ -1,0 +1,77 @@
+use crate::core::geometry::Rect;
+use crate::core::event::Event;
+use crate::core::draw::DrawBuffer;
+use crate::core::state::{StateFlags, SF_SHADOW, SHADOW_SIZE};
+use crate::terminal::Terminal;
+
+/// View trait - all UI components implement this
+pub trait View {
+    fn bounds(&self) -> Rect;
+    fn set_bounds(&mut self, bounds: Rect);
+    fn draw(&mut self, terminal: &mut Terminal);
+    fn handle_event(&mut self, event: &mut Event);
+    fn can_focus(&self) -> bool { false }
+    fn set_focus(&mut self, _focused: bool) {}
+
+    /// Get view state flags
+    fn state(&self) -> StateFlags { 0 }
+
+    /// Set view state flags
+    fn set_state(&mut self, _state: StateFlags) {}
+
+    /// Check if view has shadow enabled
+    fn has_shadow(&self) -> bool {
+        (self.state() & SF_SHADOW) != 0
+    }
+
+    /// Get bounds including shadow area
+    fn shadow_bounds(&self) -> Rect {
+        let mut bounds = self.bounds();
+        if self.has_shadow() {
+            bounds.b.x += SHADOW_SIZE.0;
+            bounds.b.y += SHADOW_SIZE.1;
+        }
+        bounds
+    }
+
+    /// Update cursor state (called after draw)
+    /// Views that need to show a cursor when focused should override this
+    fn update_cursor(&self, _terminal: &mut Terminal) {
+        // Default: do nothing (cursor stays hidden)
+    }
+}
+
+/// Helper to draw a line to the terminal
+pub fn write_line_to_terminal(terminal: &mut Terminal, x: i16, y: i16, buf: &DrawBuffer) {
+    if y < 0 || y >= terminal.size().1 as i16 {
+        return;
+    }
+    terminal.write_line(x.max(0) as u16, y as u16, &buf.data);
+}
+
+/// Draw shadow for a view
+/// Draws a shadow offset by (1, 1) from the view bounds
+/// Shadow is the same size as the view, but only the right and bottom edges are visible
+pub fn draw_shadow(terminal: &mut Terminal, bounds: Rect, shadow_attr: u8) {
+    use crate::core::state::SHADOW_SIZE;
+    use crate::core::palette::Attr;
+
+    let attr = Attr::from_u8(shadow_attr);
+    let mut buf = DrawBuffer::new(SHADOW_SIZE.0 as usize);
+
+    // Draw right edge shadow (2 columns wide, offset by 1 vertically)
+    // Starts at y+1 and extends to y+height+1
+    for y in (bounds.a.y + 1)..(bounds.b.y + 1) {
+        buf.move_char(0, ' ', attr, SHADOW_SIZE.0 as usize);
+        write_line_to_terminal(terminal, bounds.b.x, y, &buf);
+    }
+
+    // Draw bottom edge shadow (offset by 1 horizontally, includes right shadow area)
+    // Starts at x+1 and extends to match the right shadow end point
+    // Width = view_width + (SHADOW_SIZE.0 - 1) because we offset by 1
+    let bottom_width = (bounds.b.x - bounds.a.x + SHADOW_SIZE.0 - 1) as usize;
+    let mut bottom_buf = DrawBuffer::new(bottom_width);
+    bottom_buf.move_char(0, ' ', attr, bottom_width);
+    write_line_to_terminal(terminal, bounds.a.x + 1, bounds.b.y, &bottom_buf);
+}
+

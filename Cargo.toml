@@ -1,0 +1,19 @@
+[package]
+name = "turbo-vision"
+version = "0.1.0"
+edition = "2021"
+authors = ["enzinol@gmail.com"]
+license = "MIT"
+repository = "https://github.com/aovestdipaperino/turbo-vision"
+description = "A Rust implementation of the classic Borland Turbo Vision text-mode UI framework"
+keywords = ["tui", "terminal", "ui", "turbo-vision", "text-mode"]
+categories = ["command-line-interface", "gui"]
+readme = "README.md"
+
+[lib]
+name = "turbo_vision"
+path = "src/lib.rs"
+
+[dependencies]
+crossterm = "0.27"
+unicode-width = "0.1"

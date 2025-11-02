@@ -1,0 +1,64 @@
+use crate::core::geometry::{Point, Rect};
+use crate::core::event::Event;
+use crate::core::draw::DrawBuffer;
+use crate::core::palette::colors;
+use crate::terminal::Terminal;
+use super::view::{View, write_line_to_terminal};
+
+/// Indicator displays the current line and column position,
+/// typically shown in the top-right corner of an editor window.
+pub struct Indicator {
+    bounds: Rect,
+    location: Point,  // Line and column (1-based)
+    modified: bool,   // Has the document been modified?
+}
+
+impl Indicator {
+    pub fn new(bounds: Rect) -> Self {
+        Self {
+            bounds,
+            location: Point::new(1, 1),
+            modified: false,
+        }
+    }
+
+    pub fn set_value(&mut self, location: Point, modified: bool) {
+        self.location = location;
+        self.modified = modified;
+    }
+}
+
+impl View for Indicator {
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
+
+    fn set_bounds(&mut self, bounds: Rect) {
+        self.bounds = bounds;
+    }
+
+    fn draw(&mut self, terminal: &mut Terminal) {
+        let width = self.bounds.width() as usize;
+        let mut buf = DrawBuffer::new(width);
+
+        // Format: " 12:34 " or " 12:34 * " (with modified star)
+        let text = if self.modified {
+            format!(" {}:{} * ", self.location.y, self.location.x)
+        } else {
+            format!(" {}:{} ", self.location.y, self.location.x)
+        };
+
+        // Right-align the indicator
+        let text_len = text.len().min(width);
+        let start_pos = width.saturating_sub(text_len);
+
+        buf.move_char(0, ' ', colors::DIALOG_FRAME, width);
+        buf.move_str(start_pos, &text, colors::DIALOG_FRAME);
+
+        write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
+    }
+
+    fn handle_event(&mut self, _event: &mut Event) {
+        // Indicator doesn't handle events
+    }
+}

@@ -1,0 +1,96 @@
+# Turbo Vision - Rust TUI Library
+
+![Turbo Vision Logo](logo.png)
+
+A Rust implementation of the classic Borland Turbo Vision text user interface framework.
+
+## Features
+
+- **Complete UI Component Set**: Windows, dialogs, buttons, input fields, menus, status bars, scrollbars
+- **Scrollable Views**: Built-in scrollbar support with keyboard navigation
+- **Text Viewer**: Ready-to-use scrollable text viewer with line numbers
+- **Event-Driven Architecture**: Keyboard and command-based event routing
+- **Mouse Support**: Full mouse support for buttons, menus, status bar, and dialog close buttons
+- **Flexible Layout System**: Geometry primitives with absolute and relative positioning
+- **Color Support**: 16-color palette with attribute system
+- **Cross-Platform**: Built on crossterm for wide terminal compatibility
+- **Modal Dialogs**: Built-in support for modal dialog execution
+- **Focus Management**: Tab navigation and keyboard shortcuts
+
+## Quick Start
+
+```rust
+use turbo_vision::prelude::*;
+use turbo_vision::app::Application;
+use turbo_vision::views::{
+    dialog::Dialog,
+    button::Button,
+    static_text::StaticText,
+};
+
+fn main() -> std::io::Result<()> {
+    let mut app = Application::new()?;
+
+    // Create a simple dialog
+    let mut dialog = Dialog::new(
+        Rect::new(20, 8, 60, 16),
+        "Hello World"
+    );
+
+    let text = StaticText::new(
+        Rect::new(22, 10, 58, 12),
+        "Welcome to Turbo Vision!"
+    );
+    dialog.add(Box::new(text));
+
+    let button = Button::new(
+        Rect::new(35, 13, 45, 15),
+        "  OK  ",
+        CM_OK,
+        true
+    );
+    dialog.add(Box::new(button));
+
+    dialog.execute(&mut app.terminal);
+    Ok(())
+}
+```
+
+## Module Overview
+
+- **core**: Fundamental types (geometry, events, drawing, colors)
+- **terminal**: Terminal I/O abstraction layer
+- **views**: UI components (dialogs, buttons, menus, etc.)
+- **app**: Application framework and event loop
+
+## Documentation
+
+See the [examples](examples) for a complete simple examples.
+
+## Status
+
+Currently implements:
+- ✅ Core drawing and event system
+- ✅ Dialog boxes with frames and close buttons
+- ✅ Buttons with keyboard shortcuts
+- ✅ Static text labels (with centered text support)
+- ✅ Input fields
+- ✅ Menu bar with dropdowns
+- ✅ Status line
+- ✅ Desktop manager
+- ✅ Scrollbars (vertical and horizontal)
+- ✅ Scroller base class for scrollable views
+- ✅ Indicator (position display)
+- ✅ Text viewer with scrolling
+- ✅ CheckBoxes
+- ✅ RadioButtons
+- ✅ ListBoxes
+- ✅ Memo (multi-line text editor)
+- ✅ Mouse support (buttons, menus, status bar, close buttons, hover effects, listbox clicks)
+- ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
+- ❌ Full text editor with search/replace (basic editing available)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+# turbo-vision-4-rust

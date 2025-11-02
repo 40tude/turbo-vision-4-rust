@@ -1,0 +1,20 @@
+/target
+/local-only
+Cargo.lock
+
+# Screenshots and temporary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

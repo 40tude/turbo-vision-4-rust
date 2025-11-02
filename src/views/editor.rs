@@ -1,0 +1,950 @@
+use crate::core::geometry::{Point, Rect};
+use crate::core::event::{Event, EventType, KB_UP, KB_DOWN, KB_LEFT, KB_RIGHT, KB_PGUP, KB_PGDN, KB_HOME, KB_END, KB_ENTER, KB_BACKSPACE, KB_DEL, KB_TAB};
+use crate::core::draw::DrawBuffer;
+use crate::core::palette::colors;
+use crate::core::clipboard;
+use crate::terminal::Terminal;
+use super::view::{View, write_line_to_terminal};
+use super::scrollbar::ScrollBar;
+use super::indicator::Indicator;
+use std::cmp::min;
+
+// Control key codes
+const KB_CTRL_A: u16 = 0x0001;  // Ctrl+A - Select All
+const KB_CTRL_C: u16 = 0x0003;  // Ctrl+C - Copy
+#[allow(dead_code)]
+const KB_CTRL_F: u16 = 0x0006;  // Ctrl+F - Find
+#[allow(dead_code)]
+const KB_CTRL_H: u16 = 0x0008;  // Ctrl+H - Replace
+const KB_CTRL_V: u16 = 0x0016;  // Ctrl+V - Paste
+const KB_CTRL_X: u16 = 0x0018;  // Ctrl+X - Cut
+const KB_CTRL_Y: u16 = 0x0019;  // Ctrl+Y - Redo
+const KB_CTRL_Z: u16 = 0x001A;  // Ctrl+Z - Undo
+
+/// Maximum undo history size
+const MAX_UNDO_HISTORY: usize = 100;
+
+/// Edit action for undo/redo
+#[derive(Clone, Debug)]
+enum EditAction {
+    InsertChar { pos: Point, ch: char },
+    DeleteChar { pos: Point, ch: char },
+    InsertText { pos: Point, text: String },
+    DeleteText { pos: Point, text: String },
+    InsertLine { line: usize, text: String },
+    DeleteLine { line: usize, text: String },
+}
+
+impl EditAction {
+    /// Get the inverse action for undo/redo
+    fn inverse(&self) -> Self {
+        match self {
+            EditAction::InsertChar { pos, ch } => EditAction::DeleteChar { pos: *pos, ch: *ch },
+            EditAction::DeleteChar { pos, ch } => EditAction::InsertChar { pos: *pos, ch: *ch },
+            EditAction::InsertText { pos, text } => EditAction::DeleteText { pos: *pos, text: text.clone() },
+            EditAction::DeleteText { pos, text } => EditAction::InsertText { pos: *pos, text: text.clone() },
+            EditAction::InsertLine { line, text } => EditAction::DeleteLine { line: *line, text: text.clone() },
+            EditAction::DeleteLine { line, text } => EditAction::InsertLine { line: *line, text: text.clone() },
+        }
+    }
+}
+
+/// Editor - Advanced multi-line text editor with undo/redo and find/replace
+pub struct Editor {
+    bounds: Rect,
+    lines: Vec<String>,
+    cursor: Point,
+    delta: Point,
+    selection_start: Option<Point>,
+    focused: bool,
+    v_scrollbar: Option<Box<ScrollBar>>,
+    h_scrollbar: Option<Box<ScrollBar>>,
+    indicator: Option<Box<Indicator>>,
+    read_only: bool,
+    modified: bool,
+    tab_size: usize,
+    undo_stack: Vec<EditAction>,
+    redo_stack: Vec<EditAction>,
+    insert_mode: bool, // true = insert, false = overwrite
+    auto_indent: bool,
+}
+
+impl Editor {
+    /// Create a new editor control
+    pub fn new(bounds: Rect) -> Self {
+        Self {
+            bounds,
+            lines: vec![String::new()],
+            cursor: Point::zero(),
+            delta: Point::zero(),
+            selection_start: None,
+            focused: false,
+            v_scrollbar: None,
+            h_scrollbar: None,
+            indicator: None,
+            read_only: false,
+            modified: false,
+            tab_size: 4,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            insert_mode: true,
+            auto_indent: false,
+        }
+    }
+
+    /// Create with scrollbars and indicator
+    pub fn with_scrollbars_and_indicator(mut self) -> Self {
+        // Indicator at top
+        let indicator_bounds = Rect::new(
+            self.bounds.a.x,
+            self.bounds.a.y,
+            self.bounds.b.x,
+            self.bounds.a.y + 1,
+        );
+        self.indicator = Some(Box::new(Indicator::new(indicator_bounds)));
+
+        // Vertical scrollbar on right edge
+        let v_bounds = Rect::new(
+            self.bounds.b.x - 1,
+            self.bounds.a.y + 1,
+            self.bounds.b.x,
+            self.bounds.b.y - 1,
+        );
+        self.v_scrollbar = Some(Box::new(ScrollBar::new_vertical(v_bounds)));
+
+        // Horizontal scrollbar on bottom edge
+        let h_bounds = Rect::new(
+            self.bounds.a.x,
+            self.bounds.b.y - 1,
+            self.bounds.b.x - 1,
+            self.bounds.b.y,
+        );
+        self.h_scrollbar = Some(Box::new(ScrollBar::new_horizontal(h_bounds)));
+
+        self
+    }
+
+    /// Set read-only mode
+    pub fn set_read_only(&mut self, read_only: bool) {
+        self.read_only = read_only;
+    }
+
+    /// Set tab size
+    pub fn set_tab_size(&mut self, tab_size: usize) {
+        self.tab_size = tab_size.max(1);
+    }
+
+    /// Set auto-indent mode
+    pub fn set_auto_indent(&mut self, auto_indent: bool) {
+        self.auto_indent = auto_indent;
+    }
+
+    /// Toggle insert/overwrite mode
+    pub fn toggle_insert_mode(&mut self) {
+        self.insert_mode = !self.insert_mode;
+        self.update_indicator();
+    }
+
+    /// Get the text content
+    pub fn get_text(&self) -> String {
+        self.lines.join("\n")
+    }
+
+    /// Set the text content
+    pub fn set_text(&mut self, text: &str) {
+        self.lines = text.lines().map(|s| s.to_string()).collect();
+        if self.lines.is_empty() {
+            self.lines.push(String::new());
+        }
+        self.cursor = Point::zero();
+        self.delta = Point::zero();
+        self.selection_start = None;
+        self.modified = false;
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+        self.update_scrollbars();
+        self.update_indicator();
+    }
+
+    /// Check if text has been modified
+    pub fn is_modified(&self) -> bool {
+        self.modified
+    }
+
+    /// Clear the modified flag
+    pub fn clear_modified(&mut self) {
+        self.modified = false;
+        self.update_indicator();
+    }
+
+    /// Get current line count
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Undo the last action
+    pub fn undo(&mut self) {
+        if let Some(action) = self.undo_stack.pop() {
+            self.apply_action_inverse(&action);
+            self.redo_stack.push(action);
+        }
+    }
+
+    /// Redo the last undone action
+    pub fn redo(&mut self) {
+        if let Some(action) = self.redo_stack.pop() {
+            self.apply_action(&action);
+            self.undo_stack.push(action);
+        }
+    }
+
+    /// Find text in the editor
+    pub fn find(&self, text: &str, case_sensitive: bool) -> Option<Point> {
+        let search_text = if case_sensitive {
+            text.to_string()
+        } else {
+            text.to_lowercase()
+        };
+
+        // Start searching from current cursor position
+        for (line_idx, line) in self.lines.iter().enumerate().skip(self.cursor.y as usize) {
+            let search_line = if case_sensitive {
+                line.clone()
+            } else {
+                line.to_lowercase()
+            };
+
+            let start_col = if line_idx == self.cursor.y as usize {
+                self.cursor.x as usize
+            } else {
+                0
+            };
+
+            if let Some(col) = search_line[start_col..].find(&search_text) {
+                return Some(Point::new((start_col + col) as i16, line_idx as i16));
+            }
+        }
+
+        // If not found, search from beginning
+        for (line_idx, line) in self.lines.iter().enumerate().take(self.cursor.y as usize) {
+            let search_line = if case_sensitive {
+                line.clone()
+            } else {
+                line.to_lowercase()
+            };
+
+            if let Some(col) = search_line.find(&search_text) {
+                return Some(Point::new(col as i16, line_idx as i16));
+            }
+        }
+
+        None
+    }
+
+    /// Replace text at current cursor position
+    pub fn replace(&mut self, find_text: &str, replace_text: &str, case_sensitive: bool) -> bool {
+        if let Some(pos) = self.find(find_text, case_sensitive) {
+            self.cursor = pos;
+            self.selection_start = Some(pos);
+            self.cursor.x += find_text.len() as i16;
+            self.delete_selection();
+            self.insert_text(replace_text);
+            true
+        } else {
+            false
+        }
+    }
+
+    // Private helper methods
+
+    fn get_content_area(&self) -> Rect {
+        let mut area = self.bounds;
+        if self.indicator.is_some() {
+            area.a.y += 1;
+        }
+        if self.v_scrollbar.is_some() {
+            area.b.x -= 1;
+        }
+        if self.h_scrollbar.is_some() {
+            area.b.y -= 1;
+        }
+        area
+    }
+
+    fn max_line_length(&self) -> i16 {
+        self.lines
+            .iter()
+            .map(|line| line.len() as i16)
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn update_scrollbars(&mut self) {
+        let content_area = self.get_content_area();
+        let max_x = self.max_line_length();
+        let max_y = self.lines.len() as i16;
+
+        if let Some(ref mut h_bar) = self.h_scrollbar {
+            h_bar.set_params(
+                self.delta.x as i32,
+                0,
+                max_x.saturating_sub(content_area.width()) as i32,
+                content_area.width() as i32,
+                1,
+            );
+        }
+
+        if let Some(ref mut v_bar) = self.v_scrollbar {
+            v_bar.set_params(
+                self.delta.y as i32,
+                0,
+                max_y.saturating_sub(content_area.height()) as i32,
+                content_area.height() as i32,
+                1,
+            );
+        }
+    }
+
+    fn update_indicator(&mut self) {
+        if let Some(ref mut indicator) = self.indicator {
+            indicator.set_value(
+                Point::new(self.cursor.x + 1, self.cursor.y + 1),
+                self.modified,
+            );
+        }
+    }
+
+    fn ensure_cursor_visible(&mut self) {
+        let content_area = self.get_content_area();
+        let width = content_area.width();
+        let height = content_area.height();
+
+        if self.cursor.y < self.delta.y {
+            self.delta.y = self.cursor.y;
+        } else if self.cursor.y >= self.delta.y + height {
+            self.delta.y = self.cursor.y - height + 1;
+        }
+
+        if self.cursor.x < self.delta.x {
+            self.delta.x = self.cursor.x;
+        } else if self.cursor.x >= self.delta.x + width {
+            self.delta.x = self.cursor.x - width + 1;
+        }
+
+        self.update_scrollbars();
+        self.update_indicator();
+    }
+
+    fn clamp_cursor(&mut self) {
+        if self.cursor.y < 0 {
+            self.cursor.y = 0;
+        }
+        if self.cursor.y >= self.lines.len() as i16 {
+            self.cursor.y = (self.lines.len() - 1) as i16;
+        }
+
+        let line_len = self.lines[self.cursor.y as usize].len() as i16;
+        if self.cursor.x > line_len {
+            self.cursor.x = line_len;
+        }
+        if self.cursor.x < 0 {
+            self.cursor.x = 0;
+        }
+    }
+
+    fn push_undo(&mut self, action: EditAction) {
+        self.undo_stack.push(action);
+        if self.undo_stack.len() > MAX_UNDO_HISTORY {
+            self.undo_stack.remove(0);
+        }
+        self.redo_stack.clear();
+        self.modified = true;
+        self.update_indicator();
+    }
+
+    fn apply_action(&mut self, action: &EditAction) {
+        match action {
+            EditAction::InsertChar { pos, ch } => {
+                self.cursor = *pos;
+                let line_idx = pos.y as usize;
+                let col = pos.x as usize;
+                self.lines[line_idx].insert(col, *ch);
+                self.cursor.x += 1;
+            }
+            EditAction::DeleteChar { pos, .. } => {
+                self.cursor = *pos;
+                let line_idx = pos.y as usize;
+                let col = pos.x as usize;
+                if col < self.lines[line_idx].len() {
+                    self.lines[line_idx].remove(col);
+                }
+            }
+            EditAction::InsertText { pos, text } => {
+                self.cursor = *pos;
+                self.insert_text_internal(text);
+            }
+            EditAction::DeleteText { pos, text } => {
+                self.cursor = *pos;
+                self.selection_start = Some(*pos);
+                self.cursor.x += text.len() as i16;
+                self.delete_selection_internal();
+            }
+            _ => {}
+        }
+        self.ensure_cursor_visible();
+    }
+
+    fn apply_action_inverse(&mut self, action: &EditAction) {
+        let inverse = action.inverse();
+        self.apply_action(&inverse);
+    }
+
+    fn insert_char(&mut self, ch: char) {
+        if self.read_only {
+            return;
+        }
+
+        let line_idx = self.cursor.y as usize;
+        let col = self.cursor.x as usize;
+
+        if self.insert_mode {
+            let action = EditAction::InsertChar { pos: self.cursor, ch };
+            self.lines[line_idx].insert(col, ch);
+            self.cursor.x += 1;
+            self.push_undo(action);
+        } else {
+            // Overwrite mode
+            if col < self.lines[line_idx].len() {
+                let old_ch = self.lines[line_idx].chars().nth(col).unwrap();
+                let action = EditAction::DeleteChar { pos: self.cursor, ch: old_ch };
+                self.push_undo(action);
+                self.lines[line_idx].remove(col);
+            }
+            let action = EditAction::InsertChar { pos: self.cursor, ch };
+            self.lines[line_idx].insert(col, ch);
+            self.cursor.x += 1;
+            self.push_undo(action);
+        }
+
+        self.selection_start = None;
+        self.ensure_cursor_visible();
+    }
+
+    fn insert_newline(&mut self) {
+        if self.read_only {
+            return;
+        }
+
+        let line_idx = self.cursor.y as usize;
+        let col = self.cursor.x as usize;
+
+        let current_line = &self.lines[line_idx];
+        let before = current_line[..col].to_string();
+        let after = current_line[col..].to_string();
+
+        // Auto-indent: calculate leading whitespace
+        let indent = if self.auto_indent {
+            current_line.chars().take_while(|&c| c == ' ' || c == '\t').collect::<String>()
+        } else {
+            String::new()
+        };
+
+        self.lines[line_idx] = before;
+        self.lines.insert(line_idx + 1, indent.clone() + &after);
+
+        self.cursor.y += 1;
+        self.cursor.x = indent.len() as i16;
+        self.modified = true;
+        self.selection_start = None;
+        self.ensure_cursor_visible();
+        self.update_indicator();
+    }
+
+    fn delete_char(&mut self) {
+        if self.read_only {
+            return;
+        }
+
+        let line_idx = self.cursor.y as usize;
+        let col = self.cursor.x as usize;
+
+        if col < self.lines[line_idx].len() {
+            let ch = self.lines[line_idx].chars().nth(col).unwrap();
+            let action = EditAction::DeleteChar { pos: self.cursor, ch };
+            self.lines[line_idx].remove(col);
+            self.push_undo(action);
+        } else if line_idx + 1 < self.lines.len() {
+            let next_line = self.lines.remove(line_idx + 1);
+            self.lines[line_idx].push_str(&next_line);
+            self.modified = true;
+        }
+
+        self.selection_start = None;
+        self.ensure_cursor_visible();
+    }
+
+    fn backspace(&mut self) {
+        if self.read_only {
+            return;
+        }
+
+        let line_idx = self.cursor.y as usize;
+        let col = self.cursor.x as usize;
+
+        if col > 0 {
+            let ch = self.lines[line_idx].chars().nth(col - 1).unwrap();
+            self.cursor.x -= 1;
+            let action = EditAction::DeleteChar { pos: self.cursor, ch };
+            self.lines[line_idx].remove(col - 1);
+            self.push_undo(action);
+        } else if line_idx > 0 {
+            let current_line = self.lines.remove(line_idx);
+            self.cursor.y -= 1;
+            let prev_line_len = self.lines[line_idx - 1].len();
+            self.lines[line_idx - 1].push_str(&current_line);
+            self.cursor.x = prev_line_len as i16;
+            self.modified = true;
+        }
+
+        self.selection_start = None;
+        self.ensure_cursor_visible();
+    }
+
+    fn insert_tab(&mut self) {
+        if self.read_only {
+            return;
+        }
+
+        for _ in 0..self.tab_size {
+            self.insert_char(' ');
+        }
+    }
+
+    fn move_cursor(&mut self, dx: i16, dy: i16, extend_selection: bool) {
+        if !extend_selection {
+            self.selection_start = None;
+        } else if self.selection_start.is_none() {
+            self.selection_start = Some(self.cursor);
+        }
+
+        self.cursor.x += dx;
+        self.cursor.y += dy;
+        self.clamp_cursor();
+        self.ensure_cursor_visible();
+    }
+
+    fn has_selection(&self) -> bool {
+        self.selection_start.is_some()
+    }
+
+    fn get_selection(&self) -> Option<String> {
+        let start = self.selection_start?;
+        let end = self.cursor;
+
+        let (start, end) = if start.y < end.y || (start.y == end.y && start.x < end.x) {
+            (start, end)
+        } else {
+            (end, start)
+        };
+
+        if start == end {
+            return None;
+        }
+
+        let mut result = String::new();
+        for y in start.y..=end.y {
+            if y < 0 || y >= self.lines.len() as i16 {
+                continue;
+            }
+
+            let line = &self.lines[y as usize];
+            if y == start.y && y == end.y {
+                let s = start.x.max(0) as usize;
+                let e = end.x.min(line.len() as i16) as usize;
+                if s < e {
+                    result.push_str(&line[s..e]);
+                }
+            } else if y == start.y {
+                let s = start.x.max(0) as usize;
+                result.push_str(&line[s..]);
+                result.push('\n');
+            } else if y == end.y {
+                let e = end.x.min(line.len() as i16) as usize;
+                result.push_str(&line[..e]);
+            } else {
+                result.push_str(line);
+                result.push('\n');
+            }
+        }
+
+        Some(result)
+    }
+
+    fn select_all(&mut self) {
+        self.selection_start = Some(Point::zero());
+        self.cursor = Point::new(
+            self.lines.last().map(|l| l.len()).unwrap_or(0) as i16,
+            (self.lines.len() - 1) as i16,
+        );
+        self.ensure_cursor_visible();
+    }
+
+    fn delete_selection_internal(&mut self) {
+        if !self.has_selection() || self.read_only {
+            return;
+        }
+
+        let start = self.selection_start.unwrap();
+        let end = self.cursor;
+
+        let (start, end) = if start.y < end.y || (start.y == end.y && start.x < end.x) {
+            (start, end)
+        } else {
+            (end, start)
+        };
+
+        let start_line = start.y.max(0) as usize;
+        let end_line = end.y.min((self.lines.len() - 1) as i16) as usize;
+
+        if start_line == end_line {
+            let start_col = start.x.max(0) as usize;
+            let end_col = end.x.min(self.lines[start_line].len() as i16) as usize;
+            if start_col < end_col {
+                self.lines[start_line].drain(start_col..end_col);
+            }
+        } else {
+            let start_col = start.x.max(0) as usize;
+            let end_col = end.x.min(self.lines[end_line].len() as i16) as usize;
+
+            let before = self.lines[start_line][..start_col].to_string();
+            let after = self.lines[end_line][end_col..].to_string();
+
+            self.lines.drain(start_line..=end_line);
+            self.lines.insert(start_line, before + &after);
+        }
+
+        self.cursor = start;
+        self.selection_start = None;
+        self.modified = true;
+        self.ensure_cursor_visible();
+    }
+
+    fn delete_selection(&mut self) {
+        if !self.has_selection() {
+            return;
+        }
+
+        if let Some(text) = self.get_selection() {
+            let action = EditAction::DeleteText { pos: self.selection_start.unwrap(), text };
+            self.delete_selection_internal();
+            self.push_undo(action);
+        }
+    }
+
+    fn insert_text_internal(&mut self, text: &str) {
+        if self.read_only {
+            return;
+        }
+
+        let lines_to_insert: Vec<&str> = text.lines().collect();
+        if lines_to_insert.is_empty() {
+            return;
+        }
+
+        let line_idx = self.cursor.y as usize;
+        let col = self.cursor.x as usize;
+
+        if lines_to_insert.len() == 1 {
+            self.lines[line_idx].insert_str(col, lines_to_insert[0]);
+            self.cursor.x += lines_to_insert[0].len() as i16;
+        } else {
+            let current_line = &self.lines[line_idx];
+            let before = current_line[..col].to_string();
+            let after = current_line[col..].to_string();
+
+            self.lines[line_idx] = before + lines_to_insert[0];
+
+            for (i, line) in lines_to_insert.iter().enumerate().skip(1) {
+                self.lines.insert(line_idx + i, line.to_string());
+            }
+
+            let last_line_idx = line_idx + lines_to_insert.len() - 1;
+            let last_inserted = lines_to_insert.last().unwrap();
+            self.lines[last_line_idx].push_str(&after);
+
+            self.cursor.y = last_line_idx as i16;
+            self.cursor.x = last_inserted.len() as i16;
+        }
+
+        self.modified = true;
+        self.selection_start = None;
+        self.ensure_cursor_visible();
+    }
+
+    fn insert_text(&mut self, text: &str) {
+        if self.has_selection() {
+            self.delete_selection();
+        }
+
+        let action = EditAction::InsertText { pos: self.cursor, text: text.to_string() };
+        self.insert_text_internal(text);
+        self.push_undo(action);
+    }
+}
+
+impl View for Editor {
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
+
+    fn set_bounds(&mut self, bounds: Rect) {
+        self.bounds = bounds;
+
+        if let Some(ref mut indicator) = self.indicator {
+            let indicator_bounds = Rect::new(
+                bounds.a.x,
+                bounds.a.y,
+                bounds.b.x,
+                bounds.a.y + 1,
+            );
+            indicator.set_bounds(indicator_bounds);
+        }
+
+        if let Some(ref mut v_bar) = self.v_scrollbar {
+            let v_bounds = Rect::new(
+                bounds.b.x - 1,
+                bounds.a.y + if self.indicator.is_some() { 1 } else { 0 },
+                bounds.b.x,
+                bounds.b.y - if self.h_scrollbar.is_some() { 1 } else { 0 },
+            );
+            v_bar.set_bounds(v_bounds);
+        }
+
+        if let Some(ref mut h_bar) = self.h_scrollbar {
+            let h_bounds = Rect::new(
+                bounds.a.x,
+                bounds.b.y - 1,
+                bounds.b.x - if self.v_scrollbar.is_some() { 1 } else { 0 },
+                bounds.b.y,
+            );
+            h_bar.set_bounds(h_bounds);
+        }
+
+        self.update_scrollbars();
+    }
+
+    fn draw(&mut self, terminal: &mut Terminal) {
+        let content_area = self.get_content_area();
+        let width = content_area.width() as usize;
+        let height = content_area.height() as usize;
+
+        let color = colors::EDITOR_NORMAL;
+
+        for y in 0..height {
+            let line_idx = (self.delta.y + y as i16) as usize;
+            let mut buf = DrawBuffer::new(width);
+
+            buf.move_char(0, ' ', color, width);
+
+            if line_idx < self.lines.len() {
+                let line = &self.lines[line_idx];
+                let start_col = self.delta.x as usize;
+                let line_char_count = line.chars().count();
+
+                if start_col < line_char_count {
+                    // Calculate visible portion in CHARACTER positions
+                    let end_col_char = min(start_col + width, line_char_count);
+
+                    // Convert to string slice using character-based iteration
+                    let visible_text: String = line
+                        .chars()
+                        .skip(start_col)
+                        .take(end_col_char - start_col)
+                        .collect();
+
+                    buf.move_str(0, &visible_text, color);
+                }
+            }
+
+            write_line_to_terminal(
+                terminal,
+                content_area.a.x,
+                content_area.a.y + y as i16,
+                &buf,
+            );
+        }
+
+        // Draw cursor if focused
+        if self.focused {
+            let cursor_screen_x = content_area.a.x + (self.cursor.x - self.delta.x);
+            let cursor_screen_y = content_area.a.y + (self.cursor.y - self.delta.y);
+
+            if cursor_screen_x >= content_area.a.x && cursor_screen_x < content_area.b.x
+                && cursor_screen_y >= content_area.a.y && cursor_screen_y < content_area.b.y
+            {
+                let line_idx = self.cursor.y as usize;
+                let col = self.cursor.x as usize;
+                let ch = if line_idx < self.lines.len() {
+                    self.lines[line_idx].chars().nth(col).unwrap_or(' ')
+                } else {
+                    ' '
+                };
+
+                let cursor_attr = colors::EDITOR_SELECTED;
+                terminal.write_cell(
+                    cursor_screen_x as u16,
+                    cursor_screen_y as u16,
+                    crate::core::draw::Cell::new(ch, cursor_attr),
+                );
+            }
+        }
+
+        // Draw indicator
+        if let Some(ref mut indicator) = self.indicator {
+            indicator.draw(terminal);
+        }
+
+        // Draw scrollbars
+        if let Some(ref mut h_bar) = self.h_scrollbar {
+            h_bar.draw(terminal);
+        }
+        if let Some(ref mut v_bar) = self.v_scrollbar {
+            v_bar.draw(terminal);
+        }
+    }
+
+    fn handle_event(&mut self, event: &mut Event) {
+        if event.what == EventType::Keyboard {
+            // Only handle keyboard events if focused
+            if !self.focused {
+                return;
+            }
+
+            let shift_pressed = false; // TODO: Track shift state
+
+            match event.key_code {
+                KB_UP => {
+                    self.move_cursor(0, -1, shift_pressed);
+                    event.clear();
+                }
+                KB_DOWN => {
+                    self.move_cursor(0, 1, shift_pressed);
+                    event.clear();
+                }
+                KB_LEFT => {
+                    self.move_cursor(-1, 0, shift_pressed);
+                    event.clear();
+                }
+                KB_RIGHT => {
+                    self.move_cursor(1, 0, shift_pressed);
+                    event.clear();
+                }
+                KB_HOME => {
+                    self.cursor.x = 0;
+                    self.selection_start = None;
+                    self.ensure_cursor_visible();
+                    event.clear();
+                }
+                KB_END => {
+                    let line_len = self.lines[self.cursor.y as usize].len() as i16;
+                    self.cursor.x = line_len;
+                    self.selection_start = None;
+                    self.ensure_cursor_visible();
+                    event.clear();
+                }
+                KB_PGUP => {
+                    let height = self.get_content_area().height();
+                    self.move_cursor(0, -height, shift_pressed);
+                    event.clear();
+                }
+                KB_PGDN => {
+                    let height = self.get_content_area().height();
+                    self.move_cursor(0, height, shift_pressed);
+                    event.clear();
+                }
+                KB_ENTER => {
+                    self.insert_newline();
+                    event.clear();
+                }
+                KB_BACKSPACE => {
+                    if self.has_selection() {
+                        self.delete_selection();
+                    } else {
+                        self.backspace();
+                    }
+                    event.clear();
+                }
+                KB_DEL => {
+                    if self.has_selection() {
+                        self.delete_selection();
+                    } else {
+                        self.delete_char();
+                    }
+                    event.clear();
+                }
+                KB_TAB => {
+                    self.insert_tab();
+                    event.clear();
+                }
+                KB_CTRL_A => {
+                    self.select_all();
+                    event.clear();
+                }
+                KB_CTRL_C => {
+                    if let Some(selection) = self.get_selection() {
+                        clipboard::set_clipboard(&selection);
+                    }
+                    event.clear();
+                }
+                KB_CTRL_X => {
+                    if let Some(selection) = self.get_selection() {
+                        clipboard::set_clipboard(&selection);
+                        self.delete_selection();
+                    }
+                    event.clear();
+                }
+                KB_CTRL_V => {
+                    let clipboard_text = clipboard::get_clipboard();
+                    if !clipboard_text.is_empty() {
+                        self.insert_text(&clipboard_text);
+                    }
+                    event.clear();
+                }
+                KB_CTRL_Z => {
+                    self.undo();
+                    event.clear();
+                }
+                KB_CTRL_Y => {
+                    self.redo();
+                    event.clear();
+                }
+                key_code => {
+                    if (32..127).contains(&key_code) {
+                        let ch = key_code as u8 as char;
+                        self.insert_char(ch);
+                        event.clear();
+                    }
+                }
+            }
+        }
+    }
+
+    fn can_focus(&self) -> bool {
+        true
+    }
+
+    fn set_focus(&mut self, focused: bool) {
+        self.focused = focused;
+    }
+
+    fn update_cursor(&self, terminal: &mut Terminal) {
+        if self.focused {
+            // Calculate cursor position on screen
+            let cursor_x = self.bounds.a.x + (self.cursor.x - self.delta.x) as i16;
+            let cursor_y = self.bounds.a.y + (self.cursor.y - self.delta.y) as i16;
+
+            // Show cursor at the position
+            let _ = terminal.show_cursor(cursor_x as u16, cursor_y as u16);
+        }
+    }
+}

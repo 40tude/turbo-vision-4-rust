@@ -1,0 +1,182 @@
+/// A point in 2D space
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Point {
+    pub x: i16,
+    pub y: i16,
+}
+
+impl Point {
+    pub const fn new(x: i16, y: i16) -> Self {
+        Self { x, y }
+    }
+
+    pub const fn zero() -> Self {
+        Self { x: 0, y: 0 }
+    }
+}
+
+/// A rectangle defined by two points (top-left inclusive, bottom-right exclusive)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub a: Point,  // top-left (inclusive)
+    pub b: Point,  // bottom-right (exclusive)
+}
+
+impl Rect {
+    pub const fn new(x1: i16, y1: i16, x2: i16, y2: i16) -> Self {
+        Self {
+            a: Point::new(x1, y1),
+            b: Point::new(x2, y2),
+        }
+    }
+
+    pub const fn from_points(a: Point, b: Point) -> Self {
+        Self { a, b }
+    }
+
+    pub const fn from_coords(x: i16, y: i16, width: i16, height: i16) -> Self {
+        Self {
+            a: Point::new(x, y),
+            b: Point::new(x + width, y + height),
+        }
+    }
+
+    /// Move the rectangle by the given delta
+    pub fn move_by(&mut self, dx: i16, dy: i16) {
+        self.a.x += dx;
+        self.a.y += dy;
+        self.b.x += dx;
+        self.b.y += dy;
+    }
+
+    /// Grow (or shrink if negative) the rectangle by the given amount
+    pub fn grow(&mut self, dx: i16, dy: i16) {
+        self.a.x -= dx;
+        self.a.y -= dy;
+        self.b.x += dx;
+        self.b.y += dy;
+    }
+
+    /// Check if a point is inside the rectangle
+    pub fn contains(&self, p: Point) -> bool {
+        p.x >= self.a.x && p.x < self.b.x && p.y >= self.a.y && p.y < self.b.y
+    }
+
+    /// Check if the rectangle is empty (has zero or negative area)
+    pub fn is_empty(&self) -> bool {
+        self.b.x <= self.a.x || self.b.y <= self.a.y
+    }
+
+    /// Get the width of the rectangle
+    pub fn width(&self) -> i16 {
+        self.b.x - self.a.x
+    }
+
+    /// Get the height of the rectangle
+    pub fn height(&self) -> i16 {
+        self.b.y - self.a.y
+    }
+
+    /// Get the size as a Point
+    pub fn size(&self) -> Point {
+        Point::new(self.width(), self.height())
+    }
+
+    /// Intersect this rectangle with another
+    pub fn intersect(&self, other: &Rect) -> Rect {
+        Rect {
+            a: Point::new(self.a.x.max(other.a.x), self.a.y.max(other.a.y)),
+            b: Point::new(self.b.x.min(other.b.x), self.b.y.min(other.b.y)),
+        }
+    }
+
+    /// Check if this rectangle intersects (overlaps) with another
+    pub fn intersects(&self, other: &Rect) -> bool {
+        // Two rectangles intersect if they overlap on both axes
+        !(self.b.x <= other.a.x || self.a.x >= other.b.x ||
+          self.b.y <= other.a.y || self.a.y >= other.b.y)
+    }
+}
+
+impl Default for Rect {
+    fn default() -> Self {
+        Self::new(0, 0, 0, 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_point() {
+        let p = Point::new(10, 20);
+        assert_eq!(p.x, 10);
+        assert_eq!(p.y, 20);
+    }
+
+    #[test]
+    fn test_rect_basic() {
+        let r = Rect::new(1, 2, 11, 12);
+        assert_eq!(r.width(), 10);
+        assert_eq!(r.height(), 10);
+        assert!(!r.is_empty());
+    }
+
+    #[test]
+    fn test_rect_contains() {
+        let r = Rect::new(0, 0, 10, 10);
+        assert!(r.contains(Point::new(5, 5)));
+        assert!(r.contains(Point::new(0, 0)));
+        assert!(!r.contains(Point::new(10, 10)));
+        assert!(!r.contains(Point::new(-1, 5)));
+    }
+
+    #[test]
+    fn test_rect_move() {
+        let mut r = Rect::new(0, 0, 10, 10);
+        r.move_by(5, 5);
+        assert_eq!(r, Rect::new(5, 5, 15, 15));
+    }
+
+    #[test]
+    fn test_rect_grow() {
+        let mut r = Rect::new(5, 5, 15, 15);
+        r.grow(2, 2);
+        assert_eq!(r, Rect::new(3, 3, 17, 17));
+    }
+
+    #[test]
+    fn test_rect_intersect() {
+        let r1 = Rect::new(0, 0, 10, 10);
+        let r2 = Rect::new(5, 5, 15, 15);
+        let intersection = r1.intersect(&r2);
+        assert_eq!(intersection, Rect::new(5, 5, 10, 10));
+    }
+
+    #[test]
+    fn test_rect_intersects() {
+        let r1 = Rect::new(0, 0, 10, 10);
+
+        // Overlapping rectangle
+        let r2 = Rect::new(5, 5, 15, 15);
+        assert!(r1.intersects(&r2));
+        assert!(r2.intersects(&r1)); // Symmetric
+
+        // Completely inside
+        let r3 = Rect::new(2, 2, 8, 8);
+        assert!(r1.intersects(&r3));
+
+        // Adjacent but not overlapping (touching edges)
+        let r4 = Rect::new(10, 0, 20, 10);
+        assert!(!r1.intersects(&r4)); // b.x exclusive
+
+        // Completely outside
+        let r5 = Rect::new(20, 20, 30, 30);
+        assert!(!r1.intersects(&r5));
+
+        // Overlapping on one corner
+        let r6 = Rect::new(8, 8, 15, 15);
+        assert!(r1.intersects(&r6));
+    }
+}
