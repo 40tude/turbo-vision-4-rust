@@ -244,8 +244,8 @@ impl View for InputLine {
                     event.clear();
                 }
                 KB_ENTER => {
-                    // Clear event but don't handle - let parent process it
-                    event.clear();
+                    // Don't handle Enter - let dialog handle it for default button
+                    // Just pass through without clearing
                 }
                 KB_CTRL_A => {
                     self.select_all();

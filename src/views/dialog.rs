@@ -1,5 +1,5 @@
 use crate::core::geometry::Rect;
-use crate::core::event::{Event, EventType, KB_ESC_ESC};
+use crate::core::event::{Event, EventType, KB_ESC_ESC, KB_ENTER};
 use crate::core::command::{CommandId, CM_CANCEL, CM_CLOSE};
 use crate::terminal::Terminal;
 use super::view::View;
@@ -99,6 +99,56 @@ impl View for Dialog {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
+        // Intercept Enter key for default button handling
+        if event.what == EventType::Keyboard && event.key_code == KB_ENTER {
+            // Check if the currently focused view is a Memo control
+            // If so, let it handle the Enter key
+            let focused_is_memo = self.find_focused_memo();
+
+            if !focused_is_memo {
+                // Find the default button
+                if let Some(default_command) = self.find_default_button_command() {
+                    // Activate the default button by generating its command
+                    *event = Event::command(default_command);
+                    return;
+                }
+            }
+        }
+
         self.window.handle_event(event);
+    }
+}
+
+impl Dialog {
+    /// Check if the currently focused view is a Memo control
+    fn find_focused_memo(&self) -> bool {
+        for i in 0..self.child_count() {
+            let child = self.child_at(i);
+            if child.is_memo() {
+                // For now, we assume if a Memo has focus, we found it
+                // In a more sophisticated implementation, we might check focus state
+                // but Memo controls are relatively rare
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Find the default button and return its command if it's enabled
+    /// Returns None if no default button found or if it's disabled
+    fn find_default_button_command(&self) -> Option<CommandId> {
+        for i in 0..self.child_count() {
+            let child = self.child_at(i);
+            if child.is_default_button() {
+                // Check if the button can receive focus (i.e., not disabled)
+                if child.can_focus() {
+                    return child.button_command();
+                } else {
+                    // Default button is disabled
+                    return None;
+                }
+            }
+        }
+        None
     }
 }

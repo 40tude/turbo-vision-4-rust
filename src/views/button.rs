@@ -13,6 +13,7 @@ pub struct Button {
     command: CommandId,
     is_default: bool,
     focused: bool,
+    disabled: bool,
 }
 
 impl Button {
@@ -23,7 +24,16 @@ impl Button {
             command,
             is_default,
             focused: false,
+            disabled: false,
         }
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool) {
+        self.disabled = disabled;
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 }
 
@@ -40,7 +50,9 @@ impl View for Button {
         let width = self.bounds.width() as usize;
         let height = self.bounds.height() as usize;
 
-        let button_attr = if self.focused {
+        let button_attr = if self.disabled {
+            colors::BUTTON_DISABLED
+        } else if self.focused {
             colors::BUTTON_SELECTED
         } else if self.is_default {
             colors::BUTTON_DEFAULT
@@ -51,11 +63,13 @@ impl View for Button {
         // Shadow uses DarkGray on LightGray (not black background!)
         let shadow_attr = colors::BUTTON_SHADOW;
 
-        // Shortcut attributes - use white for button shortcuts
-        let shortcut_attr = if self.focused {
-            colors::BUTTON_SELECTED  // Same as focused button
+        // Shortcut attributes - use yellow for button shortcuts
+        let shortcut_attr = if self.disabled {
+            colors::BUTTON_DISABLED  // DarkGray on Green (disabled)
+        } else if self.focused {
+            colors::BUTTON_SELECTED  // White on Green (focused)
         } else {
-            colors::BUTTON_SHORTCUT  // White on LightGray
+            colors::BUTTON_SHORTCUT  // Yellow on Green (not focused)
         };
 
         // Draw all lines except the last (which is the bottom shadow)
@@ -99,6 +113,11 @@ impl View for Button {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
+        // Disabled buttons don't handle any events
+        if self.disabled {
+            return;
+        }
+
         match event.what {
             EventType::Keyboard => {
                 // Only handle keyboard events if focused
@@ -127,10 +146,18 @@ impl View for Button {
     }
 
     fn can_focus(&self) -> bool {
-        true
+        !self.disabled
     }
 
     fn set_focus(&mut self, focused: bool) {
         self.focused = focused;
+    }
+
+    fn is_default_button(&self) -> bool {
+        self.is_default
+    }
+
+    fn button_command(&self) -> Option<u16> {
+        Some(self.command)
     }
 }

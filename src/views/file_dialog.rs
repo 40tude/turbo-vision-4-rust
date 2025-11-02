@@ -70,6 +70,9 @@ use std::cell::RefCell;
 
 const CMD_FILE_SELECTED: u16 = 1000;
 
+// Child index in the dialog
+const CHILD_LISTBOX: usize = 4; // ListBox
+
 pub struct FileDialog {
     dialog: Dialog,
     current_path: PathBuf,
@@ -159,13 +162,19 @@ impl FileDialog {
         );
         self.dialog.add(Box::new(cancel_button));
 
+        // Set focus to the listbox by default (better UX for file selection)
         self.dialog.set_initial_focus();
+        // TODO: Need a way to set focus to a specific child index
+        // For now, initial focus goes to first focusable (input), user can Tab to listbox
 
         self
     }
 
     pub fn execute(&mut self, terminal: &mut Terminal) -> Option<PathBuf> {
         loop {
+            // Update OK button state based on input field
+            self.update_ok_button_state();
+
             // Draw
             self.dialog.draw(terminal);
             self.dialog.update_cursor(terminal);
@@ -196,10 +205,9 @@ impl FileDialog {
                                     return Some(path);
                                 }
                                 // Directory navigation - continue loop
-                            } else {
-                                // Empty input - just close
-                                return None;
                             }
+                            // If input is empty, do nothing (don't close dialog)
+                            // This effectively disables the OK button when input is empty
                         }
                         CM_CANCEL | crate::core::command::CM_CLOSE => {
                             return None;
@@ -319,12 +327,31 @@ impl FileDialog {
         }
     }
 
+    fn update_ok_button_state(&mut self) {
+        // Note: We can't easily disable the button visually without downcasting,
+        // but the CM_OK handler ignores empty input, effectively disabling the button
+        // TODO: Add set_enabled() method to View trait for better architecture
+    }
+
     fn rebuild_and_redraw(&mut self, _terminal: &mut Terminal) {
         // Create a new dialog with updated file list
         let old_bounds = self.dialog.bounds();
         let old_title = "Open File"; // TODO: Store title
 
         *self = Self::new(old_bounds, old_title, &self.wildcard.clone(), Some(self.current_path.clone())).build();
+
+        // Reset focus to listbox after directory navigation
+        // Clear all focus first
+        for i in 0..self.dialog.child_count() {
+            self.dialog.child_at_mut(i).set_focus(false);
+        }
+        // Set focus to listbox (child index 4)
+        if CHILD_LISTBOX < self.dialog.child_count() {
+            self.dialog.child_at_mut(CHILD_LISTBOX).set_focus(true);
+        }
+
+        // Reset selection index
+        self.selected_file_index = 0;
     }
 
     fn read_directory(&mut self) {

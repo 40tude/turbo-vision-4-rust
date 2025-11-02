@@ -52,6 +52,22 @@ pub trait View {
             path,
         )
     }
+
+    /// Check if this view is a default button (for Enter key handling at Dialog level)
+    fn is_default_button(&self) -> bool {
+        false
+    }
+
+    /// Get the command ID for this button (if it's a button)
+    /// Returns None if not a button
+    fn button_command(&self) -> Option<u16> {
+        None
+    }
+
+    /// Check if this view is a Memo control (multiline text input that handles Enter)
+    fn is_memo(&self) -> bool {
+        false
+    }
 }
 
 /// Helper to draw a line to the terminal

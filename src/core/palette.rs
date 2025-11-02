@@ -111,10 +111,11 @@ pub mod colors {
     pub const DIALOG_TITLE: Attr = Attr::new(TvColor::White, TvColor::LightGray);      // cpDialog[1] = 0x7F
     pub const DIALOG_SHORTCUT: Attr = Attr::new(TvColor::Red, TvColor::LightGray);     // Shortcut letters in dialogs
 
-    pub const BUTTON_NORMAL: Attr = Attr::new(TvColor::Black, TvColor::LightGray);
-    pub const BUTTON_DEFAULT: Attr = Attr::new(TvColor::Cyan, TvColor::LightGray);
-    pub const BUTTON_SELECTED: Attr = Attr::new(TvColor::White, TvColor::Green);
-    pub const BUTTON_SHORTCUT: Attr = Attr::new(TvColor::White, TvColor::LightGray);
+    pub const BUTTON_NORMAL: Attr = Attr::new(TvColor::Black, TvColor::Green);      // Inactive but focusable
+    pub const BUTTON_DEFAULT: Attr = Attr::new(TvColor::LightGreen, TvColor::Green); // Default but not focused
+    pub const BUTTON_SELECTED: Attr = Attr::new(TvColor::White, TvColor::Green);    // Focused
+    pub const BUTTON_DISABLED: Attr = Attr::new(TvColor::DarkGray, TvColor::Green); // Disabled (not implemented yet)
+    pub const BUTTON_SHORTCUT: Attr = Attr::new(TvColor::Yellow, TvColor::Green);   // Shortcut letters
     pub const BUTTON_SHADOW: Attr = Attr::new(TvColor::LightGray, TvColor::DarkGray);
 
     pub const STATUS_NORMAL: Attr = Attr::new(TvColor::Black, TvColor::LightGray);
