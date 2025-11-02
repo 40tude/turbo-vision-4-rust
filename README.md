@@ -18,6 +18,7 @@ A Rust implementation of the classic Borland Turbo Vision text user interface fr
 - **Cross-Platform**: Built on crossterm for wide terminal compatibility
 - **Modal Dialogs**: Built-in support for modal dialog execution
 - **Focus Management**: Tab navigation and keyboard shortcuts
+- **ANSI Dump**: Debug UI by dumping screen/views to ANSI text files
 
 ## Quick Start
 
@@ -90,6 +91,7 @@ Currently implements:
 - ✅ Memo (multi-line text editor)
 - ✅ Mouse support (buttons, menus, status bar, close buttons, hover effects, listbox clicks)
 - ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
+- ✅ ANSI Dump for debugging (dump screen/views to text files with colors)
 - ❌ Full text editor with search/replace (basic editing available)
 
 ## License

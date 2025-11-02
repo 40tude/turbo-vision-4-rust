@@ -2,6 +2,7 @@ use crate::core::draw::Cell;
 use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON};
 use crate::core::geometry::Point;
 use crate::core::palette::Attr;
+use crate::core::ansi_dump;
 use crossterm::{
     cursor, execute, queue, style,
     terminal::{self},
@@ -19,6 +20,7 @@ pub struct Terminal {
     esc_tracker: EscSequenceTracker,
     last_mouse_pos: Point,
     last_mouse_buttons: u8,
+    clip_stack: Vec<crate::core::geometry::Rect>,
 }
 
 impl Terminal {
@@ -47,6 +49,7 @@ impl Terminal {
             esc_tracker: EscSequenceTracker::new(),
             last_mouse_pos: Point::zero(),
             last_mouse_buttons: 0,
+            clip_stack: Vec::new(),
         })
     }
 
@@ -68,15 +71,60 @@ impl Terminal {
         (self.width, self.height)
     }
 
+    /// Push a clipping region onto the stack
+    pub fn push_clip(&mut self, rect: crate::core::geometry::Rect) {
+        self.clip_stack.push(rect);
+    }
+
+    /// Pop a clipping region from the stack
+    pub fn pop_clip(&mut self) {
+        self.clip_stack.pop();
+    }
+
+    /// Get the current effective clipping region (intersection of all regions on stack)
+    fn get_clip_rect(&self) -> Option<crate::core::geometry::Rect> {
+        if self.clip_stack.is_empty() {
+            None
+        } else {
+            let mut result = self.clip_stack[0];
+            for clip in &self.clip_stack[1..] {
+                result = result.intersect(clip);
+            }
+            Some(result)
+        }
+    }
+
+    /// Check if a point is within the current clipping region
+    fn is_clipped(&self, x: i16, y: i16) -> bool {
+        if let Some(clip) = self.get_clip_rect() {
+            !clip.contains(Point::new(x, y))
+        } else {
+            false
+        }
+    }
+
     /// Write a cell at the given position
     pub fn write_cell(&mut self, x: u16, y: u16, cell: Cell) {
-        if (x as usize) < self.width as usize && (y as usize) < self.height as usize {
-            self.buffer[y as usize][x as usize] = cell;
+        let x_i16 = x as i16;
+        let y_i16 = y as i16;
+
+        // Check terminal bounds
+        if (x as usize) >= self.width as usize || (y as usize) >= self.height as usize {
+            return;
         }
+
+        // Check clipping
+        if self.is_clipped(x_i16, y_i16) {
+            return;
+        }
+
+        self.buffer[y as usize][x as usize] = cell;
     }
 
     /// Write a line from a draw buffer
     pub fn write_line(&mut self, x: u16, y: u16, cells: &[Cell]) {
+        let y_i16 = y as i16;
+
         if (y as usize) >= self.height as usize {
             return;
         }
@@ -85,7 +133,13 @@ impl Terminal {
         let len = cells.len().min(max_width);
 
         for (i, cell) in cells.iter().enumerate().take(len) {
-            self.buffer[y as usize][(x as usize) + i] = *cell;
+            let cell_x = (x as usize) + i;
+            let cell_x_i16 = cell_x as i16;
+
+            // Check clipping for each cell
+            if !self.is_clipped(cell_x_i16, y_i16) {
+                self.buffer[y as usize][cell_x] = *cell;
+            }
         }
     }
 
@@ -242,6 +296,29 @@ impl Terminal {
 
         // TODO: implement proper double-click detection
         Some(Event::mouse(event_type, pos, buttons, false))
+    }
+
+    /// Dump the entire screen buffer to an ANSI text file for debugging
+    pub fn dump_screen(&self, path: &str) -> io::Result<()> {
+        ansi_dump::dump_buffer_to_file(&self.buffer, self.width as usize, self.height as usize, path)
+    }
+
+    /// Dump a rectangular region of the screen to an ANSI text file
+    pub fn dump_region(&self, x: u16, y: u16, width: u16, height: u16, path: &str) -> io::Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        ansi_dump::dump_buffer_region(
+            &mut file,
+            &self.buffer,
+            x as usize,
+            y as usize,
+            width as usize,
+            height as usize,
+        )
+    }
+
+    /// Get a reference to the internal buffer for custom dumping
+    pub fn buffer(&self) -> &[Vec<Cell>] {
+        &self.buffer
     }
 }
 

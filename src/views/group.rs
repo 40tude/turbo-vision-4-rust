@@ -189,14 +189,20 @@ impl View for Group {
             }
         }
 
+        // Push clipping region for this group's bounds
+        terminal.push_clip(self.bounds);
+
         // Only draw children that intersect with this group's bounds
-        // This ensures children can't render outside parent boundaries
+        // The clipping region ensures children can't render outside parent boundaries
         for child in &mut self.children {
             let child_bounds = child.bounds();
             if self.bounds.intersects(&child_bounds) {
                 child.draw(terminal);
             }
         }
+
+        // Pop clipping region
+        terminal.pop_clip();
     }
 
     fn handle_event(&mut self, event: &mut Event) {

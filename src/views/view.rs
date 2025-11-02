@@ -3,6 +3,7 @@ use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;
 use crate::core::state::{StateFlags, SF_SHADOW, SHADOW_SIZE};
 use crate::terminal::Terminal;
+use std::io;
 
 /// View trait - all UI components implement this
 pub trait View {
@@ -38,6 +39,18 @@ pub trait View {
     /// Views that need to show a cursor when focused should override this
     fn update_cursor(&self, _terminal: &mut Terminal) {
         // Default: do nothing (cursor stays hidden)
+    }
+
+    /// Dump this view's region of the terminal buffer to an ANSI file for debugging
+    fn dump_to_file(&self, terminal: &Terminal, path: &str) -> io::Result<()> {
+        let bounds = self.shadow_bounds();
+        terminal.dump_region(
+            bounds.a.x as u16,
+            bounds.a.y as u16,
+            (bounds.b.x - bounds.a.x) as u16,
+            (bounds.b.y - bounds.a.y) as u16,
+            path,
+        )
     }
 }
 
