@@ -26,6 +26,7 @@ pub const KB_F9: KeyCode = 0x4300;
 pub const KB_F10: KeyCode = 0x4400;
 pub const KB_F11: KeyCode = 0x8500;
 pub const KB_F12: KeyCode = 0x8600;
+pub const KB_SHIFT_F12: KeyCode = 0x8601;  // Shift+F12 for active view dump
 
 // Arrow keys
 pub const KB_UP: KeyCode = 0x4800;
@@ -314,7 +315,13 @@ fn crossterm_to_keycode(key: KeyEvent) -> KeyCode {
         CKC::F(9) => KB_F9,
         CKC::F(10) => KB_F10,
         CKC::F(11) => KB_F11,
-        CKC::F(12) => KB_F12,
+        CKC::F(12) => {
+            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                KB_SHIFT_F12
+            } else {
+                KB_F12
+            }
+        }
         _ => 0,
     }
 }

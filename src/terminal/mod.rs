@@ -1,5 +1,5 @@
 use crate::core::draw::Cell;
-use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON, KB_F11, KB_F12};
+use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON, KB_F12, KB_SHIFT_F12};
 use crate::core::geometry::Point;
 use crate::core::palette::Attr;
 use crate::core::ansi_dump;
@@ -248,8 +248,8 @@ impl Terminal {
                         return Ok(None);  // Don't propagate event, it's been handled
                     }
 
-                    // Handle active view dump shortcut
-                    if key_code == KB_F11 {
+                    // Handle active view dump shortcut (Shift+F12)
+                    if key_code == KB_SHIFT_F12 {
                         let _ = self.flash();
                         if let Some(bounds) = self.active_view_bounds {
                             let _ = self.dump_region(
@@ -293,8 +293,8 @@ impl Terminal {
                         continue;  // Don't return event, it's been handled - wait for next event
                     }
 
-                    // Handle active view dump shortcut
-                    if key_code == KB_F11 {
+                    // Handle active view dump shortcut (Shift+F12)
+                    if key_code == KB_SHIFT_F12 {
                         let _ = self.flash();
                         if let Some(bounds) = self.active_view_bounds {
                             let _ = self.dump_region(

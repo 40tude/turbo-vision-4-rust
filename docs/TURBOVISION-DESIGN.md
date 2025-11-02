@@ -308,7 +308,7 @@ The screen dump system provides global keyboard shortcuts to capture terminal ou
 Two shortcuts are available at any time during application execution:
 
 - **F12** - Dump entire screen to `screen-dump.txt`
-- **F11** - Dump active window/dialog to `active-view-dump.txt`
+- **Shift+F12** - Dump active window/dialog to `active-view-dump.txt`
 
 Both shortcuts provide:
 - **Visual Feedback**: Brief screen flash (color inversion) to confirm capture
@@ -327,7 +327,7 @@ use turbo_vision::app::Application;
 fn main() -> std::io::Result<()> {
     let mut app = Application::new()?;
     // ... set up your UI ...
-    app.run();  // Press F12 or F11 anytime!
+    app.run();  // Press F12 or Shift+F12 anytime!
     Ok(())
 }
 ```
@@ -377,7 +377,7 @@ if key_code == KB_F12 {
     return Ok(None);  // Event consumed, not propagated
 }
 
-if key_code == KB_F11 {
+if key_code == KB_SHIFT_F12 {
     let _ = self.flash();
     if let Some(bounds) = self.active_view_bounds {
         let _ = self.dump_region(..., "active-view-dump.txt");
