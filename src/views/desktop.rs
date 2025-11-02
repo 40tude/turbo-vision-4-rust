@@ -33,6 +33,16 @@ impl Desktop {
             }
         }
     }
+
+    /// Get the number of child views (windows) on the desktop
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Get a reference to a child view by index
+    pub fn child_at(&self, index: usize) -> &dyn View {
+        self.children.child_at(index)
+    }
 }
 
 impl View for Desktop {

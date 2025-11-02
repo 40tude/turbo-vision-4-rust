@@ -8,6 +8,25 @@ The ANSI dump feature allows you to export terminal buffers to text files with A
 - Creating visual regression tests
 - Documenting UI behavior
 
+## Quick Start: Keyboard Shortcuts
+
+The easiest way to capture a screen dump is to use one of these keyboard shortcuts at any time while your application is running:
+
+- **F12** - Quick screen dump
+- **ESC + Shift + S** - Alternative shortcut (useful on systems where F12 is reserved)
+
+Both shortcuts will:
+1. Flash the screen briefly (visual feedback)
+2. Save the current screen to `screen-dump.txt`
+
+```rust
+use turbo_vision::app::Application;
+
+let mut app = Application::new()?;
+// ... set up your UI ...
+app.run();  // Press F12 or ESC+Shift+S during execution
+```
+
 ## Usage
 
 ### Dumping the Entire Screen
@@ -100,6 +119,20 @@ The color codes correspond to the standard 16-color terminal palette used by Tur
 
 ## API Reference
 
+### Global Shortcuts
+
+- **F12** - Automatically dumps the screen to `screen-dump.txt`
+  - Works at any time during application execution
+  - Handled at the application level (before any other event handlers)
+  - Shows a brief flash effect for visual feedback
+  - Silently fails if file cannot be written (doesn't crash app)
+
+- **ESC + Shift + S** - Alternative screen dump shortcut
+  - Same functionality as F12
+  - Useful on systems where F12 is captured by the OS or terminal
+  - Also shows flash effect
+  - Processed through ESC sequence tracker
+
 ### Terminal Methods
 
 - `dump_screen(&self, path: &str) -> io::Result<()>`
@@ -110,6 +143,11 @@ The color codes correspond to the standard 16-color terminal palette used by Tur
 
 - `buffer(&self) -> &[Vec<Cell>]`
   - Returns a reference to the internal buffer for custom dumping
+
+- `flash(&mut self) -> io::Result<()>`
+  - Flashes the screen by inverting all colors for 50ms
+  - Used for visual feedback when capturing screen dumps
+  - Can also be called manually for other notifications
 
 ### View Trait Method
 

@@ -38,46 +38,25 @@ use super::palette::TvColor;
 use std::io::{self, Write};
 use std::fs::File;
 
-/// Convert TvColor to ANSI escape code
-fn color_to_ansi_fg(color: TvColor) -> u8 {
+/// Convert TvColor to RGB values for 24-bit ANSI codes
+fn color_to_rgb(color: TvColor) -> (u8, u8, u8) {
     match color {
-        TvColor::Black => 30,
-        TvColor::Red => 31,
-        TvColor::Green => 32,
-        TvColor::Brown => 33,
-        TvColor::Blue => 34,
-        TvColor::Magenta => 35,
-        TvColor::Cyan => 36,
-        TvColor::LightGray => 37,
-        TvColor::DarkGray => 90,
-        TvColor::LightRed => 91,
-        TvColor::LightGreen => 92,
-        TvColor::Yellow => 93,
-        TvColor::LightBlue => 94,
-        TvColor::LightMagenta => 95,
-        TvColor::LightCyan => 96,
-        TvColor::White => 97,
-    }
-}
-
-fn color_to_ansi_bg(color: TvColor) -> u8 {
-    match color {
-        TvColor::Black => 40,
-        TvColor::Red => 41,
-        TvColor::Green => 42,
-        TvColor::Brown => 43,
-        TvColor::Blue => 44,
-        TvColor::Magenta => 45,
-        TvColor::Cyan => 46,
-        TvColor::LightGray => 47,
-        TvColor::DarkGray => 100,
-        TvColor::LightRed => 101,
-        TvColor::LightGreen => 102,
-        TvColor::Yellow => 103,
-        TvColor::LightBlue => 104,
-        TvColor::LightMagenta => 105,
-        TvColor::LightCyan => 106,
-        TvColor::White => 107,
+        TvColor::Black => (0, 0, 0),
+        TvColor::Blue => (0, 0, 170),
+        TvColor::Green => (0, 170, 0),
+        TvColor::Cyan => (0, 170, 170),
+        TvColor::Red => (170, 0, 0),
+        TvColor::Magenta => (170, 0, 170),
+        TvColor::Brown => (170, 85, 0),
+        TvColor::LightGray => (170, 170, 170),
+        TvColor::DarkGray => (85, 85, 85),
+        TvColor::LightBlue => (85, 85, 255),
+        TvColor::LightGreen => (85, 255, 85),
+        TvColor::LightCyan => (85, 255, 255),
+        TvColor::LightRed => (255, 85, 85),
+        TvColor::LightMagenta => (255, 85, 255),
+        TvColor::Yellow => (255, 255, 85),
+        TvColor::White => (255, 255, 255),
     }
 }
 
@@ -133,16 +112,19 @@ pub fn dump_buffer<W: Write>(
 
             if need_fg_change || need_bg_change {
                 if need_fg_change && need_bg_change {
+                    let (fg_r, fg_g, fg_b) = color_to_rgb(cell.attr.fg);
+                    let (bg_r, bg_g, bg_b) = color_to_rgb(cell.attr.bg);
                     write!(
                         writer,
-                        "\x1b[{};{}m",
-                        color_to_ansi_fg(cell.attr.fg),
-                        color_to_ansi_bg(cell.attr.bg)
+                        "\x1b[38;2;{};{};{};48;2;{};{};{}m",
+                        fg_r, fg_g, fg_b, bg_r, bg_g, bg_b
                     )?;
                 } else if need_fg_change {
-                    write!(writer, "\x1b[{}m", color_to_ansi_fg(cell.attr.fg))?;
+                    let (fg_r, fg_g, fg_b) = color_to_rgb(cell.attr.fg);
+                    write!(writer, "\x1b[38;2;{};{};{}m", fg_r, fg_g, fg_b)?;
                 } else {
-                    write!(writer, "\x1b[{}m", color_to_ansi_bg(cell.attr.bg))?;
+                    let (bg_r, bg_g, bg_b) = color_to_rgb(cell.attr.bg);
+                    write!(writer, "\x1b[48;2;{};{};{}m", bg_r, bg_g, bg_b)?;
                 }
                 last_fg = Some(cell.attr.fg);
                 last_bg = Some(cell.attr.bg);
@@ -190,16 +172,19 @@ pub fn dump_buffer_region<W: Write>(
 
             if need_fg_change || need_bg_change {
                 if need_fg_change && need_bg_change {
+                    let (fg_r, fg_g, fg_b) = color_to_rgb(cell.attr.fg);
+                    let (bg_r, bg_g, bg_b) = color_to_rgb(cell.attr.bg);
                     write!(
                         writer,
-                        "\x1b[{};{}m",
-                        color_to_ansi_fg(cell.attr.fg),
-                        color_to_ansi_bg(cell.attr.bg)
+                        "\x1b[38;2;{};{};{};48;2;{};{};{}m",
+                        fg_r, fg_g, fg_b, bg_r, bg_g, bg_b
                     )?;
                 } else if need_fg_change {
-                    write!(writer, "\x1b[{}m", color_to_ansi_fg(cell.attr.fg))?;
+                    let (fg_r, fg_g, fg_b) = color_to_rgb(cell.attr.fg);
+                    write!(writer, "\x1b[38;2;{};{};{}m", fg_r, fg_g, fg_b)?;
                 } else {
-                    write!(writer, "\x1b[{}m", color_to_ansi_bg(cell.attr.bg))?;
+                    let (bg_r, bg_g, bg_b) = color_to_rgb(cell.attr.bg);
+                    write!(writer, "\x1b[48;2;{};{};{}m", bg_r, bg_g, bg_b)?;
                 }
                 last_fg = Some(cell.attr.fg);
                 last_bg = Some(cell.attr.bg);

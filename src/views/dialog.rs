@@ -46,6 +46,9 @@ impl Dialog {
         self.result = CM_CANCEL;
 
         loop {
+            // Set dialog as the active view for F11 dumps
+            terminal.set_active_view_bounds(self.shadow_bounds());
+
             // Draw
             self.draw(terminal);
             self.update_cursor(terminal);

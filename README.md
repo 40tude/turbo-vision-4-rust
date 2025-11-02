@@ -18,7 +18,7 @@ A Rust implementation of the classic Borland Turbo Vision text user interface fr
 - **Cross-Platform**: Built on crossterm for wide terminal compatibility
 - **Modal Dialogs**: Built-in support for modal dialog execution
 - **Focus Management**: Tab navigation and keyboard shortcuts
-- **ANSI Dump**: Debug UI by dumping screen/views to ANSI text files
+- **ANSI Dump**: Debug UI by dumping screen/views to ANSI text files (F12 for full screen, F11 for active view, with flash effect)
 
 ## Quick Start
 
@@ -58,6 +58,8 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 ```
+
+**Tip**: Press F12 at any time to capture full screen to `screen-dump.txt`, or F11 to capture active window/dialog to `active-view-dump.txt` - both with a visual flash effect for debugging!
 
 ## Module Overview
 

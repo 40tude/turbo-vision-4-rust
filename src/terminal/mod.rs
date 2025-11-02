@@ -1,5 +1,5 @@
 use crate::core::draw::Cell;
-use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON};
+use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON, KB_F11, KB_F12};
 use crate::core::geometry::Point;
 use crate::core::palette::Attr;
 use crate::core::ansi_dump;
@@ -21,6 +21,7 @@ pub struct Terminal {
     last_mouse_pos: Point,
     last_mouse_buttons: u8,
     clip_stack: Vec<crate::core::geometry::Rect>,
+    active_view_bounds: Option<crate::core::geometry::Rect>,
 }
 
 impl Terminal {
@@ -50,6 +51,7 @@ impl Terminal {
             last_mouse_pos: Point::zero(),
             last_mouse_buttons: 0,
             clip_stack: Vec::new(),
+            active_view_bounds: None,
         })
     }
 
@@ -69,6 +71,16 @@ impl Terminal {
     /// Get terminal size
     pub fn size(&self) -> (u16, u16) {
         (self.width, self.height)
+    }
+
+    /// Set the bounds of the currently active view (for F11 screen dumps)
+    pub fn set_active_view_bounds(&mut self, bounds: crate::core::geometry::Rect) {
+        self.active_view_bounds = Some(bounds);
+    }
+
+    /// Clear the active view bounds
+    pub fn clear_active_view_bounds(&mut self) {
+        self.active_view_bounds = None;
     }
 
     /// Push a clipping region onto the stack
@@ -228,6 +240,29 @@ impl Terminal {
                         // ESC sequence in progress, don't generate event yet
                         return Ok(None);
                     }
+
+                    // Handle global screen dump shortcuts at the lowest level
+                    if key_code == KB_F12 {
+                        let _ = self.flash();
+                        let _ = self.dump_screen("screen-dump.txt");
+                        return Ok(None);  // Don't propagate event, it's been handled
+                    }
+
+                    // Handle active view dump shortcut
+                    if key_code == KB_F11 {
+                        let _ = self.flash();
+                        if let Some(bounds) = self.active_view_bounds {
+                            let _ = self.dump_region(
+                                bounds.a.x as u16,
+                                bounds.a.y as u16,
+                                (bounds.b.x - bounds.a.x) as u16,
+                                (bounds.b.y - bounds.a.y) as u16,
+                                "active-view-dump.txt"
+                            );
+                        }
+                        return Ok(None);  // Don't propagate event, it's been handled
+                    }
+
                     Ok(Some(Event::keyboard(key_code)))
                 }
                 CTEvent::Mouse(mouse) => {
@@ -250,6 +285,29 @@ impl Terminal {
                         // ESC sequence in progress, wait for next key
                         continue;
                     }
+
+                    // Handle global screen dump shortcuts at the lowest level
+                    if key_code == KB_F12 {
+                        let _ = self.flash();
+                        let _ = self.dump_screen("screen-dump.txt");
+                        continue;  // Don't return event, it's been handled - wait for next event
+                    }
+
+                    // Handle active view dump shortcut
+                    if key_code == KB_F11 {
+                        let _ = self.flash();
+                        if let Some(bounds) = self.active_view_bounds {
+                            let _ = self.dump_region(
+                                bounds.a.x as u16,
+                                bounds.a.y as u16,
+                                (bounds.b.x - bounds.a.x) as u16,
+                                (bounds.b.y - bounds.a.y) as u16,
+                                "active-view-dump.txt"
+                            );
+                        }
+                        continue;  // Don't return event, it's been handled - wait for next event
+                    }
+
                     return Ok(Event::keyboard(key_code));
                 }
                 CTEvent::Mouse(mouse) => {
@@ -319,6 +377,38 @@ impl Terminal {
     /// Get a reference to the internal buffer for custom dumping
     pub fn buffer(&self) -> &[Vec<Cell>] {
         &self.buffer
+    }
+
+    /// Flash the screen by inverting all colors briefly
+    pub fn flash(&mut self) -> io::Result<()> {
+        use std::thread;
+
+        // Save current buffer
+        let saved_buffer = self.buffer.clone();
+
+        // Invert all colors
+        for row in &mut self.buffer {
+            for cell in row {
+                // Swap foreground and background colors
+                let temp_fg = cell.attr.fg;
+                cell.attr.fg = cell.attr.bg;
+                cell.attr.bg = temp_fg;
+            }
+        }
+
+        // Flush inverted screen
+        self.flush()?;
+
+        // Wait briefly (50ms)
+        thread::sleep(Duration::from_millis(50));
+
+        // Restore original buffer
+        self.buffer = saved_buffer;
+
+        // Flush restored screen
+        self.flush()?;
+
+        Ok(())
     }
 }
 

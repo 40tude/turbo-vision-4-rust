@@ -31,7 +31,17 @@ Added a comprehensive ANSI dump feature to the turbo-vision crate for debugging 
 
 ## API Design
 
-### High-Level API (Recommended for most users)
+### Global Shortcut (Easiest Method)
+
+Press **F12** at any time during application execution to automatically dump the screen to `screen-dump.txt`. This is handled at the application level and works globally across all views and dialogs.
+
+```rust
+let mut app = Application::new()?;
+// ... set up UI ...
+app.run();  // User can press F12 anytime
+```
+
+### High-Level API (Programmatic Access)
 
 ```rust
 // Dump entire screen

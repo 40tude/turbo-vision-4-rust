@@ -90,6 +90,15 @@ impl Group {
         }
     }
 
+    /// Get a reference to the currently focused child view, if any
+    pub fn focused_child(&self) -> Option<&dyn View> {
+        if self.focused < self.children.len() {
+            Some(&*self.children[self.focused])
+        } else {
+            None
+        }
+    }
+
     pub fn select_next(&mut self) {
         if self.children.is_empty() {
             return;

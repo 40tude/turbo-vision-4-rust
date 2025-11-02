@@ -41,6 +41,9 @@ impl Application {
         self.running = true;
 
         while self.running {
+            // Update active view bounds for F11 dumps
+            self.update_active_view_bounds();
+
             // Draw everything
             self.draw();
             let _ = self.terminal.flush();
@@ -49,6 +52,18 @@ impl Application {
             if let Ok(Some(mut event)) = self.terminal.poll_event(Duration::from_millis(50)) {
                 self.handle_event(&mut event);
             }
+        }
+    }
+
+    fn update_active_view_bounds(&mut self) {
+        // The active view is the topmost window on the desktop (last child with shadow)
+        // Get the focused child from the desktop
+        let child_count = self.desktop.child_count();
+        if child_count > 0 {
+            let last_child = self.desktop.child_at(child_count - 1);
+            self.terminal.set_active_view_bounds(last_child.shadow_bounds());
+        } else {
+            self.terminal.clear_active_view_bounds();
         }
     }
 
