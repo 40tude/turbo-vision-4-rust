@@ -4,7 +4,7 @@ use crate::core::draw::DrawBuffer;
 use crate::core::event::{Event, EventType, KB_ENTER, MB_LEFT_BUTTON};
 use crate::core::geometry::Rect;
 use crate::core::palette::colors;
-use crate::core::state::{SHADOW_BOTTOM, SHADOW_SOLID, SHADOW_TOP};
+use crate::core::state::{StateFlags, SF_DISABLED, SHADOW_BOTTOM, SHADOW_SOLID, SHADOW_TOP};
 use crate::terminal::Terminal;
 
 pub struct Button {
@@ -13,27 +13,36 @@ pub struct Button {
     command: CommandId,
     is_default: bool,
     focused: bool,
-    disabled: bool,
+    state: StateFlags,
 }
 
 impl Button {
     pub fn new(bounds: Rect, title: &str, command: CommandId, is_default: bool) -> Self {
+        use crate::core::command_set;
+
+        // Check if command is initially enabled
+        // Matches Borland: TButton constructor checks commandEnabled() (tbutton.cc:55-56)
+        let mut state = 0;
+        if !command_set::command_enabled(command) {
+            state |= SF_DISABLED;
+        }
+
         Self {
             bounds,
             title: title.to_string(),
             command,
             is_default,
             focused: false,
-            disabled: false,
+            state,
         }
     }
 
     pub fn set_disabled(&mut self, disabled: bool) {
-        self.disabled = disabled;
+        self.set_state_flag(SF_DISABLED, disabled);
     }
 
     pub fn is_disabled(&self) -> bool {
-        self.disabled
+        self.get_state_flag(SF_DISABLED)
     }
 }
 
@@ -50,7 +59,9 @@ impl View for Button {
         let width = self.bounds.width() as usize;
         let height = self.bounds.height() as usize;
 
-        let button_attr = if self.disabled {
+        let is_disabled = self.is_disabled();
+
+        let button_attr = if is_disabled {
             colors::BUTTON_DISABLED
         } else if self.focused {
             colors::BUTTON_SELECTED
@@ -64,7 +75,7 @@ impl View for Button {
         let shadow_attr = colors::BUTTON_SHADOW;
 
         // Shortcut attributes - use yellow for button shortcuts
-        let shortcut_attr = if self.disabled {
+        let shortcut_attr = if is_disabled {
             colors::BUTTON_DISABLED  // DarkGray on Green (disabled)
         } else if self.focused {
             colors::BUTTON_SELECTED  // White on Green (focused)
@@ -114,7 +125,7 @@ impl View for Button {
 
     fn handle_event(&mut self, event: &mut Event) {
         // Disabled buttons don't handle any events
-        if self.disabled {
+        if self.is_disabled() {
             return;
         }
 
@@ -141,16 +152,47 @@ impl View for Button {
                     *event = Event::command(self.command);
                 }
             }
+            EventType::Broadcast => {
+                use crate::core::command::CM_COMMAND_SET_CHANGED;
+                use crate::core::command_set;
+
+                // Handle command set changed broadcast
+                // Matches Borland: TButton::handleEvent() cmCommandSetChanged (tbutton.cc:255-262)
+                if event.command == CM_COMMAND_SET_CHANGED {
+                    // Query global command set (thread-local static, like Borland)
+                    let should_be_enabled = command_set::command_enabled(self.command);
+                    let is_currently_disabled = self.is_disabled();
+
+                    // Update disabled state if it changed
+                    if should_be_enabled && is_currently_disabled {
+                        // Command was disabled, now enabled
+                        self.set_disabled(false);
+                    } else if !should_be_enabled && !is_currently_disabled {
+                        // Command was enabled, now disabled
+                        self.set_disabled(true);
+                    }
+
+                    // Event is not cleared - other views may need it
+                }
+            }
             _ => {}
         }
     }
 
     fn can_focus(&self) -> bool {
-        !self.disabled
+        !self.is_disabled()
     }
 
     fn set_focus(&mut self, focused: bool) {
         self.focused = focused;
+    }
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 
     fn is_default_button(&self) -> bool {

@@ -70,8 +70,9 @@ use std::cell::RefCell;
 
 const CMD_FILE_SELECTED: u16 = 1000;
 
-// Child index in the dialog
+// Child indices in the dialog
 const CHILD_LISTBOX: usize = 4; // ListBox
+const CHILD_OK_BUTTON: usize = 5; // Open button
 
 pub struct FileDialog {
     dialog: Dialog,
@@ -328,9 +329,17 @@ impl FileDialog {
     }
 
     fn update_ok_button_state(&mut self) {
-        // Note: We can't easily disable the button visually without downcasting,
-        // but the CM_OK handler ignores empty input, effectively disabling the button
-        // TODO: Add set_enabled() method to View trait for better architecture
+        use crate::core::state::SF_DISABLED;
+
+        // Check if input field is empty
+        let is_empty = self.file_name_data.borrow().is_empty();
+
+        // Get the OK button and update its disabled state
+        // Matches Borland's TView::setState(sfDisabled, enable) pattern
+        if CHILD_OK_BUTTON < self.dialog.child_count() {
+            let ok_button = self.dialog.child_at_mut(CHILD_OK_BUTTON);
+            ok_button.set_state_flag(SF_DISABLED, is_empty);
+        }
     }
 
     fn rebuild_and_redraw(&mut self, _terminal: &mut Terminal) {

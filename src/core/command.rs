@@ -10,6 +10,13 @@ pub const CM_YES: CommandId = 12;
 pub const CM_NO: CommandId = 13;
 pub const CM_DEFAULT: CommandId = 14;
 
+// Broadcast commands
+pub const CM_COMMAND_SET_CHANGED: CommandId = 52;  // Borland: cmCommandSetChanged
+pub const CM_RECEIVED_FOCUS: CommandId = 50;       // Borland: cmReceivedFocus
+pub const CM_RELEASED_FOCUS: CommandId = 51;       // Borland: cmReleasedFocus
+pub const CM_GRAB_DEFAULT: CommandId = 62;         // Borland: cmGrabDefault
+pub const CM_RELEASE_DEFAULT: CommandId = 63;      // Borland: cmReleaseDefault
+
 // Custom commands (user defined)
 pub const CM_ABOUT: CommandId = 100;
 pub const CM_BIRTHDATE: CommandId = 101;

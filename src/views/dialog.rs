@@ -99,48 +99,49 @@ impl View for Dialog {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        // Intercept Enter key for default button handling
-        if event.what == EventType::Keyboard && event.key_code == KB_ENTER {
-            // Check if the currently focused view is a Memo control
-            // If so, let it handle the Enter key
-            let focused_is_memo = self.find_focused_memo();
+        // First let the window (and its children) handle the event
+        // This is critical: if a focused Memo/Editor handles Enter, it will clear the event
+        // Borland's TDialog calls TWindow::handleEvent() FIRST (tdialog.cc line 47)
+        self.window.handle_event(event);
 
-            if !focused_is_memo {
-                // Find the default button
-                if let Some(default_command) = self.find_default_button_command() {
-                    // Activate the default button by generating its command
-                    *event = Event::command(default_command);
-                    return;
+        // Now check if the event is still active after children processed it
+        // If a child (like Memo/Editor) handled Enter, event.what will be EventType::None
+        // This matches Borland's TDialog architecture (tdialog.cc lines 48-86)
+        match event.what {
+            EventType::Keyboard => {
+                match event.key_code {
+                    KB_ESC_ESC => {
+                        // Double ESC generates cancel command (lines 53-58)
+                        *event = Event::command(CM_CANCEL);
+                    }
+                    KB_ENTER => {
+                        // Enter key activates default button (lines 60-66)
+                        // Borland converts to evBroadcast + cmDefault and re-queues
+                        // We simplify by directly activating the default button
+                        if let Some(cmd) = self.find_default_button_command() {
+                            *event = Event::command(cmd);
+                        } else {
+                            event.clear();
+                        }
+                    }
+                    _ => {}
                 }
             }
+            _ => {}
         }
-
-        self.window.handle_event(event);
     }
 }
 
 impl Dialog {
-    /// Check if the currently focused view is a Memo control
-    fn find_focused_memo(&self) -> bool {
-        for i in 0..self.child_count() {
-            let child = self.child_at(i);
-            if child.is_memo() {
-                // For now, we assume if a Memo has focus, we found it
-                // In a more sophisticated implementation, we might check focus state
-                // but Memo controls are relatively rare
-                return true;
-            }
-        }
-        false
-    }
-
     /// Find the default button and return its command if it's enabled
     /// Returns None if no default button found or if it's disabled
+    /// Matches Borland's TButton::handleEvent() cmDefault broadcast handling (tbutton.cc lines 238-244)
     fn find_default_button_command(&self) -> Option<CommandId> {
         for i in 0..self.child_count() {
             let child = self.child_at(i);
             if child.is_default_button() {
                 // Check if the button can receive focus (i.e., not disabled)
+                // Borland checks: amDefault && !(state & sfDisabled)
                 if child.can_focus() {
                     return child.button_command();
                 } else {

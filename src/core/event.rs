@@ -138,6 +138,14 @@ impl Event {
         }
     }
 
+    pub fn broadcast(cmd: CommandId) -> Self {
+        Self {
+            what: EventType::Broadcast,
+            command: cmd,
+            ..Self::nothing()
+        }
+    }
+
     pub fn mouse(event_type: EventType, pos: Point, buttons: u8, double_click: bool) -> Self {
         Self {
             what: event_type,

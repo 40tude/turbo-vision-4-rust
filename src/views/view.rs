@@ -20,6 +20,24 @@ pub trait View {
     /// Set view state flags
     fn set_state(&mut self, _state: StateFlags) {}
 
+    /// Set or clear specific state flag(s)
+    /// Matches Borland's TView::setState(ushort aState, Boolean enable)
+    /// If enable is true, sets the flag(s), otherwise clears them
+    fn set_state_flag(&mut self, flag: StateFlags, enable: bool) {
+        let current = self.state();
+        if enable {
+            self.set_state(current | flag);
+        } else {
+            self.set_state(current & !flag);
+        }
+    }
+
+    /// Check if specific state flag(s) are set
+    /// Matches Borland's TView::getState(ushort aState)
+    fn get_state_flag(&self, flag: StateFlags) -> bool {
+        (self.state() & flag) == flag
+    }
+
     /// Check if view has shadow enabled
     fn has_shadow(&self) -> bool {
         (self.state() & SF_SHADOW) != 0
@@ -54,19 +72,16 @@ pub trait View {
     }
 
     /// Check if this view is a default button (for Enter key handling at Dialog level)
+    /// Corresponds to Borland's TButton::amDefault flag (tbutton.cc line 239)
     fn is_default_button(&self) -> bool {
         false
     }
 
     /// Get the command ID for this button (if it's a button)
     /// Returns None if not a button
+    /// Used by Dialog to activate default button on Enter key
     fn button_command(&self) -> Option<u16> {
         None
-    }
-
-    /// Check if this view is a Memo control (multiline text input that handles Enter)
-    fn is_memo(&self) -> bool {
-        false
     }
 }
 
