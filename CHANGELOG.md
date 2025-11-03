@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2025-11-03
+
+### Added
+- **Help System** (Phase 9 - 867 lines, 22 tests)
+  - **HelpFile** (src/views/help_file.rs - 302 lines, 7 tests)
+    - Parses markdown files into help topics with # Title {#topic-id} format
+    - Cross-reference support via [Text](#topic-id) markdown links
+    - Methods: `get_topic()`, `get_default_topic()`, `get_topic_ids()`, `reload()`
+    - Human-readable format replacing Borland's binary TPH files
+  - **HelpViewer** (src/views/help_viewer.rs - 286 lines, 4 tests)
+    - Displays help topic content with scrolling support
+    - Keyboard navigation: Up/Down, PgUp/PgDn, Home/End
+    - Optional vertical scrollbar for long topics
+    - Focus-aware coloring (HELP_NORMAL, HELP_FOCUSED)
+    - Uses DrawBuffer for efficient rendering
+  - **HelpWindow** (src/views/help_window.rs - 157 lines, 4 tests)
+    - Modal help window wrapper around HelpViewer
+    - Methods: `show_topic()`, `show_default_topic()`, `execute()`
+    - ESC key closes help window
+    - Delegates to Window for frame and modal behavior
+  - **HelpContext** (src/views/help_context.rs - 122 lines, 7 tests)
+    - Maps context IDs (u16) to help topic IDs (String)
+    - Methods: `register()`, `get_topic()`, `has_context()`, `unregister()`
+    - Foundation for F1 context-sensitive help support
+  - Example: examples/help_system.rs demonstrating help topics and navigation
+  - Sample help file: examples/help.md with 6 topics and cross-references
+
+- **Color Palette**:
+  - `HELP_NORMAL`: Black on LightGray for unfocused help text
+  - `HELP_FOCUSED`: Black on White for focused help text
+
+### Technical Details
+The Help System implements Borland's context-sensitive help architecture using modern markdown format instead of proprietary binary TPH files. Key advantages:
+
+**Markdown Format**:
+- Human-readable and easy to author
+- Version control friendly (plain text diffs)
+- No special tools required for editing
+- Cross-platform compatible
+- Can be generated from other documentation
+
+**Architecture**:
+- HelpFile parses markdown on load, building a HashMap of topics
+- Topics identified by {#topic-id} in heading: # Welcome {#welcome}
+- Cross-references via standard markdown links: [See also](#other-topic)
+- HelpViewer provides scrollable display with keyboard navigation
+- HelpWindow wraps viewer in a modal window for display
+- HelpContext enables F1-style context-sensitive help
+
+**Design Patterns**:
+- Matches Borland's THelpFile, THelpViewer, THelpWindow patterns
+- Uses Rc<RefCell<HelpFile>> for shared help file access
+- Modal execution via Window's execute() method
+- Keyboard-driven navigation matching Borland's behavior
+
+Reference: Borland Turbo Vision help.h and help system architecture
+
 ## [0.2.3] - 2025-11-03
 
 ### Added

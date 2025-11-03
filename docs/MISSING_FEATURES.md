@@ -1,16 +1,16 @@
 # Missing Features Inventory
 
 *Generated from Borland Turbo Vision source analysis*
-*Last updated: 2025-11-03 (post-Phase 7 completion: TEditWindow + TLookupValidator + OSClipboard)*
+*Last updated: 2025-11-03 (post-Phase 9: Help System complete)*
 
 This document catalogs missing features compared to the original Borland Turbo Vision framework, providing a roadmap for future development.
 
 ## Summary Statistics
 
-- **Total Missing Components**: 29 (was 35; completed: TEditWindow, TLookupValidator, OSClipboard, TFileCollection, TDirCollection)
-- **Estimated Total Effort**: 648 hours (~16 weeks at 40 hrs/week)
+- **Total Missing Components**: 25 (was 29; completed: Help System 4 components)
+- **Estimated Total Effort**: 592 hours (~15 weeks at 40 hrs/week)
 - **HIGH Priority**: 0 items (0 hours) - Core functionality COMPLETE
-- **MEDIUM Priority**: 27 items (330 hours) - Extended features
+- **MEDIUM Priority**: 23 items (274 hours) - Extended features
 - **LOW Priority**: 2 items (318 hours) - Nice to have
 
 ## Quick Reference by Category
@@ -105,11 +105,13 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 **Note:** Borland's binary resource files were a 1990s necessity. Modern Rust has excellent serialization libraries (serde) and standard formats (JSON, TOML, RON) that are more maintainable and debuggable.
 
-### Help System (56 hours)
-- **THelpFile** - Help file manager (20h)
-- **THelpBase** - Help infrastructure (12h)
-- **THelpWindow** - Help display window (12h)
-- **THelpViewer** - Help content viewer (12h)
+### Help System (~0 hours remaining)
+- ✅ **THelpFile** - Help file manager (IMPLEMENTED - `src/views/help_file.rs`, markdown-based, 302 lines, 7 tests)
+- ✅ **THelpViewer** - Help content viewer (IMPLEMENTED - `src/views/help_viewer.rs`, 286 lines, 4 tests)
+- ✅ **THelpWindow** - Help display window (IMPLEMENTED - `src/views/help_window.rs`, 157 lines, 4 tests)
+- ✅ **HelpContext** - Context-sensitive help (IMPLEMENTED - `src/views/help_context.rs`, 122 lines, 7 tests)
+
+**Note:** Modern implementation uses markdown files instead of Borland's binary TPH format. Features include topic navigation, cross-references, keyboard scrolling, and context-sensitive help mapping. Total: 867 lines, 22 tests.
 
 ### Streaming System (~0 hours - NOT NEEDED)
 - ~~**pstream, ipstream, opstream**~~ - Use serde for serialization
@@ -137,7 +139,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **CodePage** - Character encoding (12h)
 - ✅ **OSClipboard** - System clipboard (IMPLEMENTED - arboard integration in `src/core/clipboard.rs`)
 
-**Total MEDIUM Priority: 330 hours** (was 352 hours; completed: TLookupValidator 8h, OSClipboard 10h; marked obsolete: TFileCollection 8h, TDirCollection 8h = -34h total)
+**Total MEDIUM Priority: 274 hours** (was 330 hours; completed: TLookupValidator 8h, OSClipboard 10h, Help System 56h; marked obsolete: TFileCollection 8h, TDirCollection 8h = -90h total)
 
 ## Low Priority Components (Nice to Have)
 
@@ -297,10 +299,27 @@ Enhanced core infrastructure:
 
 **Rationale:** Modern Rust has superior serialization (serde) and standard formats. No need to recreate 1990s binary resource files.
 
-### Phase 9: Help System (56 hours)
-Context-sensitive help:
-- THelpFile, THelpBase
-- THelpWindow, THelpViewer
+### Phase 9: Help System (56 hours) - COMPLETE
+**Goal**: Context-sensitive help with markdown format
+- ✅ THelpFile - Markdown parser and topic manager (302 lines, 7 tests)
+  - Parses markdown with # Title {#topic-id} format
+  - Cross-reference support via [Text](#topic-id)
+  - get_topic(), get_default_topic(), reload()
+  - Human-readable format (not binary TPH)
+- ✅ THelpViewer - Scrollable content display (286 lines, 4 tests)
+  - Keyboard navigation (arrows, PgUp/PgDn, Home/End)
+  - Optional vertical scrollbar
+  - Focus-aware coloring
+- ✅ THelpWindow - Modal help window (157 lines, 4 tests)
+  - show_topic(), show_default_topic()
+  - execute() for modal display
+  - ESC to close
+- ✅ HelpContext - Context-sensitive mapping (122 lines, 7 tests)
+  - Maps context IDs to help topics
+  - Foundation for F1 context help
+- Example: examples/help_system.rs with examples/help.md
+
+**Completed**: 2025-11-03. Modern markdown-based help system replaces Borland's binary TPH format. Total: 867 lines, 22 tests.
 
 ### Phase 10: Polish (262+ hours)
 Optional enhancements:
@@ -317,10 +336,10 @@ Optional enhancements:
 - **After Phase 6** (124 hours): ✅ COMPLETE - File system navigation with tree and list views
 - **After Phase 7** (132 hours): ✅ COMPLETE - Professional text editing with file I/O
 - **After Phase 8** (190 hours): ✅ COMPLETE - Application framework (already implemented!)
-- **After Phase 9** (246 hours): Context-sensitive help system
+- **After Phase 9** (246 hours): ✅ COMPLETE - Context-sensitive help system with markdown
 - **After Phase 10** (508+ hours): Complete framework with all utilities
 
-**Current Status**: 190 cumulative hours of implementation complete
+**Current Status**: 246 cumulative hours of implementation complete
 
 ## Quick Win Opportunities
 
@@ -333,7 +352,7 @@ These items provide high architectural value for relatively low effort:
 
 **All quick wins completed!** Total: 37 hours of foundational architectural improvements.
 
-## Current Implementation Status (v0.2.5+)
+## Current Implementation Status (v0.2.5)
 
 ### What We Have
 - Basic controls: Button, InputLine, StaticText, Label, CheckBox, RadioButton
@@ -346,10 +365,31 @@ These items provide high architectural value for relatively low effort:
 - Utilities: ScrollBar, Scroller, Indicator, ParamText, Background
 - Validation: Validator trait, FilterValidator, RangeValidator, **LookupValidator**
 - History: HistoryManager, HistoryViewer, HistoryWindow, History button
+- **Help: HelpFile (markdown), HelpViewer, HelpWindow, HelpContext**
 - Event system: Three-phase processing, event re-queuing, broadcasts
 - Cluster trait (base for CheckBox/RadioButton button groups)
 
-### Recent Improvements (Phase 7+ - Editor, Validators, Clipboard)
+### Recent Improvements (Phase 9 - Help System)
+- **HelpFile** (`src/views/help_file.rs`, 302 lines, 7 tests)
+  - Parses markdown files into help topics
+  - Topic format: # Title {#topic-id}
+  - Cross-reference links: [Text](#topic-id)
+  - get_topic(), get_default_topic(), reload()
+- **HelpViewer** (`src/views/help_viewer.rs`, 286 lines, 4 tests)
+  - Displays help topic content with scrolling
+  - Keyboard navigation (arrows, PgUp/PgDn, Home/End)
+  - Optional vertical scrollbar
+  - Focus-aware coloring
+- **HelpWindow** (`src/views/help_window.rs`, 157 lines, 4 tests)
+  - Modal help window wrapper
+  - show_topic(), show_default_topic()
+  - execute() for modal display, ESC to close
+- **HelpContext** (`src/views/help_context.rs`, 122 lines, 7 tests)
+  - Maps context IDs to help topic IDs
+  - Foundation for F1 context-sensitive help
+- Example: examples/help_system.rs with examples/help.md
+
+### Earlier Improvements (Phase 7+ - Editor, Validators, Clipboard)
 - **EditWindow** (`src/views/edit_window.rs`, 169 lines, 3 tests)
   - Window wrapper around Editor
   - Delegates file operations (load_file, save_file, save_as)

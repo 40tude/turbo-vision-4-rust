@@ -107,6 +107,7 @@ Currently implements:
 - ✅ Editor with search/replace and file I/O (load_file, save_file, save_as)
 - ✅ EditWindow (ready-to-use editor window wrapper)
 - ✅ OS Clipboard integration (cross-platform with arboard)
+- ✅ Help System (markdown-based with HelpFile, HelpViewer, HelpWindow, HelpContext)
 
 ## Architecture
 
@@ -130,11 +131,11 @@ See `local-only/ARCHITECTURAL-FINDINGS.md` for detailed analysis of how Borland'
 ===============================================================================
  Language            Files        Lines         Code     Comments       Blanks
 ===============================================================================
- Rust                   55        14175        10856         1218         2101
- |- Markdown            49         1251            5         1088          158
- (Total)                          15426        10861         2306         2259
+ Rust                   59        15034        11530         1261         2243
+ |- Markdown            53         1310            5         1144          161
+ (Total)                          16344        11535         2405         2404
 ===============================================================================
- Total                  55        14175        10856         1218         2101
+ Total                  59        15034        11530         1261         2243
 ===============================================================================
 ```
 
