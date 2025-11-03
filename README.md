@@ -103,7 +103,8 @@ Currently implements:
 - ✅ Window closing (non-modal windows close with close button, modal dialogs convert to cancel)
 - ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
 - ✅ ANSI Dump for debugging (dump screen/views to text files with colors)
-- ❌ Full text editor with search/replace (basic editing available)
+- ✅ Input Validators (FilterValidator, RangeValidator with hex/octal support)
+- ✅ Editor with search/replace (case-sensitive, whole-word, find-next, replace-all)
 
 ## Architecture
 
@@ -127,15 +128,15 @@ See `local-only/ARCHITECTURAL-FINDINGS.md` for detailed analysis of how Borland'
 ===============================================================================
  Language            Files        Lines         Code     Comments       Blanks
 ===============================================================================
- Rust                   53        10362         7966          915         1481
- Markdown                6         1613            0         1171          442
- TOML                    1           35           32            0            3
+ Rust                   41         9882         7649          829         1404
+ |- Markdown            34          641            2          582           57
+ (Total)                          10523         7651         1411         1461
 ===============================================================================
- Total                  60        12010         7998         2086         1926
+ Total                  41         9882         7649          829         1404
 ===============================================================================
 ```
 
-Generated with [tokei](https://github.com/XAMPPRocky/tokei)
+Generated with [tokei](https://github.com/XAMPPRocky/tokei) - includes inline documentation
 
 ## License
 
