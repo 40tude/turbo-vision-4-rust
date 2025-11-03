@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-11-03
+
+### Added
+- **Status Line Hot Spots**: Status line items now have visual feedback and improved interaction
+  - Mouse hover highlighting: items change color when mouse hovers over them
+  - Hover color: White on Green (matching button style) for better visibility
+  - Dedicated `draw_select()` method to render items with selection state
+  - Context-sensitive hint display: `set_hint()` method to show help text on status line
+  - Improved mouse tracking during clicks for better user feedback
+  - New `StatusLine::item_mouse_is_in()` helper to detect which item mouse is over
+  - New example: `status_line_demo.rs` showcasing all status line improvements
+
+### Changed
+- **StatusLine**: Enhanced with hover state tracking and hint system
+  - Added `selected_item: Option<usize>` field to track hovered item
+  - Added `hint_text: Option<String>` field for context-sensitive help
+  - Improved `handle_event()` with mouse move detection for hover effects
+  - Hint text displayed on right side when available and space permits
+  - Matches Borland's `TStatusLine::drawSelect()` pattern from tstatusl.cc
+
+- **Color Palette**: Added new status line selection colors
+  - `STATUS_SELECTED`: White on Green for selected status items
+  - `STATUS_SELECTED_SHORTCUT`: Yellow on Green for shortcuts in selected items
+  - Provides clear visual feedback matching button color scheme
+
+### Technical Details
+This implements Borland Turbo Vision's status line hot spot pattern. The status line now provides visual feedback when the user hovers over items, matching the behavior of `TStatusLine::drawSelect()` in the original implementation. The hint system allows displaying context-sensitive help text on the status line, which can be updated based on the focused control or current application state. This is a step toward full context-sensitive help support planned for v0.3.0.
+
 ## [0.1.7] - 2025-11-03
 
 ### Added

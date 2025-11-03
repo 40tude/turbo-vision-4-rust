@@ -120,6 +120,8 @@ pub mod colors {
 
     pub const STATUS_NORMAL: Attr = Attr::new(TvColor::Black, TvColor::LightGray);
     pub const STATUS_SHORTCUT: Attr = Attr::new(TvColor::Red, TvColor::LightGray);
+    pub const STATUS_SELECTED: Attr = Attr::new(TvColor::White, TvColor::Green);
+    pub const STATUS_SELECTED_SHORTCUT: Attr = Attr::new(TvColor::Yellow, TvColor::Green);
 
     pub const INPUT_NORMAL: Attr = Attr::new(TvColor::Black, TvColor::LightGray);
     pub const INPUT_FOCUSED: Attr = Attr::new(TvColor::Yellow, TvColor::Blue);

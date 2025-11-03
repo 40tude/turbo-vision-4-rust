@@ -85,7 +85,7 @@ Currently implements:
 - ✅ Static text labels (with centered text support)
 - ✅ Input fields
 - ✅ Menu bar with dropdowns and keyboard shortcut display
-- ✅ Status line
+- ✅ Status line with hot spots (hover highlighting, context-sensitive hints)
 - ✅ Desktop manager
 - ✅ Scrollbars (vertical and horizontal)
 - ✅ Scroller base class for scrollable views

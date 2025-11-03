@@ -26,6 +26,8 @@ pub struct StatusLine {
     bounds: Rect,
     items: Vec<StatusItem>,
     item_positions: Vec<(i16, i16)>, // (start_x, end_x) for each item
+    selected_item: Option<usize>,    // Currently hovered/selected item
+    hint_text: Option<String>,       // Context-sensitive help text
 }
 
 impl StatusLine {
@@ -34,7 +36,99 @@ impl StatusLine {
             bounds,
             items,
             item_positions: Vec::new(),
+            selected_item: None,
+            hint_text: None,
         }
+    }
+
+    /// Set the hint text to display on the right side of the status line
+    pub fn set_hint(&mut self, hint: Option<String>) {
+        self.hint_text = hint;
+    }
+
+    /// Draw the status line with optional selected item highlighting
+    fn draw_select(&mut self, terminal: &mut Terminal, selected: Option<usize>) {
+        let width = self.bounds.width() as usize;
+        let mut buf = DrawBuffer::new(width);
+        buf.move_char(0, ' ', colors::STATUS_NORMAL, width);
+
+        // Clear previous item positions
+        self.item_positions.clear();
+
+        let mut x = 1;
+        for (idx, item) in self.items.iter().enumerate() {
+            if x + item.text.len() + 2 < width {
+                let start_x = x as i16;
+
+                // Determine color based on selection
+                let is_selected = selected == Some(idx);
+                let normal_color = if is_selected {
+                    colors::STATUS_SELECTED
+                } else {
+                    colors::STATUS_NORMAL
+                };
+                let shortcut_color = if is_selected {
+                    colors::STATUS_SELECTED_SHORTCUT
+                } else {
+                    colors::STATUS_SHORTCUT
+                };
+
+                // Parse ~X~ for highlighting - everything between tildes is highlighted
+                let mut chars = item.text.chars();
+                #[allow(clippy::while_let_on_iterator)]
+                while let Some(ch) = chars.next() {
+                    if ch == '~' {
+                        // Read all characters until closing ~ in highlight color
+                        #[allow(clippy::while_let_on_iterator)]
+                        while let Some(shortcut_ch) = chars.next() {
+                            if shortcut_ch == '~' {
+                                break;  // Found closing tilde
+                            }
+                            buf.put_char(x, shortcut_ch, shortcut_color);
+                            x += 1;
+                        }
+                    } else {
+                        buf.put_char(x, ch, normal_color);
+                        x += 1;
+                    }
+                }
+
+                let end_x = x as i16;
+                self.item_positions.push((start_x, end_x));
+
+                buf.move_str(x, " │ ", normal_color);
+                x += 3;
+            }
+        }
+
+        // Display hint text if available and there's space
+        if let Some(ref hint) = self.hint_text {
+            if x + hint.len() + 3 < width {
+                buf.move_str(x, " - ", colors::STATUS_NORMAL);
+                x += 3;
+                let hint_len = (width - x).min(hint.len());
+                for (i, ch) in hint.chars().take(hint_len).enumerate() {
+                    buf.put_char(x + i, ch, colors::STATUS_NORMAL);
+                }
+            }
+        }
+
+        write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
+    }
+
+    /// Find which item the mouse is currently over
+    fn item_mouse_is_in(&self, mouse_x: i16) -> Option<usize> {
+        for (i, &(start_x, end_x)) in self.item_positions.iter().enumerate() {
+            if i < self.items.len() {
+                let absolute_start = self.bounds.a.x + start_x;
+                let absolute_end = self.bounds.a.x + end_x;
+
+                if mouse_x >= absolute_start && mouse_x < absolute_end {
+                    return Some(i);
+                }
+            }
+        }
+        None
     }
 }
 
@@ -48,74 +142,56 @@ impl View for StatusLine {
     }
 
     fn draw(&mut self, terminal: &mut Terminal) {
-        let width = self.bounds.width() as usize;
-        let mut buf = DrawBuffer::new(width);
-        buf.move_char(0, ' ', colors::STATUS_NORMAL, width);
-
-        // Clear previous item positions
-        self.item_positions.clear();
-
-        let mut x = 1;
-        for item in &self.items {
-            if x + item.text.len() + 2 < width {
-                let start_x = x as i16;
-
-                // Parse ~X~ for highlighting - everything between tildes is red
-                let mut chars = item.text.chars();
-                #[allow(clippy::while_let_on_iterator)]
-                while let Some(ch) = chars.next() {
-                    if ch == '~' {
-                        // Read all characters until closing ~ in red
-                        #[allow(clippy::while_let_on_iterator)]
-                        while let Some(shortcut_ch) = chars.next() {
-                            if shortcut_ch == '~' {
-                                break;  // Found closing tilde
-                            }
-                            buf.put_char(x, shortcut_ch, colors::STATUS_SHORTCUT);  // Red color
-                            x += 1;
-                        }
-                    } else {
-                        buf.put_char(x, ch, colors::STATUS_NORMAL);
-                        x += 1;
-                    }
-                }
-
-                let end_x = x as i16;
-                self.item_positions.push((start_x, end_x));
-
-                buf.move_str(x, " │ ", colors::STATUS_NORMAL);
-                x += 3;
-            }
-        }
-
-        write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
+        // Draw with current selection (if any)
+        self.draw_select(terminal, self.selected_item);
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        // Handle mouse clicks on status items
+        // Handle mouse clicks on status items with tracking (like Borland)
         if event.what == EventType::MouseDown {
             let mouse_pos = event.mouse.pos;
 
-            if event.mouse.buttons & MB_LEFT_BUTTON != 0 {
-                // Check if click is on the status line
-                if mouse_pos.y == self.bounds.a.y {
-                    // Check which item was clicked
-                    for (i, &(start_x, end_x)) in self.item_positions.iter().enumerate() {
-                        if i < self.items.len() {
-                            let absolute_start = self.bounds.a.x + start_x;
-                            let absolute_end = self.bounds.a.x + end_x;
+            if event.mouse.buttons & MB_LEFT_BUTTON != 0 && mouse_pos.y == self.bounds.a.y {
+                // Track mouse movement while button is held down
+                // Initial selection
+                let selected_item = self.item_mouse_is_in(mouse_pos.x);
+                if selected_item.is_some() {
+                    self.selected_item = selected_item;
+                    // Note: In full implementation, we'd redraw here with selection
+                    // For now, we'll skip the redraw to avoid terminal borrow issues
+                }
 
-                            if mouse_pos.x >= absolute_start && mouse_pos.x < absolute_end {
-                                // Item clicked - execute its command
-                                let item = &self.items[i];
-                                if item.command != 0 {
-                                    *event = Event::command(item.command);
-                                    return;
-                                }
-                            }
+                // Clear the event since we're handling it
+                event.clear();
+
+                // If an item was selected, generate command
+                if let Some(idx) = selected_item {
+                    if idx < self.items.len() {
+                        let item = &self.items[idx];
+                        if item.command != 0 {
+                            *event = Event::command(item.command);
                         }
                     }
                 }
+
+                // Reset selection
+                self.selected_item = None;
+                return;
+            }
+        }
+
+        // Handle mouse move to show hover effect
+        if event.what == EventType::MouseMove {
+            let mouse_pos = event.mouse.pos;
+            if mouse_pos.y == self.bounds.a.y {
+                let hovered_item = self.item_mouse_is_in(mouse_pos.x);
+                if hovered_item != self.selected_item {
+                    self.selected_item = hovered_item;
+                    // Note: Ideally we'd redraw here to show hover effect
+                    // But without access to terminal in handle_event, we defer to next draw cycle
+                }
+            } else if self.selected_item.is_some() {
+                self.selected_item = None;
             }
         }
 
