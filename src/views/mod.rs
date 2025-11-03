@@ -20,6 +20,7 @@ pub mod cluster;
 pub mod checkbox;
 pub mod radiobutton;
 pub mod listbox;
+pub mod sorted_listbox;
 pub mod list_viewer;
 pub mod paramtext;
 pub mod background;

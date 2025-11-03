@@ -24,6 +24,7 @@ This document tracks missing controls, classes, and features from the original B
 - ✅ **TStaticText** - Static text label with centering support
 - ✅ **TLabel** - Text label (implemented as `Label`)
 - ✅ **TListBox** - List selection control (implemented as `ListBox`)
+- ✅ **TSortedListBox** - Sorted list with binary search (implemented as `SortedListBox`)
 - ✅ **TCluster** - Base class for check/radio groups (implemented as `Cluster` trait)
 
 ### Editor Components
@@ -412,6 +413,54 @@ Implemented Cluster trait for button group controls, following the successful pa
 - Updated `src/views/mod.rs` to export Cluster trait
 
 This completes Phase 3 of the roadmap (8 hours). Next recommendation: Phase 4 - Sorted Lists (8 hours).
+
+### TSortedListBox Implementation (2025-11-03)
+Implemented SortedListBox for sorted lists with binary search capabilities, completing Phase 4 of the roadmap:
+
+**Features:**
+- Automatic sorting of items on insertion (maintains sorted order)
+- Binary search for efficient lookups
+- find_exact() method for exact match searching
+- find_prefix() method for prefix-based searching
+- focus_prefix() for quick keyboard navigation to items
+- Case-sensitive and case-insensitive modes
+- Extends ListBox functionality with sorting
+
+**Binary Search Implementation:**
+- Uses Vec::sort() and Vec::sort_by() for sorting
+- Uses Vec::binary_search_by() for efficient O(log n) searching
+- Separate helpers for case-sensitive vs case-insensitive search
+- Handles prefix matching with proper boundary detection
+
+**Tests:**
+- 8 comprehensive tests covering all functionality
+- All 95 library tests passing (up from 87)
+- Tests cover: creation, sorting, exact search, prefix search, case sensitivity
+
+**Files:**
+- Created `src/views/sorted_listbox.rs` (415 lines)
+- Updated `src/views/mod.rs` to export SortedListBox
+- Added `examples/sorted_listbox.rs` demonstrating all features
+
+**Usage Example:**
+```rust
+let mut sorted = SortedListBox::new(bounds, command);
+sorted.add_item("Zebra".to_string());
+sorted.add_item("Apple".to_string());
+// Items are automatically sorted: Apple, Zebra
+
+// Binary search for exact match
+if let Some(idx) = sorted.find_exact("Apple") {
+    sorted.set_selection(idx);
+}
+
+// Binary search for prefix
+if sorted.focus_prefix("Z") {
+    // Focuses on "Zebra"
+}
+```
+
+This completes Phase 4 of the roadmap (8 hours). All quick wins complete! Next recommendation: Phase 5 - History System (32 hours).
 
 ### FileDialog Implementation (2025-11-01 - Updated 2025-11-02)
 A fully functional FileDialog has been implemented with the following features:

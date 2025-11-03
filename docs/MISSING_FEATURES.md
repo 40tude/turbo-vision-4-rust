@@ -7,10 +7,10 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 ## Summary Statistics
 
-- **Total Missing Components**: 51 (was 85, implemented 4, skipped 30 obsolete pre-Rust features)
-- **Estimated Total Effort**: 858 hours (~21 weeks at 40 hrs/week)
+- **Total Missing Components**: 50 (was 85, implemented 5, skipped 30 obsolete pre-Rust features)
+- **Estimated Total Effort**: 850 hours (~21 weeks at 40 hrs/week)
 - **HIGH Priority**: 15 items (236 hours) - Core functionality
-- **MEDIUM Priority**: 32 items (360 hours) - Extended features
+- **MEDIUM Priority**: 31 items (352 hours) - Extended features
 - **LOW Priority**: 17 items (262 hours) - Nice to have
 
 ## Quick Reference by Category
@@ -20,7 +20,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 | Core Views/Controls | 14 | HIGH-MEDIUM | 136h |
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
 | Editor Components | 3 | HIGH-MEDIUM | 52h |
-| System Utilities | 11 | MEDIUM | 42h |
+| System Utilities | 10 | MEDIUM | 34h |
 | Helper Classes | 0 | - | 0h |
 | Advanced Features | 10 | HIGH-LOW | 162h |
 
@@ -118,8 +118,8 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 **Note:** String collections were pre-generic workarounds. Use Vec<String>, HashSet<String>, or HashMap for string management.
 
-### List Enhancements (8 hours)
-- **TSortedListBox** - Sorted list with search (8h)
+### List Enhancements (~0 hours remaining)
+- ✅ **TSortedListBox** - Sorted list with binary search (IMPLEMENTED - `src/views/sorted_listbox.rs`)
 
 ### Application Enhancements (20 hours)
 - **TDeskTop** - Enhanced desktop features (10h)
@@ -128,7 +128,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **CodePage** - Character encoding (12h)
 - **OSClipboard** - System clipboard (10h)
 
-**Total MEDIUM Priority: 360 hours** (was 486 hours, removed 126 hours of obsolete streaming/resources/strings)
+**Total MEDIUM Priority: 352 hours** (was 486 hours, removed 126 hours of obsolete streaming/resources/strings, completed 8 hours of TSortedListBox)
 
 ## Low Priority Components (Nice to Have)
 
@@ -195,9 +195,15 @@ Architectural improvement for button groups:
 - Common drawing, event handling, and color logic now shared
 - Borland-compatible while being idiomatic Rust
 
-### Phase 4: Sorted Lists (8 hours)
-Extend list infrastructure:
-- TSortedListBox with binary search using Vec + sort
+### ✅ Phase 4: Sorted Lists (8 hours) - COMPLETE
+**Goal**: Extend list infrastructure with sorting and search
+- ✅ TSortedListBox with binary search using Vec::sort
+- ✅ find_exact() for exact match search
+- ✅ find_prefix() for prefix search
+- ✅ focus_prefix() for quick keyboard navigation
+- ✅ Case-sensitive and case-insensitive modes
+
+**Completed**: 2025-11-03. Uses Vec::sort and Vec::binary_search_by for efficient sorted list management. Eight tests added.
 
 ### Phase 5: History System (32 hours)
 Essential for professional UIs:
@@ -242,27 +248,28 @@ Optional enhancements:
 
 - **After Phase 2** (58 hours): ✅ COMPLETE - List and menu infrastructure solid
 - **After Phase 3** (66 hours): ✅ COMPLETE - Button group controls unified with Cluster trait
-- **After Phase 5** (98 hours): Most commonly used UI components complete
-- **After Phase 7** (182 hours): Professional editing applications possible
-- **After Phase 9** (296 hours): Feature parity with Borland's core framework (minus obsolete pre-Rust features)
-- **After Phase 10** (558+ hours): Complete framework with all utilities
+- **After Phase 4** (74 hours): ✅ COMPLETE - Sorted lists with binary search
+- **After Phase 5** (106 hours): Most commonly used UI components complete
+- **After Phase 7** (190 hours): Professional editing applications possible
+- **After Phase 9** (304 hours): Feature parity with Borland's core framework (minus obsolete pre-Rust features)
+- **After Phase 10** (566+ hours): Complete framework with all utilities
 
 ## Quick Win Opportunities
 
 These items provide high architectural value for relatively low effort:
 
 1. ~~**TCluster** (8 hours)~~ - ✅ COMPLETE - Refactored RadioButton/CheckBox with trait pattern
-2. **TSortedListBox** (8 hours) - Extend ListBox with Vec::sort + binary_search
+2. ~~**TSortedListBox** (8 hours)~~ - ✅ COMPLETE - Binary search sorted lists
 3. ~~**TStatusDef/TStatusItem** (7 hours)~~ - ✅ COMPLETE
 4. ~~**TMenu/TMenuItem/TSubMenu** (14 hours)~~ - ✅ COMPLETE
 
-**Total Quick Wins Remaining: 8 hours for TSortedListBox**
+**All quick wins completed!** Total: 37 hours of foundational architectural improvements.
 
 ## Current Implementation Status (v0.2.3+)
 
 ### What We Have
 - Basic controls: Button, InputLine, StaticText, Label, CheckBox, RadioButton
-- Lists: ListBox with ListViewer trait, full navigation support
+- Lists: ListBox with ListViewer trait, SortedListBox with binary search
 - Menus: MenuBar with MenuViewer trait, MenuBox popup menus
 - Dialogs: Dialog, FileDialog (basic), MsgBox
 - Text: Memo, TextView, Editor (basic)
@@ -273,14 +280,16 @@ These items provide high architectural value for relatively low effort:
 - **NEW**: List Components (ListViewer, MenuViewer, MenuBox)
 - **NEW**: Menu/Status data structures (MenuItem, Menu, MenuBuilder, StatusDef, etc.)
 - **NEW**: Cluster trait (base for CheckBox/RadioButton button groups)
+- **NEW**: SortedListBox with binary search (find_exact, find_prefix)
 
-### Recent Improvements (TCluster Phase)
-- **Cluster trait**: Base for all button group controls with shared behavior
-- **ClusterState**: Shared state management (value, group_id, keyboard enable)
-- **CheckBox refactored**: Now uses Cluster, 173 → 159 lines (14 lines saved)
-- **RadioButton refactored**: Now uses Cluster, 202 → 182 lines (20 lines saved)
-- **Trait-based architecture**: Single source of truth for button group logic
-- **34 lines eliminated**: Common drawing, event handling, colors now shared
+### Recent Improvements (TSortedListBox Phase)
+- **SortedListBox**: Sorted list control with binary search capabilities
+- **Automatic sorting**: Items maintained in sorted order on insertion
+- **Binary search**: find_exact() for exact matches, find_prefix() for prefix search
+- **Case sensitivity**: Supports both case-sensitive and case-insensitive modes
+- **Efficient navigation**: focus_prefix() for quick keyboard navigation
+- **8 comprehensive tests**: All passing
+- **Example included**: examples/sorted_listbox.rs demonstrates all features
 
 ### Modern Rust Advantages
 - **No need for TCollection**: Using `Vec<T>` (type-safe, generic, efficient)
@@ -299,13 +308,14 @@ These items provide high architectural value for relatively low effort:
 
 ## Next Steps
 
-**Recommended: Phase 4 - Sorted Lists (8 hours)**
-- Small, focused extension of existing ListBox functionality
-- Add binary search support using Vec::sort
-- Quick win with immediate functionality benefits
+**Recommended: Phase 5 - History System (32 hours)**
+- Implement THistory dropdown for input fields
+- Add THistoryViewer for displaying history lists
+- Create THistoryWindow popup for history selection
+- Professional input field enhancement
 
 **Alternative Options:**
-- Phase 5: History System (32 hours) - Professional input fields
+- Phase 6: File Dialogs (52 hours) - Enhanced file system UI
 - Phase 7: Editor Enhancements (32 hours) - Search/replace functionality
 
 ---
