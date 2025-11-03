@@ -7,9 +7,9 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 ## Summary Statistics
 
-- **Total Missing Components**: 82 (was 85, implemented 3 more)
-- **Estimated Total Effort**: 1,030 hours (~26 weeks at 40 hrs/week)
-- **HIGH Priority**: 19 items (282 hours) - Core functionality
+- **Total Missing Components**: 78 (was 85, implemented 3, skipped 4 obsolete collections)
+- **Estimated Total Effort**: 992 hours (~25 weeks at 40 hrs/week)
+- **HIGH Priority**: 15 items (244 hours) - Core functionality
 - **MEDIUM Priority**: 45 items (486 hours) - Extended features
 - **LOW Priority**: 18 items (262 hours) - Nice to have
 
@@ -17,7 +17,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 | Category | Count | Priority | Effort |
 |----------|-------|----------|--------|
-| Core Views/Controls | 19 | HIGH-MEDIUM | 182h |
+| Core Views/Controls | 15 | HIGH-MEDIUM | 144h |
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
 | Editor Components | 3 | HIGH-MEDIUM | 52h |
 | System Utilities | 24 | MEDIUM | 168h |
@@ -26,11 +26,13 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 ## High Priority Components (Core Functionality)
 
-### Collections & Data Structures (38 hours)
-- **TCollection** - Dynamic array collection (12h)
-- **TSortedCollection** - Sorted collection with binary search (10h)
-- **TNSCollection** - Non-streamable collection (8h)
-- **TNSSortedCollection** - Non-streamable sorted (8h)
+### Collections & Data Structures (~0 hours - NOT NEEDED)
+- ~~**TCollection**~~ - Use Rust `Vec<T>` instead (type-safe, generic)
+- ~~**TSortedCollection**~~ - Use `Vec<T>` + sort/binary_search
+- ~~**TNSCollection**~~ - Not needed in Rust
+- ~~**TNSSortedCollection**~~ - Not needed in Rust
+
+**Note:** Borland's collections were pre-generics workarounds. Rust's `Vec<T>`, `HashMap<K,V>`, and standard library provide superior type-safe alternatives. We use `Vec` throughout the codebase instead of recreating 1990s-era dynamic arrays.
 
 ### Menu & Status Infrastructure (~0 hours remaining)
 - ✅ **MenuItem** - Menu item data structure (IMPLEMENTED in v0.2.2 - `src/core/menu_data.rs`)
@@ -76,7 +78,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TMouse** - Mouse system (12h)
 - **TEventQueue** - Event queue (10h)
 
-**Total HIGH Priority: 282 hours** (was 320 hours, completed 38 hours of List Components)
+**Total HIGH Priority: 244 hours** (was 282 hours, removed 38 hours of obsolete collections)
 
 ## Medium Priority Components (Extended Features)
 
@@ -166,50 +168,56 @@ Proper hierarchy for list and menu controls:
 
 **Phase 1-2 Complete: 58 hours implemented, ~270 lines of code eliminated through trait-based architecture**
 
-### Phase 3: Core Collections (80 hours)
-Foundation for all other components:
-- TCollection, TSortedCollection, TNSCollection, TNSSortedCollection
-- Essential for proper Borland architecture
+### ~~Phase 3: Core Collections (80 hours)~~ - SKIPPED (NOT NEEDED)
+~~Foundation for all other components~~
+- ~~TCollection, TSortedCollection, TNSCollection, TNSSortedCollection~~
+
+**Rationale:** Borland collections were pre-generics workarounds. Rust's `Vec<T>`, `HashMap<K,V>`, etc. are superior. No need to recreate 1990s dynamic arrays.
+
+### Phase 3: TCluster Refactoring (8 hours)
+Architectural improvement for button groups:
+- Create Cluster trait for RadioButton/CheckBox base
+- Refactor RadioButton to use Cluster trait
+- Refactor CheckBox to use Cluster trait
+- Eliminate duplicate selection/group logic
+- Similar pattern to ListViewer/MenuViewer success
 
 ### Phase 4: Sorted Lists (8 hours)
 Extend list infrastructure:
-- TSortedListBox with binary search
+- TSortedListBox with binary search using Vec + sort
 
 ### Phase 5: History System (32 hours)
 Essential for professional UIs:
-- THistory, THistoryViewer, THistoryWindow
+- THistory - History management
+- THistoryViewer - History list display
+- THistoryWindow - Popup history window
 
-### Phase 6: Cluster Controls (16 hours)
-Architectural improvement:
-- TCluster base class
-- Refactor RadioButton/CheckBox
-
-### Phase 7: File Dialogs (52 hours)
+### Phase 6: File Dialogs (52 hours)
 Complete file system UI:
-- TFileList, TDirListBox
+- TFileList, TDirListBox (using Vec for file lists)
 - TFileInputLine, TFileInfoPane, TChDirDialog
 
-### Phase 8: Editor (52 hours)
+### Phase 7: Editor Enhancements (32 hours)
 Full-featured text editing:
-- TFileEditor with search/replace
-- TEditWindow, load/save
+- TFileEditor with search/replace (24h)
+- TEditWindow wrapper (8h)
 
-### Phase 9: Application Framework (56 hours)
+### Phase 8: Application Framework (58 hours)
 Enhanced core infrastructure:
 - TProgram, TApplication
 - TScreen, TDisplay, TMouse, TEventQueue
 
-### Phase 10: Resources & Persistence (90 hours)
+### Phase 9: Resources & Persistence (90 hours)
 Professional app development:
 - Complete streaming system
 - Resource file support
 
-### Phase 11: Help System (56 hours)
+### Phase 10: Help System (56 hours)
 Context-sensitive help:
 - THelpFile, THelpBase
 - THelpWindow, THelpViewer
 
-### Phase 12: Polish (262+ hours)
+### Phase 11: Polish (262+ hours)
 Optional enhancements:
 - Color customization
 - Calculator, validators
@@ -218,21 +226,21 @@ Optional enhancements:
 ## Milestone Markers
 
 - **After Phase 2** (58 hours): ✅ COMPLETE - List and menu infrastructure solid
-- **After Phase 6** (246 hours): Most commonly used components complete
-- **After Phase 8** (350 hours): Professional editing applications possible
-- **After Phase 11** (500 hours): Feature parity with Borland's core framework
-- **After Phase 12** (762+ hours): Complete framework with all utilities
+- **After Phase 5** (106 hours): Most commonly used UI components complete
+- **After Phase 7** (190 hours): Professional editing applications possible
+- **After Phase 10** (394 hours): Feature parity with Borland's core framework (minus obsolete collections)
+- **After Phase 11** (656+ hours): Complete framework with all utilities
 
 ## Quick Win Opportunities
 
 These items provide high architectural value for relatively low effort:
 
-1. **TSItem** (2 hours) - Simple linked list node
-2. **TCluster** (8 hours) - Refactor existing RadioButton/CheckBox
-3. **TStatusDef/TStatusItem** (7 hours) - Enhance existing status line
-4. **TMenu/TMenuItem/TSubMenu** (14 hours) - Formalize menu data
+1. **TCluster** (8 hours) - Refactor existing RadioButton/CheckBox with trait pattern
+2. **TSortedListBox** (8 hours) - Extend ListBox with Vec::sort + binary_search
+3. ~~**TStatusDef/TStatusItem** (7 hours)~~ - ✅ COMPLETE
+4. ~~**TMenu/TMenuItem/TSubMenu** (14 hours)~~ - ✅ COMPLETE
 
-**Total: 31 hours for significant architectural improvements**
+**Total Quick Wins Remaining: 16 hours for significant architectural improvements**
 
 ## Current Implementation Status (v0.2.3+)
 
@@ -257,21 +265,30 @@ These items provide high architectural value for relatively low effort:
 - **MenuBar refactored**: Now uses MenuViewer, eliminated 200+ lines
 - **Trait-based architecture**: Single source of truth for navigation logic
 
+### Modern Rust Advantages
+- **No need for TCollection**: Using `Vec<T>` (type-safe, generic, efficient)
+- **No need for linked lists**: Vec provides better cache locality
+- **Trait-based inheritance**: More flexible than C++ class hierarchy
+- **Safe memory management**: No manual memory management needed
+
 ### Architectural Gaps
-- Missing collection infrastructure (using Vec instead of TCollection)
 - No history system for input fields
 - No resource/streaming system
 - No help system infrastructure
-- Missing TCluster base for RadioButton/CheckBox
+- Missing TCluster base for RadioButton/CheckBox (easy refactor)
 
 ## Next Steps
 
-For v0.2.3+, consider:
-1. TCluster base class for RadioButton/CheckBox refactoring
-2. TEditor enhancement with search/replace
-3. Window Min/Max buttons
+**Recommended: Phase 3 - TCluster Refactoring (8 hours)**
+- Small, focused refactoring similar to ListViewer/MenuViewer
+- Eliminates duplicate code in RadioButton/CheckBox
+- Sets pattern for button group controls
+- Quick win with immediate code quality benefits
 
-For v0.3.0+, consider starting Phase 3 (Collections) to establish proper architectural foundation before building more complex features.
+**Alternative Options:**
+- Phase 4: Sorted Lists (8 hours) - Extend ListBox functionality
+- Phase 5: History System (32 hours) - Professional input fields
+- Phase 7: Editor Enhancements (32 hours) - Search/replace functionality
 
 ---
 
