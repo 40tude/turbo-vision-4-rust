@@ -24,7 +24,7 @@ This document tracks missing controls, classes, and features from the original B
 - ✅ **TStaticText** - Static text label with centering support
 - ✅ **TLabel** - Text label (implemented as `Label`)
 - ✅ **TListBox** - List selection control (implemented as `ListBox`)
-- ❌ **TCluster** - Base class for check/radio groups
+- ✅ **TCluster** - Base class for check/radio groups (implemented as `Cluster` trait)
 
 ### Editor Components
 - 🚧 **TEditor** - Text editor (basic implementation exists)
@@ -376,6 +376,42 @@ Many features from the original may not be necessary in a modern Rust implementa
 The focus should be on UI components and user-facing features that provide value in a terminal UI context.
 
 ## Recent Updates
+
+### TCluster Refactoring (2025-11-03)
+Implemented Cluster trait for button group controls, following the successful pattern established with ListViewer and MenuViewer:
+
+**Architecture:**
+- Created Cluster trait for shared button group behavior
+- Created ClusterState struct for common state (value, group_id, keyboard enable)
+- Hybrid trait + helper struct pattern (same as ListViewer/MenuViewer)
+- CheckBox and RadioButton embed ClusterState and implement Cluster trait
+
+**Code Improvements:**
+- CheckBox refactored: 173 → 159 lines (14 lines eliminated)
+- RadioButton refactored: 202 → 182 lines (20 lines eliminated)
+- Total: 34 lines of duplicate code eliminated
+- Shared drawing logic with marker rendering ("[X]", "( )", etc.)
+- Shared event handling (space key toggle/select)
+- Shared color determination (focused vs unfocused)
+
+**Key Features:**
+- Borland-compatible API maintained (set_checked(), is_checked(), toggle(), etc.)
+- Default implementations in Cluster trait for common behavior
+- on_space_pressed() customizable (toggle for checkbox, select for radio)
+- Group ID support for radio button mutual exclusion
+- Focus-based color changes (Yellow on Blue when focused)
+
+**Tests:**
+- All 7 existing tests pass (3 CheckBox + 4 RadioButton)
+- 4 new ClusterState tests added
+
+**Files Modified:**
+- Created `src/views/cluster.rs` (229 lines)
+- Refactored `src/views/checkbox.rs`
+- Refactored `src/views/radiobutton.rs`
+- Updated `src/views/mod.rs` to export Cluster trait
+
+This completes Phase 3 of the roadmap (8 hours). Next recommendation: Phase 4 - Sorted Lists (8 hours).
 
 ### FileDialog Implementation (2025-11-01 - Updated 2025-11-02)
 A fully functional FileDialog has been implemented with the following features:

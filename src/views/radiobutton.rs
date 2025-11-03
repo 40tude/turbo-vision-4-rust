@@ -1,6 +1,6 @@
 // RadioButton - Mutually exclusive selection control
 //
-// Original Turbo Vision equivalent: TRadioButtons
+// Matches Borland: TRadioButtons (extends TCluster)
 //
 // A radio button control displays a circle with a label. Only one radio button
 // in a group can be selected at a time. Radio buttons with the same group_id
@@ -10,6 +10,8 @@
 //   ( ) Unselected option
 //   (•) Selected option
 //
+// Architecture: Uses Cluster trait for shared button group behavior
+//
 // Usage:
 //   let radio1 = RadioButton::new(
 //       Rect::new(3, 5, 20, 6),
@@ -17,21 +19,22 @@
 //       1,  // group_id
 //   );
 
-use crate::core::draw::DrawBuffer;
-use crate::core::event::{Event, EventType};
+use crate::core::event::Event;
 use crate::core::geometry::Rect;
-use crate::core::palette::{Attr, TvColor};
 use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
-use crate::views::view::{View, write_line_to_terminal};
+use super::view::View;
+use super::cluster::{Cluster, ClusterState};
 
 /// RadioButton - A mutually exclusive selection control with a label
+///
+/// Now implements Cluster trait for standard button group behavior.
+/// Matches Borland: TRadioButtons (extends TCluster)
 #[derive(Debug)]
 pub struct RadioButton {
     bounds: Rect,
     label: String,
-    group_id: u16,
-    selected: bool,
+    cluster_state: ClusterState,
     state: StateFlags,
 }
 
@@ -43,35 +46,29 @@ impl RadioButton {
         RadioButton {
             bounds,
             label: label.to_string(),
-            group_id,
-            selected: false,
+            cluster_state: ClusterState::with_group(group_id),
             state: 0,
         }
     }
 
     /// Set the selected state
     pub fn set_selected(&mut self, selected: bool) {
-        self.selected = selected;
+        self.cluster_state.set_value(if selected { 1 } else { 0 });
     }
 
     /// Get the selected state
     pub fn is_selected(&self) -> bool {
-        self.selected
-    }
-
-    /// Get the group ID
-    pub fn group_id(&self) -> u16 {
-        self.group_id
+        self.cluster_state.value != 0
     }
 
     /// Select this radio button (should deselect others in the group)
     pub fn select(&mut self) {
-        self.selected = true;
+        self.cluster_state.set_value(1);
     }
 
     /// Deselect this radio button
     pub fn deselect(&mut self) {
-        self.selected = false;
+        self.cluster_state.set_value(0);
     }
 }
 
@@ -85,64 +82,18 @@ impl View for RadioButton {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        if event.what == EventType::Keyboard && self.is_focused() {
-            // Space key selects
-            if event.key_code == ' ' as u16 {
-                self.select();
-                // TODO: Parent should deselect other radio buttons in the same group
-                event.clear();
-            }
-            // TODO: Add hotkey support (need to map key_code to character)
-        }
+        // Use Cluster trait's standard event handling
+        self.handle_cluster_event(event);
     }
 
     fn draw(&mut self, terminal: &mut Terminal) {
-        let width = self.bounds.width() as usize;
-        let mut buffer = DrawBuffer::new(width);
-
-        // Determine colors based on focus state
-        let color = if self.is_focused() {
-            Attr::new(TvColor::Yellow, TvColor::Blue)
-        } else {
-            Attr::new(TvColor::Black, TvColor::LightGray)
-        };
-
-        let hotkey_color = if self.is_focused() {
-            Attr::new(TvColor::LightRed, TvColor::Blue)
-        } else {
-            Attr::new(TvColor::Red, TvColor::LightGray)
-        };
-
-        // Draw radio button
-        let radio_str = if self.selected { "(•) " } else { "( ) " };
-        let mut x = 0;
-
-        for ch in radio_str.chars() {
-            if x < width {
-                buffer.put_char(x, ch, color);
-                x += 1;
-            }
-        }
-
-        // Draw label with shortcut highlighting (returns number of chars written)
-        let written = buffer.move_str_with_shortcut(x, &self.label, color, hotkey_color);
-        x += written;
-
-        // Fill remaining space
-        if x < width {
-            buffer.move_char(x, ' ', color, width - x);
-        }
-
-        // Write to terminal
-        write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buffer);
+        // Use Cluster trait's standard drawing
+        self.draw_cluster(terminal);
     }
 
     fn can_focus(&self) -> bool {
         true
     }
-
-    // set_focus() now uses default implementation from View trait
-    // which sets/clears SF_FOCUSED flag
 
     fn state(&self) -> StateFlags {
         self.state
@@ -150,6 +101,35 @@ impl View for RadioButton {
 
     fn set_state(&mut self, state: StateFlags) {
         self.state = state;
+    }
+}
+
+// Implement Cluster trait
+impl Cluster for RadioButton {
+    fn cluster_state(&self) -> &ClusterState {
+        &self.cluster_state
+    }
+
+    fn cluster_state_mut(&mut self) -> &mut ClusterState {
+        &mut self.cluster_state
+    }
+
+    fn get_label(&self) -> &str {
+        &self.label
+    }
+
+    fn get_marker(&self) -> &str {
+        if self.is_selected() {
+            "(•) "
+        } else {
+            "( ) "
+        }
+    }
+
+    /// Radio buttons select (don't toggle) on space
+    fn on_space_pressed(&mut self) {
+        self.select();
+        // TODO: Parent should deselect other radio buttons in the same group
     }
 }
 

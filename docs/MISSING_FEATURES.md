@@ -7,17 +7,17 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 ## Summary Statistics
 
-- **Total Missing Components**: 78 (was 85, implemented 3, skipped 4 obsolete collections)
-- **Estimated Total Effort**: 992 hours (~25 weeks at 40 hrs/week)
-- **HIGH Priority**: 15 items (244 hours) - Core functionality
+- **Total Missing Components**: 77 (was 85, implemented 4, skipped 4 obsolete collections)
+- **Estimated Total Effort**: 984 hours (~25 weeks at 40 hrs/week)
+- **HIGH Priority**: 15 items (236 hours) - Core functionality
 - **MEDIUM Priority**: 45 items (486 hours) - Extended features
-- **LOW Priority**: 18 items (262 hours) - Nice to have
+- **LOW Priority**: 17 items (262 hours) - Nice to have
 
 ## Quick Reference by Category
 
 | Category | Count | Priority | Effort |
 |----------|-------|----------|--------|
-| Core Views/Controls | 15 | HIGH-MEDIUM | 144h |
+| Core Views/Controls | 14 | HIGH-MEDIUM | 136h |
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
 | Editor Components | 3 | HIGH-MEDIUM | 52h |
 | System Utilities | 24 | MEDIUM | 168h |
@@ -57,8 +57,8 @@ This document catalogs missing features compared to the original Borland Turbo V
 - All navigation behavior now shared through default trait implementations
 - Borland-compatible while being idiomatic Rust
 
-### Input Controls (26 hours)
-- **TCluster** - Base for radio/checkbox (8h)
+### Input Controls (18 hours)
+- ✅ **TCluster** - Base for radio/checkbox (IMPLEMENTED - `src/views/cluster.rs`)
 - **THistory** - History dropdown (12h)
 - **THistoryViewer** - History list viewer (6h)
 
@@ -78,7 +78,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TMouse** - Mouse system (12h)
 - **TEventQueue** - Event queue (10h)
 
-**Total HIGH Priority: 244 hours** (was 282 hours, removed 38 hours of obsolete collections)
+**Total HIGH Priority: 236 hours** (was 282 hours, removed 38 hours of obsolete collections, completed 8 hours of TCluster)
 
 ## Medium Priority Components (Extended Features)
 
@@ -174,13 +174,21 @@ Proper hierarchy for list and menu controls:
 
 **Rationale:** Borland collections were pre-generics workarounds. Rust's `Vec<T>`, `HashMap<K,V>`, etc. are superior. No need to recreate 1990s dynamic arrays.
 
-### Phase 3: TCluster Refactoring (8 hours)
+### ✅ Phase 3: TCluster Refactoring (8 hours) - COMPLETE
 Architectural improvement for button groups:
-- Create Cluster trait for RadioButton/CheckBox base
-- Refactor RadioButton to use Cluster trait
-- Refactor CheckBox to use Cluster trait
-- Eliminate duplicate selection/group logic
-- Similar pattern to ListViewer/MenuViewer success
+- ✅ Created Cluster trait for RadioButton/CheckBox base
+- ✅ Refactored RadioButton to use Cluster trait
+- ✅ Refactored CheckBox to use Cluster trait
+- ✅ Eliminated duplicate selection/group logic
+- ✅ Similar pattern to ListViewer/MenuViewer success
+
+**Implementation Notes:**
+- Hybrid trait + helper struct pattern (ClusterState + Cluster trait)
+- RadioButton refactored: 202 → 182 lines (20 lines saved)
+- CheckBox refactored: 173 → 159 lines (14 lines saved)
+- All 7 tests passing (3 CheckBox + 4 RadioButton)
+- Common drawing, event handling, and color logic now shared
+- Borland-compatible while being idiomatic Rust
 
 ### Phase 4: Sorted Lists (8 hours)
 Extend list infrastructure:
@@ -226,21 +234,22 @@ Optional enhancements:
 ## Milestone Markers
 
 - **After Phase 2** (58 hours): ✅ COMPLETE - List and menu infrastructure solid
-- **After Phase 5** (106 hours): Most commonly used UI components complete
-- **After Phase 7** (190 hours): Professional editing applications possible
-- **After Phase 10** (394 hours): Feature parity with Borland's core framework (minus obsolete collections)
-- **After Phase 11** (656+ hours): Complete framework with all utilities
+- **After Phase 3** (66 hours): ✅ COMPLETE - Button group controls unified with Cluster trait
+- **After Phase 5** (98 hours): Most commonly used UI components complete
+- **After Phase 7** (182 hours): Professional editing applications possible
+- **After Phase 10** (386 hours): Feature parity with Borland's core framework (minus obsolete collections)
+- **After Phase 11** (648+ hours): Complete framework with all utilities
 
 ## Quick Win Opportunities
 
 These items provide high architectural value for relatively low effort:
 
-1. **TCluster** (8 hours) - Refactor existing RadioButton/CheckBox with trait pattern
+1. ~~**TCluster** (8 hours)~~ - ✅ COMPLETE - Refactored RadioButton/CheckBox with trait pattern
 2. **TSortedListBox** (8 hours) - Extend ListBox with Vec::sort + binary_search
 3. ~~**TStatusDef/TStatusItem** (7 hours)~~ - ✅ COMPLETE
 4. ~~**TMenu/TMenuItem/TSubMenu** (14 hours)~~ - ✅ COMPLETE
 
-**Total Quick Wins Remaining: 16 hours for significant architectural improvements**
+**Total Quick Wins Remaining: 8 hours for TSortedListBox**
 
 ## Current Implementation Status (v0.2.3+)
 
@@ -256,14 +265,15 @@ These items provide high architectural value for relatively low effort:
 - Event system: Three-phase processing, event re-queuing, broadcasts
 - **NEW**: List Components (ListViewer, MenuViewer, MenuBox)
 - **NEW**: Menu/Status data structures (MenuItem, Menu, MenuBuilder, StatusDef, etc.)
+- **NEW**: Cluster trait (base for CheckBox/RadioButton button groups)
 
-### Recent Improvements (List Components Phase)
-- **ListViewer trait**: Base for all scrollable lists with navigation
-- **MenuViewer trait**: Base for all menu views with item selection
-- **MenuBox**: Borland-compatible popup menu with modal execution
-- **ListBox refactored**: Now uses ListViewer, eliminated 70+ lines
-- **MenuBar refactored**: Now uses MenuViewer, eliminated 200+ lines
-- **Trait-based architecture**: Single source of truth for navigation logic
+### Recent Improvements (TCluster Phase)
+- **Cluster trait**: Base for all button group controls with shared behavior
+- **ClusterState**: Shared state management (value, group_id, keyboard enable)
+- **CheckBox refactored**: Now uses Cluster, 173 → 159 lines (14 lines saved)
+- **RadioButton refactored**: Now uses Cluster, 202 → 182 lines (20 lines saved)
+- **Trait-based architecture**: Single source of truth for button group logic
+- **34 lines eliminated**: Common drawing, event handling, colors now shared
 
 ### Modern Rust Advantages
 - **No need for TCollection**: Using `Vec<T>` (type-safe, generic, efficient)
@@ -275,18 +285,15 @@ These items provide high architectural value for relatively low effort:
 - No history system for input fields
 - No resource/streaming system
 - No help system infrastructure
-- Missing TCluster base for RadioButton/CheckBox (easy refactor)
 
 ## Next Steps
 
-**Recommended: Phase 3 - TCluster Refactoring (8 hours)**
-- Small, focused refactoring similar to ListViewer/MenuViewer
-- Eliminates duplicate code in RadioButton/CheckBox
-- Sets pattern for button group controls
-- Quick win with immediate code quality benefits
+**Recommended: Phase 4 - Sorted Lists (8 hours)**
+- Small, focused extension of existing ListBox functionality
+- Add binary search support using Vec::sort
+- Quick win with immediate functionality benefits
 
 **Alternative Options:**
-- Phase 4: Sorted Lists (8 hours) - Extend ListBox functionality
 - Phase 5: History System (32 hours) - Professional input fields
 - Phase 7: Editor Enhancements (32 hours) - Search/replace functionality
 
