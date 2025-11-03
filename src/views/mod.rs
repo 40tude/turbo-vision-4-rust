@@ -6,6 +6,7 @@ pub mod dialog;
 pub mod desktop;
 pub mod status_line;
 pub mod menu_bar;
+pub mod menu_viewer;
 pub mod button;
 pub mod static_text;
 pub mod input_line;
@@ -28,3 +29,4 @@ pub mod validator;
 
 pub use view::View;
 pub use list_viewer::{ListViewer, ListViewerState};
+pub use menu_viewer::{MenuViewer, MenuViewerState};
