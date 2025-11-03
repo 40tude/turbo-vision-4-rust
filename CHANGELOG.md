@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-11-03
+
+### Added
+- **Input Validators**: Comprehensive input validation system matching Borland's TValidator architecture
+  - New `Validator` trait with `is_valid()`, `is_valid_input()`, `error()`, and `valid()` methods
+  - `FilterValidator`: Validates input against allowed character set (e.g., digits only)
+  - `RangeValidator`: Validates numeric input within min/max range
+  - Support for decimal, hexadecimal (0x prefix), and octal (0 prefix) number formats
+  - Real-time validation: invalid characters rejected as user types
+  - Final validation: check complete input before accepting
+  - `ValidatorRef` type alias: `Rc<RefCell<dyn Validator>>` for shared validator references
+
+### Changed
+- **InputLine**: Enhanced with validator support
+  - Added `with_validator()` constructor to create InputLine with validator
+  - Added `set_validator()` method to attach validator after construction
+  - Added `validate()` method to check current input validity
+  - Character insertion now checks `is_valid_input()` before accepting
+  - Matches Borland's `TInputLine` with `TValidator` attachment pattern
+
+### Examples
+- **validator_demo.rs**: New example demonstrating input validation
+  - Field 1: Digits only (FilterValidator with "0123456789")
+  - Field 2: Number 0-100 (RangeValidator for positive range)
+  - Field 3: Number -50 to 50 (RangeValidator for mixed range)
+  - Field 4: Hex 0x00-0xFF (RangeValidator with hex support)
+  - Shows real-time rejection of invalid characters
+  - Displays validation results when OK is clicked
+
+### Technical Details
+This implements Borland Turbo Vision's validator architecture from validate.h and tvalidat.cc. The `Validator` trait provides the base validation interface, with `FilterValidator` implementing character filtering (matching `TFilterValidator` from tfilterv.cc) and `RangeValidator` implementing numeric range validation (matching `TRangeValidator` from trangeva.cc).
+
+The `InputLine` checks validators in two contexts:
+1. **During typing** (`is_valid_input()`): Rejects invalid characters immediately
+2. **Final validation** (`is_valid()`): Checks complete input when accepting
+
+RangeValidator supports multiple number formats:
+- Decimal: "123", "-45"
+- Hexadecimal: "0xFF", "0xAB"
+- Octal: "077" (63 decimal), "0100" (64 decimal)
+
+This matches Borland's `get_val()` and `get_uval()` functions from trangeva.cc:59-69.
+
+Reference: Borland's TValidator architecture in validate.h, tvalidat.cc, tfilterv.cc, and trangeva.cc.
+
 ## [0.2.0] - 2025-11-03
 
 ### Added

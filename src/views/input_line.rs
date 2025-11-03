@@ -5,6 +5,7 @@ use crate::core::palette::colors;
 use crate::core::clipboard;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
+use super::validator::ValidatorRef;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -23,6 +24,7 @@ pub struct InputLine {
     sel_start: usize,      // Selection start position
     sel_end: usize,        // Selection end position
     first_pos: usize,      // First visible character position for horizontal scrolling
+    validator: Option<ValidatorRef>,  // Optional validator for input validation
 }
 
 impl InputLine {
@@ -37,6 +39,30 @@ impl InputLine {
             sel_start: 0,
             sel_end: 0,
             first_pos: 0,
+            validator: None,
+        }
+    }
+
+    /// Create an InputLine with a validator
+    /// Matches Borland's TInputLine with validator attachment pattern
+    pub fn with_validator(bounds: Rect, max_length: usize, data: Rc<RefCell<String>>, validator: ValidatorRef) -> Self {
+        let mut input_line = Self::new(bounds, max_length, data);
+        input_line.validator = Some(validator);
+        input_line
+    }
+
+    /// Set the validator for this InputLine
+    pub fn set_validator(&mut self, validator: ValidatorRef) {
+        self.validator = Some(validator);
+    }
+
+    /// Validate the current input
+    /// Returns true if valid or no validator is set
+    pub fn validate(&self) -> bool {
+        if let Some(ref validator) = self.validator {
+            validator.borrow().valid(&self.data.borrow())
+        } else {
+            true
         }
     }
 
@@ -326,6 +352,23 @@ impl View for InputLine {
                         let text_len = self.data.borrow().len();
                         if text_len < self.max_length {
                             let ch = key_code as u8 as char;
+
+                            // Check validator before inserting
+                            // Matches Borland's TValidator::IsValidInput() pattern
+                            if let Some(ref validator) = self.validator {
+                                // Create test string with new character
+                                let mut test_text = self.data.borrow().clone();
+                                test_text.insert(self.cursor_pos, ch);
+
+                                // Check if valid input during typing
+                                if !validator.borrow().is_valid_input(&test_text, true) {
+                                    // Invalid character - reject it
+                                    event.clear();
+                                    return;
+                                }
+                            }
+
+                            // Character is valid, insert it
                             {
                                 let mut text = self.data.borrow_mut();
                                 text.insert(self.cursor_pos, ch);

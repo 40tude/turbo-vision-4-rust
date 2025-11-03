@@ -23,5 +23,6 @@ pub mod memo;
 pub mod editor;
 pub mod file_dialog;
 pub mod msgbox;
+pub mod validator;
 
 pub use view::View;
