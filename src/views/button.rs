@@ -215,3 +215,182 @@ impl View for Button {
         Some(self.command)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::event::{Event, EventType};
+    use crate::core::command::CM_COMMAND_SET_CHANGED;
+    use crate::core::command_set;
+    use crate::core::geometry::Point;
+
+    #[test]
+    fn test_button_creation_with_disabled_command() {
+        // Test that button is created disabled when command is disabled
+        const TEST_CMD: u16 = 500;
+        command_set::disable_command(TEST_CMD);
+
+        let button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        assert!(button.is_disabled(), "Button should start disabled when command is disabled");
+    }
+
+    #[test]
+    fn test_button_creation_with_enabled_command() {
+        // Test that button is created enabled when command is enabled
+        const TEST_CMD: u16 = 501;
+        command_set::enable_command(TEST_CMD);
+
+        let button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        assert!(!button.is_disabled(), "Button should start enabled when command is enabled");
+    }
+
+    #[test]
+    fn test_disabled_button_receives_broadcast_and_becomes_enabled() {
+        // REGRESSION TEST: Disabled buttons must receive broadcasts to become enabled
+        // This tests the fix for the bug where disabled buttons returned early
+        // and never received CM_COMMAND_SET_CHANGED broadcasts
+
+        const TEST_CMD: u16 = 502;
+
+        // Start with command disabled
+        command_set::disable_command(TEST_CMD);
+
+        let mut button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        // Verify button starts disabled
+        assert!(button.is_disabled(), "Button should start disabled");
+
+        // Enable the command in the global command set
+        command_set::enable_command(TEST_CMD);
+
+        // Send broadcast to button
+        let mut event = Event::broadcast(CM_COMMAND_SET_CHANGED);
+        button.handle_event(&mut event);
+
+        // Verify button is now enabled
+        assert!(!button.is_disabled(), "Button should be enabled after receiving broadcast");
+    }
+
+    #[test]
+    fn test_enabled_button_receives_broadcast_and_becomes_disabled() {
+        // Test that enabled buttons can be disabled via broadcast
+
+        const TEST_CMD: u16 = 503;
+
+        // Start with command enabled
+        command_set::enable_command(TEST_CMD);
+
+        let mut button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        // Verify button starts enabled
+        assert!(!button.is_disabled(), "Button should start enabled");
+
+        // Disable the command in the global command set
+        command_set::disable_command(TEST_CMD);
+
+        // Send broadcast to button
+        let mut event = Event::broadcast(CM_COMMAND_SET_CHANGED);
+        button.handle_event(&mut event);
+
+        // Verify button is now disabled
+        assert!(button.is_disabled(), "Button should be disabled after receiving broadcast");
+    }
+
+    #[test]
+    fn test_disabled_button_ignores_keyboard_events() {
+        // Test that disabled buttons don't respond to keyboard input
+
+        const TEST_CMD: u16 = 504;
+        command_set::disable_command(TEST_CMD);
+
+        let mut button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        button.set_focus(true);
+
+        // Try to activate with Enter key
+        let mut event = Event::keyboard(crate::core::event::KB_ENTER);
+        button.handle_event(&mut event);
+
+        // Event should not be converted to command
+        assert_ne!(event.what, EventType::Command, "Disabled button should not generate command");
+    }
+
+    #[test]
+    fn test_disabled_button_ignores_mouse_clicks() {
+        // Test that disabled buttons don't respond to mouse clicks
+
+        const TEST_CMD: u16 = 505;
+        command_set::disable_command(TEST_CMD);
+
+        let mut button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        // Try to click the button
+        let mut event = Event::mouse(
+            EventType::MouseDown,
+            Point::new(5, 1),
+            crate::core::event::MB_LEFT_BUTTON,
+            false
+        );
+        button.handle_event(&mut event);
+
+        // Event should not be converted to command
+        assert_ne!(event.what, EventType::Command, "Disabled button should not generate command");
+    }
+
+    #[test]
+    fn test_broadcast_does_not_clear_event() {
+        // Test that CM_COMMAND_SET_CHANGED broadcast is not cleared
+        // (so it can propagate to other buttons)
+
+        const TEST_CMD: u16 = 506;
+        command_set::disable_command(TEST_CMD);
+
+        let mut button = Button::new(
+            Rect::new(0, 0, 10, 2),
+            "Test",
+            TEST_CMD,
+            false
+        );
+
+        command_set::enable_command(TEST_CMD);
+
+        let mut event = Event::broadcast(CM_COMMAND_SET_CHANGED);
+        button.handle_event(&mut event);
+
+        // Event should still be a broadcast (not cleared)
+        assert_eq!(event.what, EventType::Broadcast, "Broadcast should not be cleared");
+        assert_eq!(event.command, CM_COMMAND_SET_CHANGED, "Broadcast command should remain");
+    }
+}
