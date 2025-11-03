@@ -24,6 +24,7 @@ pub struct Terminal {
     last_click_pos: Point,
     clip_stack: Vec<crate::core::geometry::Rect>,
     active_view_bounds: Option<crate::core::geometry::Rect>,
+    pending_event: Option<Event>,  // Event queue for putEvent() - matches Borland's TProgram::pending
 }
 
 impl Terminal {
@@ -56,6 +57,7 @@ impl Terminal {
             last_click_pos: Point::zero(),
             clip_stack: Vec::new(),
             active_view_bounds: None,
+            pending_event: None,
         })
     }
 
@@ -234,8 +236,19 @@ impl Terminal {
         Ok(())
     }
 
+    /// Put an event in the queue for next iteration
+    /// Matches Borland's TProgram::putEvent() - allows re-queuing events
+    pub fn put_event(&mut self, event: Event) {
+        self.pending_event = Some(event);
+    }
+
     /// Poll for an event with timeout
     pub fn poll_event(&mut self, timeout: Duration) -> io::Result<Option<Event>> {
+        // Check for pending event first (matches Borland's TProgram::getEvent)
+        if let Some(event) = self.pending_event.take() {
+            return Ok(Some(event));
+        }
+
         if event::poll(timeout)? {
             match event::read()? {
                 CTEvent::Key(key) => {

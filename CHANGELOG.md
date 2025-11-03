@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2025-11-03
+
+### Added
+- **Event Re-queuing System**: Implemented Borland's putEvent() pattern for deferred event processing
+  - Added `put_event()` method to Terminal
+  - Added `pending_event` field to Terminal struct
+  - Events can now be re-queued for processing in next iteration
+  - Matches Borland's `TProgram::putEvent()` and `TProgram::pending` from tprogram.cc
+  - Enables complex event transformation chains and command generation patterns
+
+### Changed
+- **Terminal**: Enhanced `poll_event()` to check pending events first
+  - Pending events are processed before polling for new input
+  - Matches Borland's `TProgram::getEvent()` behavior (tprogram.cc:154-194)
+  - Event queue is FIFO - pending event delivered on next poll
+  - Supports Borland-style event flow patterns
+
+### Technical Details
+This completes the event architecture trilogy started in v0.1.9. While three-phase processing handles HOW events flow through views, event re-queuing handles WHEN events are processed. The `put_event()` method allows views to:
+- Generate new events for next iteration (e.g., converting mouse clicks to commands)
+- Defer complex event processing
+- Implement modal dialog patterns where unhandled events bubble up
+- Match Borland's event generation patterns from status line and buttons
+
+The pending event is checked first in `poll_event()`, ensuring re-queued events take priority over new input. This matches the exact behavior of `TProgram::getEvent()` which checks `pending.what != evNothing` before reading new events.
+
 ## [0.1.9] - 2025-11-03
 
 ### Added
