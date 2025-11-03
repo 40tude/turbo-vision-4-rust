@@ -277,16 +277,14 @@ impl View for ListBox {
                         let clicked_item = self.top_item + relative_y;
 
                         if clicked_item < self.items.len() {
-                            // Check if clicking the same item (double-click behavior)
-                            let was_selected = self.selected == Some(clicked_item);
-
                             // Select the clicked item
                             self.selected = Some(clicked_item);
-                            event.clear();
 
-                            // If clicking already selected item, trigger selection command
-                            if was_selected {
+                            // Double-click triggers selection command (matching Borland's TListViewer)
+                            if event.mouse.double_click {
                                 *event = Event::command(self.on_select_command);
+                            } else {
+                                event.clear();
                             }
                         }
                     }

@@ -12,6 +12,7 @@ pub enum MenuItem {
         command: CommandId,
         key_code: KeyCode,
         enabled: bool,
+        shortcut: Option<String>,  // Display shortcut (e.g., "Ctrl+O", "F3", "Alt+X")
     },
     Separator,
 }
@@ -23,6 +24,17 @@ impl MenuItem {
             command,
             key_code,
             enabled: true,
+            shortcut: None,
+        }
+    }
+
+    pub fn new_with_shortcut(text: &str, command: CommandId, key_code: KeyCode, shortcut: &str) -> Self {
+        Self::Regular {
+            text: text.to_string(),
+            command,
+            key_code,
+            enabled: true,
+            shortcut: Some(shortcut.to_string()),
         }
     }
 
@@ -32,6 +44,7 @@ impl MenuItem {
             command,
             key_code,
             enabled: false,
+            shortcut: None,
         }
     }
 
@@ -196,16 +209,31 @@ impl View for MenuBar {
                 };
                 let menu_y = self.bounds.a.y + 1;
 
-                // Calculate dropdown width (find longest item)
-                let mut max_width = 12; // Minimum width
+                // Calculate dropdown width (find longest item + shortcut)
+                let mut max_text_width = 12; // Minimum width for text
+                let mut max_shortcut_width = 0;
                 for item in &menu.items {
-                    if let MenuItem::Regular { text, .. } = item {
+                    if let MenuItem::Regular { text, shortcut, .. } = item {
                         let text_len = text.replace('~', "").len();
-                        if text_len + 2 > max_width {
-                            max_width = text_len + 2; // +2 for padding
+                        if text_len > max_text_width {
+                            max_text_width = text_len;
+                        }
+                        if let Some(shortcut_text) = shortcut {
+                            let shortcut_len = shortcut_text.len();
+                            if shortcut_len > max_shortcut_width {
+                                max_shortcut_width = shortcut_len;
+                            }
                         }
                     }
                 }
+
+                // Total width: text + gap + shortcut + padding
+                // +2 for left padding, +2 for space before shortcut, +2 for borders
+                let max_width = if max_shortcut_width > 0 {
+                    max_text_width + 2 + max_shortcut_width + 2
+                } else {
+                    max_text_width + 2
+                };
 
                 let dropdown_height = menu.items.len() as i16;
                 let dropdown_width = max_width;
@@ -232,7 +260,7 @@ impl View for MenuBar {
                             }
                             item_buf.put_char(dropdown_width - 1, '┤', colors::MENU_NORMAL); // Right junction
                         }
-                        MenuItem::Regular { text, enabled, .. } => {
+                        MenuItem::Regular { text, enabled, shortcut, .. } => {
                             let attr = if i == self.selected_item && *enabled {
                                 colors::MENU_SELECTED
                             } else if !enabled {
@@ -279,6 +307,16 @@ impl View for MenuBar {
                                 } else {
                                     item_buf.put_char(x, ch, attr);
                                     x += 1;
+                                }
+                            }
+
+                            // Draw shortcut right-aligned (if present)
+                            if let Some(shortcut_text) = shortcut {
+                                let shortcut_x = dropdown_width - shortcut_text.len() - 1;
+                                for (i, ch) in shortcut_text.chars().enumerate() {
+                                    if shortcut_x + i < dropdown_width - 1 {
+                                        item_buf.put_char(shortcut_x + i, ch, attr);
+                                    }
                                 }
                             }
 

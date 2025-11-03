@@ -15,8 +15,8 @@ A Rust implementation of the classic Borland Turbo Vision text user interface fr
 - **Scrollable Views**: Built-in scrollbar support with keyboard navigation
 - **Text Viewer**: Ready-to-use scrollable text viewer with line numbers
 - **Event-Driven Architecture**: Keyboard and command-based event routing
-- **Mouse Support**: Full mouse support for buttons, menus, status bar, dialog close buttons, and scroll wheel
-- **Window Dragging**: Drag windows in all directions with proper redrawing
+- **Mouse Support**: Full mouse support for buttons, menus, status bar, dialog close buttons, scroll wheel, and double-click detection
+- **Window Dragging and Resizing**: Drag windows by title bar, resize by bottom-right corner
 - **Flexible Layout System**: Geometry primitives with absolute and relative positioning
 - **Color Support**: 16-color palette with attribute system
 - **Cross-Platform**: Built on crossterm for wide terminal compatibility
@@ -84,7 +84,7 @@ Currently implements:
 - ✅ Buttons with keyboard shortcuts
 - ✅ Static text labels (with centered text support)
 - ✅ Input fields
-- ✅ Menu bar with dropdowns
+- ✅ Menu bar with dropdowns and keyboard shortcut display
 - ✅ Status line
 - ✅ Desktop manager
 - ✅ Scrollbars (vertical and horizontal)
@@ -95,7 +95,8 @@ Currently implements:
 - ✅ RadioButtons
 - ✅ ListBoxes
 - ✅ Memo (multi-line text editor)
-- ✅ Mouse support (buttons, menus, status bar, close buttons, hover effects, listbox clicks, scroll wheel)
+- ✅ Mouse support (buttons, menus, status bar, close buttons, hover effects, listbox clicks, scroll wheel, double-click detection)
+- ✅ Window dragging and resizing (drag by title bar, resize from bottom-right corner with minimum size constraints)
 - ✅ Window closing (non-modal windows close with close button, modal dialogs convert to cancel)
 - ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
 - ✅ ANSI Dump for debugging (dump screen/views to text files with colors)

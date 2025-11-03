@@ -1,7 +1,7 @@
 use crate::core::geometry::{Rect, Point};
 use crate::core::event::{Event, EventType};
 use crate::core::command::{CM_CLOSE, CM_CANCEL};
-use crate::core::state::{StateFlags, SF_SHADOW, SF_DRAGGING, SF_MODAL, SF_CLOSED, SHADOW_ATTR};
+use crate::core::state::{StateFlags, SF_SHADOW, SF_DRAGGING, SF_RESIZING, SF_MODAL, SF_CLOSED, SHADOW_ATTR};
 use crate::core::palette::colors;
 use crate::terminal::Terminal;
 use super::view::{View, draw_shadow};
@@ -15,6 +15,10 @@ pub struct Window {
     state: StateFlags,
     /// Drag start position (relative to mouse when drag started)
     drag_offset: Option<Point>,
+    /// Resize start size (size when resize drag started)
+    resize_start_size: Option<Point>,
+    /// Minimum window size (matches Borland's minWinSize)
+    min_size: Point,
     /// Previous bounds (for calculating union rect for redrawing)
     /// Matches Borland: TView::locate() calculates union of old and new bounds
     prev_bounds: Option<Rect>,
@@ -35,6 +39,8 @@ impl Window {
             interior,
             state: SF_SHADOW, // Windows have shadows by default
             drag_offset: None,
+            resize_start_size: None,
+            min_size: Point::new(16, 6), // Minimum size: 16 wide, 6 tall (matches Borland's minWinSize)
             prev_bounds: None,
         }
     }
@@ -147,8 +153,9 @@ impl View for Window {
         // First, let the frame handle the event (for close button clicks, drag start, etc.)
         self.frame.handle_event(event);
 
-        // Check if frame started dragging
+        // Check if frame started dragging or resizing
         let frame_dragging = (self.frame.state() & SF_DRAGGING) != 0;
+        let frame_resizing = (self.frame.state() & SF_RESIZING) != 0;
 
         if frame_dragging && self.drag_offset.is_none() {
             // Frame just started dragging - record offset
@@ -159,6 +166,20 @@ impl View for Window {
                     mouse_pos.y - self.bounds.a.y,
                 ));
                 self.state |= SF_DRAGGING;
+            }
+        }
+
+        if frame_resizing && self.resize_start_size.is_none() {
+            // Frame just started resizing - record initial size
+            if event.what == EventType::MouseDown || event.what == EventType::MouseMove {
+                let mouse_pos = event.mouse.pos;
+                // Calculate offset from bottom-right corner
+                // Borland: p = size - event.mouse.where (tview.cc:235)
+                self.resize_start_size = Some(Point::new(
+                    self.bounds.b.x - mouse_pos.x,
+                    self.bounds.b.y - mouse_pos.y,
+                ));
+                self.state |= SF_RESIZING;
             }
         }
 
@@ -191,10 +212,48 @@ impl View for Window {
             }
         }
 
+        // Handle mouse move during resize
+        if frame_resizing && self.resize_start_size.is_some() {
+            if event.what == EventType::MouseMove {
+                let mouse_pos = event.mouse.pos;
+                let offset = self.resize_start_size.unwrap();
+
+                // Calculate new size (Borland: event.mouse.where += p, then use as size)
+                let new_width = (mouse_pos.x + offset.x - self.bounds.a.x) as u16;
+                let new_height = (mouse_pos.y + offset.y - self.bounds.a.y) as u16;
+
+                // Apply minimum size constraints (Borland: sizeLimits)
+                let final_width = new_width.max(self.min_size.x as u16);
+                let final_height = new_height.max(self.min_size.y as u16);
+
+                // Save previous bounds for union rect calculation
+                self.prev_bounds = Some(self.bounds);
+
+                // Update bounds (maintaining position, changing size)
+                self.bounds.b.x = self.bounds.a.x + final_width as i16;
+                self.bounds.b.y = self.bounds.a.y + final_height as i16;
+
+                // Update frame and interior bounds
+                self.frame.set_bounds(self.bounds);
+                let mut interior_bounds = self.bounds;
+                interior_bounds.grow(-1, -1);
+                self.interior.set_bounds(interior_bounds);
+
+                event.clear(); // Mark event as handled
+                return;
+            }
+        }
+
         // Check if frame ended dragging
         if !frame_dragging && self.drag_offset.is_some() {
             self.drag_offset = None;
             self.state &= !SF_DRAGGING;
+        }
+
+        // Check if frame ended resizing
+        if !frame_resizing && self.resize_start_size.is_some() {
+            self.resize_start_size = None;
+            self.state &= !SF_RESIZING;
         }
 
         // Handle CM_CLOSE command (Borland: twindow.cc lines 124-138)

@@ -21,16 +21,16 @@ fn main() -> std::io::Result<()> {
     // Create menu bar
     let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
 
-    // File menu
+    // File menu (with keyboard shortcuts displayed)
     let mut file_menu = SubMenu::new("~F~ile");
-    file_menu.add_item(MenuItem::new("~N~ew", CM_NEW, 0));
-    file_menu.add_item(MenuItem::new("~O~pen...", CM_OPEN, 0));
+    file_menu.add_item(MenuItem::new_with_shortcut("~N~ew", CM_NEW, 0, "Ctrl+N"));
+    file_menu.add_item(MenuItem::new_with_shortcut("~O~pen...", CM_OPEN, 0, "Ctrl+O"));
     file_menu.add_item(MenuItem::separator());
-    file_menu.add_item(MenuItem::new("E~x~it", CM_QUIT, 0));
+    file_menu.add_item(MenuItem::new_with_shortcut("E~x~it", CM_QUIT, 0, "Alt+X"));
 
     // Help menu
     let mut help_menu = SubMenu::new("~H~elp");
-    help_menu.add_item(MenuItem::new("~A~bout", CMD_ABOUT, 0));
+    help_menu.add_item(MenuItem::new_with_shortcut("~A~bout", CMD_ABOUT, 0, "F1"));
 
     menu_bar.add_menu(file_menu);
     menu_bar.add_menu(help_menu);

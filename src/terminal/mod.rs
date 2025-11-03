@@ -9,7 +9,7 @@ use crossterm::{
     event::{self, Event as CTEvent, MouseEventKind, MouseButton},
 };
 use std::io::{self, Write, stdout};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Terminal abstraction for crossterm backend
 pub struct Terminal {
@@ -20,6 +20,8 @@ pub struct Terminal {
     esc_tracker: EscSequenceTracker,
     last_mouse_pos: Point,
     last_mouse_buttons: u8,
+    last_click_time: Option<Instant>,
+    last_click_pos: Point,
     clip_stack: Vec<crate::core::geometry::Rect>,
     active_view_bounds: Option<crate::core::geometry::Rect>,
 }
@@ -50,6 +52,8 @@ impl Terminal {
             esc_tracker: EscSequenceTracker::new(),
             last_mouse_pos: Point::zero(),
             last_mouse_buttons: 0,
+            last_click_time: None,
+            last_click_pos: Point::zero(),
             clip_stack: Vec::new(),
             active_view_bounds: None,
         })
@@ -345,26 +349,37 @@ impl Terminal {
             _ => return None,
         };
 
-        // Determine event type
-        let event_type = match mouse.kind {
+        // Determine event type and detect double-clicks
+        let (event_type, is_double_click) = match mouse.kind {
             MouseEventKind::Down(_) => {
+                // Check for double-click: same position, within 500ms
+                let is_double = if let Some(last_time) = self.last_click_time {
+                    let elapsed = last_time.elapsed();
+                    elapsed.as_millis() <= 500 && pos == self.last_click_pos
+                } else {
+                    false
+                };
+
+                // Update click tracking
+                self.last_click_time = Some(Instant::now());
+                self.last_click_pos = pos;
                 self.last_mouse_buttons = buttons;
                 self.last_mouse_pos = pos;
-                EventType::MouseDown
+
+                (EventType::MouseDown, is_double)
             }
             MouseEventKind::Up(_) => {
                 self.last_mouse_buttons = 0;
-                EventType::MouseUp
+                (EventType::MouseUp, false)
             }
             MouseEventKind::Drag(_) | MouseEventKind::Moved => {
                 self.last_mouse_pos = pos;
-                EventType::MouseMove
+                (EventType::MouseMove, false)
             }
             _ => return None,
         };
 
-        // TODO: implement proper double-click detection
-        Some(Event::mouse(event_type, pos, buttons, false))
+        Some(Event::mouse(event_type, pos, buttons, is_double_click))
     }
 
     /// Dump the entire screen buffer to an ANSI text file for debugging

@@ -15,6 +15,7 @@ pub const SF_MODAL: StateFlags = 0x200;
 pub const SF_DEFAULT: StateFlags = 0x400;
 pub const SF_EXPOSED: StateFlags = 0x800;
 pub const SF_CLOSED: StateFlags = 0x1000;  // Window marked for removal (Rust-specific)
+pub const SF_RESIZING: StateFlags = 0x2000;  // Window is being resized (Rust-specific)
 
 // TView Option masks
 pub const OF_SELECTABLE: u16 = 0x001;

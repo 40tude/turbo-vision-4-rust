@@ -3,7 +3,7 @@ use crate::core::event::{Event, EventType, MB_LEFT_BUTTON};
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::{colors, Attr, TvColor};
 use crate::core::command::CM_CLOSE;
-use crate::core::state::{StateFlags, SF_ACTIVE, SF_DRAGGING};
+use crate::core::state::{StateFlags, SF_ACTIVE, SF_DRAGGING, SF_RESIZING};
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 
@@ -154,6 +154,15 @@ impl View for Frame {
         if event.what == EventType::MouseDown && (event.mouse.buttons & MB_LEFT_BUTTON) != 0 {
             let mouse_pos = event.mouse.pos;
 
+            // Check if click is on the resize corner (bottom-right, matching Borland tframe.cc:214)
+            // Borland: mouse.x >= size.x - 2 && mouse.y >= size.y - 1
+            if mouse_pos.x >= self.bounds.b.x - 2 && mouse_pos.y >= self.bounds.b.y - 1 {
+                // Resize corner - set resizing state
+                self.state |= SF_RESIZING;
+                event.clear(); // Mark event as handled
+                return;
+            }
+
             // Check if click is on the top frame line (title bar)
             if mouse_pos.y == self.bounds.a.y {
                 // Check if click is on the close button [■] at position (2,3,4)
@@ -171,10 +180,15 @@ impl View for Frame {
                 self.state |= SF_DRAGGING;
                 event.clear(); // Mark event as handled
             }
-        } else if event.what == EventType::MouseUp && (self.state & SF_DRAGGING) != 0 {
-            // End dragging
-            self.state &= !SF_DRAGGING;
-            event.clear();
+        } else if event.what == EventType::MouseUp {
+            // End dragging or resizing
+            if (self.state & SF_DRAGGING) != 0 {
+                self.state &= !SF_DRAGGING;
+                event.clear();
+            } else if (self.state & SF_RESIZING) != 0 {
+                self.state &= !SF_RESIZING;
+                event.clear();
+            }
         }
 
         // Handle mouse up on close button (after mouse down was already on it)

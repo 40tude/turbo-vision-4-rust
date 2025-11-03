@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2025-11-03
+
+### Added
+- **Keyboard Shortcuts in Menus**: Menu items now display keyboard shortcuts right-aligned
+  - New `MenuItem::new_with_shortcut()` constructor to specify shortcut text
+  - Shortcuts displayed right-aligned in dropdown menus (e.g., "Ctrl+O", "F3", "Alt+X")
+  - Menu width automatically adjusts to accommodate shortcuts
+  - Matches Borland's `TMenuItem::keyCode` display pattern
+
+### Changed
+- **MenuItem**: Enhanced with optional `shortcut` field for display purposes
+  - Shortcut text is purely visual - shows users what keys to press
+  - Improves menu polish and user experience
+  - Follows desktop UI conventions for shortcut display
+
+### Technical Details
+This implements Borland Turbo Vision's menu shortcut display pattern. Menu items can now show keyboard shortcuts right-aligned, similar to modern desktop applications. The implementation calculates menu width based on both item text and shortcut length, ensuring proper alignment and visual polish. Shortcuts are currently display-only - actual global shortcut handling would require application-level key routing.
+
+## [0.1.6] - 2025-11-03
+
+### Added
+- **Window Resize Support**: Windows can now be resized by dragging the bottom-right corner
+  - Click and drag the bottom-right corner (last 2 columns, last row) to resize
+  - Minimum size constraints prevent windows from becoming too small (16x6 minimum)
+  - All child views automatically update during resize
+  - Efficient redrawing using union rect pattern (same as window movement)
+  - Matches Borland's `TWindow` resize behavior from `twindow.cc` and `tframe.cc`
+
+### Changed
+- **Frame**: Enhanced mouse event handling to detect resize corner clicks
+  - Bottom-right corner detection: `mouse.x >= size.x - 2 && mouse.y >= size.y - 1`
+  - New `SF_RESIZING` state flag to track resize operations
+  - Matches Borland's `TFrame::handleEvent()` pattern (tframe.cc:214-219)
+
+- **Window**: Added resize drag logic and size constraints
+  - Tracks resize offset from bottom-right corner during drag
+  - Applies minimum size limits (16 wide, 6 tall) matching Borland's `minWinSize`
+  - Updates frame and interior bounds during resize
+  - Prevents resizing smaller than minimum dimensions
+
+### Technical Details
+This implements Borland Turbo Vision's window resizing architecture. The Frame detects resize corner clicks and sets the `SF_RESIZING` flag. The Window handles mouse move events during resize, calculating new size while respecting minimum size constraints from `sizeLimits()`. Child views are automatically repositioned through the `set_bounds()` cascade, and efficient redrawing uses the union rect pattern to minimize screen updates.
+
+## [0.1.5] - 2025-11-03
+
+### Added
+- **Double-click Detection**: Implemented proper double-click detection for mouse events
+  - Added timing and position tracking to Terminal (`last_click_time`, `last_click_pos`)
+  - Detects double-clicks within 500ms at the same position
+  - `MouseEvent.double_click` field now properly set by `Terminal::convert_mouse_event()`
+  - Matches expected desktop UI behavior for quick successive clicks
+
+### Changed
+- **ListBox**: Updated to trigger selection command on double-click instead of repeated single clicks
+  - Double-clicking an item in ListBox now immediately triggers the `on_select_command`
+  - Single clicks select items without triggering the command
+  - Matches Borland's `TListViewer` pattern: `if (event.mouse.doubleClick) selectItem(focused)`
+
+- **FileDialog**: Automatically benefits from ListBox double-click support
+  - Double-clicking files now opens them immediately (no need to click OK button)
+  - Double-clicking folders navigates into them
+  - Improves user experience with modern expected behavior
+
+### Technical Details
+This implements double-click detection based on Borland Turbo Vision's `MouseEventType.doubleClick` field. The implementation tracks click timing using `Instant` and checks that consecutive clicks occur within 500ms at the same position. This pattern matches modern desktop UI conventions while maintaining compatibility with Borland's event-driven architecture.
+
 ## [0.1.4] - 2025-11-02
 
 ### Changed
