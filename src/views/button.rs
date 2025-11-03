@@ -126,7 +126,33 @@ impl View for Button {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        // Disabled buttons don't handle any events
+        // Handle broadcasts FIRST, even if button is disabled
+        // This is critical for CM_COMMAND_SET_CHANGED which updates button enabled state
+        // Matches Borland: TButton::handleEvent() checks cmCommandSetChanged before disabled check
+        if event.what == EventType::Broadcast {
+            use crate::core::command::CM_COMMAND_SET_CHANGED;
+            use crate::core::command_set;
+
+            if event.command == CM_COMMAND_SET_CHANGED {
+                // Query global command set (thread-local static, like Borland)
+                let should_be_enabled = command_set::command_enabled(self.command);
+                let is_currently_disabled = self.is_disabled();
+
+                // Update disabled state if it changed
+                if should_be_enabled && is_currently_disabled {
+                    // Command was disabled, now enabled
+                    self.set_disabled(false);
+                } else if !should_be_enabled && !is_currently_disabled {
+                    // Command was enabled, now disabled
+                    self.set_disabled(true);
+                }
+
+                // Event is not cleared - other views may need it
+            }
+            return; // Broadcasts don't fall through to regular event handling
+        }
+
+        // Disabled buttons don't handle any other events
         if self.is_disabled() {
             return;
         }
@@ -152,29 +178,6 @@ impl View for Button {
                 {
                     // Button clicked - generate command
                     *event = Event::command(self.command);
-                }
-            }
-            EventType::Broadcast => {
-                use crate::core::command::CM_COMMAND_SET_CHANGED;
-                use crate::core::command_set;
-
-                // Handle command set changed broadcast
-                // Matches Borland: TButton::handleEvent() cmCommandSetChanged (tbutton.cc:255-262)
-                if event.command == CM_COMMAND_SET_CHANGED {
-                    // Query global command set (thread-local static, like Borland)
-                    let should_be_enabled = command_set::command_enabled(self.command);
-                    let is_currently_disabled = self.is_disabled();
-
-                    // Update disabled state if it changed
-                    if should_be_enabled && is_currently_disabled {
-                        // Command was disabled, now enabled
-                        self.set_disabled(false);
-                    } else if !should_be_enabled && !is_currently_disabled {
-                        // Command was enabled, now disabled
-                        self.set_disabled(true);
-                    }
-
-                    // Event is not cleared - other views may need it
                 }
             }
             _ => {}
