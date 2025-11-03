@@ -123,69 +123,47 @@ fn main() -> std::io::Result<()> {
     );
     dialog.add(Box::new(close_button));
 
-    // Execute the dialog with custom event handling
-    let result = execute_demo_dialog(&mut dialog, &mut app.terminal);
+    // Execute the dialog - use standard Application.run() with custom command handling
+    app.desktop.add(Box::new(dialog));
 
-    // Clean up before exit
-    drop(dialog);
-    println!("\nDemo Result: Command {:?}", result);
-    println!("Notice how buttons automatically updated when commands were enabled/disabled!");
-    Ok(())
-}
-
-fn execute_demo_dialog(dialog: &mut Dialog, terminal: &mut Terminal) -> CommandId {
+    // Custom event loop to handle Enable/Disable commands
     loop {
-        // Draw
-        dialog.draw(terminal);
-        dialog.update_cursor(terminal);
-        let _ = terminal.flush();
+        // Use application's event handling
+        if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+            app.handle_event(&mut event);
 
-        // Get event
-        if let Ok(Some(mut event)) = terminal.poll_event(std::time::Duration::from_millis(50)) {
-            // Handle double ESC to close
-            if event.what == EventType::Keyboard && event.key_code == 0x011C {
-                return CM_CANCEL;
-            }
-
-            dialog.handle_event(&mut event);
-
-            // Check if dialog should close
+            // Check for our custom commands
             if event.what == EventType::Command {
                 match event.command {
                     CMD_ENABLE_EDITS => {
-                        // Enable all edit commands - buttons will auto-update!
                         command_set::enable_command(CM_COPY);
                         command_set::enable_command(CM_CUT);
                         command_set::enable_command(CM_PASTE);
                         command_set::enable_command(CM_UNDO);
                         command_set::enable_command(CM_REDO);
-                        event.clear();
                     }
                     CMD_DISABLE_EDITS => {
-                        // Disable all edit commands - buttons will auto-update!
                         command_set::disable_command(CM_COPY);
                         command_set::disable_command(CM_CUT);
                         command_set::disable_command(CM_PASTE);
                         command_set::disable_command(CM_UNDO);
                         command_set::disable_command(CM_REDO);
-                        event.clear();
                     }
                     CM_CANCEL => {
-                        return CM_CANCEL;
+                        break;
                     }
                     _ => {}
                 }
             }
         }
 
-        // CRITICAL: Call idle to broadcast command set changes
-        // This is what triggers the automatic button updates!
-        if command_set::command_set_changed() {
-            let mut broadcast_event = Event::broadcast(
-                turbo_vision::core::command::CM_COMMAND_SET_CHANGED
-            );
-            dialog.handle_event(&mut broadcast_event);
-            command_set::clear_command_set_changed();
-        }
+        // CRITICAL: Call idle() to broadcast command set changes, then draw
+        app.idle();
+        app.draw();
+        let _ = app.terminal.flush();
     }
+
+    println!("\nDemo complete!");
+    println!("Notice how buttons automatically updated when commands were enabled/disabled!");
+    Ok(())
 }

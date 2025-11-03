@@ -20,9 +20,10 @@ use turbo_vision::app::Application;
 use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE};
 use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
+use turbo_vision::core::menu_data::{Menu, MenuItem};
 use turbo_vision::views::button::Button;
 use turbo_vision::views::dialog::Dialog;
-use turbo_vision::views::menu_bar::{MenuBar, MenuItem, SubMenu};
+use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
 use turbo_vision::views::static_text::StaticText;
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
 use turbo_vision::views::text_viewer::TextViewer;
@@ -40,29 +41,35 @@ fn main() -> std::io::Result<()> {
     let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
 
     // File menu with shortcuts
-    let mut file_menu = SubMenu::new("~F~ile");
-    file_menu.add_item(MenuItem::new_with_shortcut("~N~ew", CM_NEW, 0, "Ctrl+N"));
-    file_menu.add_item(MenuItem::new_with_shortcut("~O~pen...", CM_OPEN, 0, "Ctrl+O"));
-    file_menu.add_item(MenuItem::new_with_shortcut("~S~ave", CM_SAVE, 0, "Ctrl+S"));
-    file_menu.add_item(MenuItem::separator());
-    file_menu.add_item(MenuItem::new_with_shortcut("E~x~it", CM_QUIT, 0, "Alt+X"));
+    let file_menu_items = vec![
+        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "Ctrl+N", 0),
+        MenuItem::with_shortcut("~O~pen...", CM_OPEN, 0, "Ctrl+O", 0),
+        MenuItem::with_shortcut("~S~ave", CM_SAVE, 0, "Ctrl+S", 0),
+        MenuItem::separator(),
+        MenuItem::with_shortcut("E~x~it", CM_QUIT, 0, "Alt+X", 0),
+    ];
+    let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
 
     // Window menu
-    let mut window_menu = SubMenu::new("~W~indow");
-    window_menu.add_item(MenuItem::new("~T~ile", 0, 0));
-    window_menu.add_item(MenuItem::new("~C~ascade", 0, 0));
-    window_menu.add_item(MenuItem::separator());
-    window_menu.add_item(MenuItem::new("~N~ext", 0, 0));
+    let window_menu_items = vec![
+        MenuItem::new("~T~ile", 0, 0, 0),
+        MenuItem::new("~C~ascade", 0, 0, 0),
+        MenuItem::separator(),
+        MenuItem::new("~N~ext", 0, 0, 0),
+    ];
+    let window_menu = SubMenu::new("~W~indow", Menu::from_items(window_menu_items));
 
     // Help menu with shortcuts
-    let mut help_menu = SubMenu::new("~H~elp");
-    help_menu.add_item(MenuItem::new_with_shortcut("~H~elp Index", CMD_HELP, 0, "F1"));
-    help_menu.add_item(MenuItem::separator());
-    help_menu.add_item(MenuItem::new("~A~bout", CMD_ABOUT, 0));
+    let help_menu_items = vec![
+        MenuItem::with_shortcut("~H~elp Index", CMD_HELP, 0, "F1", 0),
+        MenuItem::separator(),
+        MenuItem::new("~A~bout", CMD_ABOUT, 0, 0),
+    ];
+    let help_menu = SubMenu::new("~H~elp", Menu::from_items(help_menu_items));
 
-    menu_bar.add_menu(file_menu);
-    menu_bar.add_menu(window_menu);
-    menu_bar.add_menu(help_menu);
+    menu_bar.add_submenu(file_menu);
+    menu_bar.add_submenu(window_menu);
+    menu_bar.add_submenu(help_menu);
     app.set_menu_bar(menu_bar);
 
     // Create status line

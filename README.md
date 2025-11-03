@@ -2,9 +2,7 @@
 
 ![Turbo Vision Logo](https://raw.githubusercontent.com/aovestdipaperino/turbo-vision-4-rust/main/logo.png)
 
-## WARNING: WORK IN PROGRESS
-
-A Rust implementation of the classic Borland Turbo Vision text user interface framework.
+A Rust implementation of the classic Borland Turbo Vision text user interface framework. Relatively complete but still under (small) bug fixing.
 
 ## Features
 

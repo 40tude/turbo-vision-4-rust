@@ -473,9 +473,21 @@ impl View for Group {
                 }
             }
         } else {
+            // Broadcast events: send to ALL children
             // Other event types: send to focused child only
-            if self.focused < self.children.len() {
-                self.children[self.focused].handle_event(event);
+            if event.what == EventType::Broadcast {
+                // Matches Borland: TGroup::handleEvent() broadcasts to all children via forEach
+                for child in &mut self.children {
+                    if event.what == EventType::Nothing {
+                        break; // Event was handled
+                    }
+                    child.handle_event(event);
+                }
+            } else {
+                // Other event types: send to focused child only
+                if self.focused < self.children.len() {
+                    self.children[self.focused].handle_event(event);
+                }
             }
         }
     }

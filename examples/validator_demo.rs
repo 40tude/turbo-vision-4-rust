@@ -1,25 +1,74 @@
-// Example demonstrating input validation with FilterValidator and RangeValidator
+// Comprehensive Validator Demo
 //
-// This example shows:
-// - FilterValidator: Only allows specific characters (e.g., digits only)
-// - RangeValidator: Only allows numbers within a range (e.g., 0-100)
-// - Real-time validation: Invalid characters are rejected as you type
-// - Final validation: Check if complete input is valid before accepting
+// Demonstrates all Validator types in one example:
+// - FilterValidator (character filtering)
+// - RangeValidator (numeric ranges)
+// - PictureValidator (format masks)
 
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_OK, CM_CANCEL};
 use turbo_vision::core::geometry::Rect;
-use turbo_vision::views::dialog::Dialog;
-use turbo_vision::views::input_line::InputLine;
-use turbo_vision::views::label::Label;
-use turbo_vision::views::button::Button;
-use turbo_vision::views::static_text::StaticText;
-use turbo_vision::views::validator::{FilterValidator, RangeValidator, Validator};
+use turbo_vision::core::command::{CM_OK, CM_CANCEL};
+use turbo_vision::views::{
+    dialog::Dialog,
+    button::Button,
+    static_text::StaticText,
+    label::Label,
+    input_line::InputLine,
+    validator::{FilterValidator, RangeValidator, Validator},
+    picture_validator::PictureValidator,
+};
 use std::rc::Rc;
 use std::cell::RefCell;
 
 fn main() -> std::io::Result<()> {
     let mut app = Application::new()?;
+
+    // Show menu to choose demo type
+    loop {
+        let choice = show_menu(&mut app);
+
+        match choice {
+            1 => demo_filter_range(&mut app),
+            2 => demo_picture_masks(&mut app),
+            _ => break,
+        }
+    }
+
+    Ok(())
+}
+
+fn show_menu(app: &mut Application) -> u16 {
+    let mut dialog = Dialog::new(
+        Rect::new(20, 8, 60, 16),
+        "Validator Demonstrations"
+    );
+
+    let text = StaticText::new(
+        Rect::new(2, 2, 38, 3),
+        "Choose a validator type to demonstrate:"
+    );
+    dialog.add(Box::new(text));
+
+    let btn1 = Button::new(
+        Rect::new(3, 4, 37, 6),
+        "1. ~F~ilter and Range Validators",
+        1,
+        true
+    );
+    dialog.add(Box::new(btn1));
+
+    let btn2 = Button::new(
+        Rect::new(3, 6, 37, 8),
+        "2. ~P~icture Mask Validator",
+        2,
+        false
+    );
+    dialog.add(Box::new(btn2));
+
+    dialog.execute(app)
+}
+
+fn demo_filter_range(app: &mut Application) {
     let (width, height) = app.terminal.size();
 
     // Create dialog
@@ -30,14 +79,13 @@ fn main() -> std::io::Result<()> {
 
     let mut dialog = Dialog::new(
         Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Input Validation Demo"
+        "Filter & Range Validators"
     );
 
     // Instructions
     let instructions = StaticText::new(
         Rect::new(2, 1, dialog_width - 4, 3),
-        "Try typing in each field. Invalid characters are rejected.\n\
-         Click OK to validate final values.",
+        "Try typing in each field. Invalid characters are rejected.\nClick OK to validate final values.",
     );
     dialog.add(Box::new(instructions));
 
@@ -117,7 +165,7 @@ fn main() -> std::io::Result<()> {
     dialog.set_initial_focus();
 
     // Execute dialog
-    let result = dialog.execute(&mut app);
+    let result = dialog.execute(app);
 
     if result == CM_OK {
         // Validate all fields
@@ -154,6 +202,121 @@ fn main() -> std::io::Result<()> {
     } else {
         println!("\nDialog cancelled");
     }
+}
 
-    Ok(())
+fn demo_picture_masks(app: &mut Application) {
+    // Create dialog
+    let mut dialog = Dialog::new(
+        Rect::new(10, 4, 70, 20),
+        "Picture Mask Validator"
+    );
+
+    // Title
+    let title = StaticText::new(
+        Rect::new(12, 6, 68, 7),
+        "Enter formatted data using picture masks:"
+    );
+    dialog.add(Box::new(title));
+
+    // Phone number field with validator
+    let phone_label = Label::new(
+        Rect::new(12, 8, 28, 9),
+        "~P~hone Number:"
+    );
+    dialog.add(Box::new(phone_label));
+
+    let phone_data = Rc::new(RefCell::new(String::new()));
+    let mut phone_input = InputLine::new(Rect::new(29, 8, 52, 9), 20, phone_data.clone());
+    phone_input.set_validator(
+        Rc::new(RefCell::new(
+            PictureValidator::new("(###) ###-####")
+        ))
+    );
+    dialog.add(Box::new(phone_input));
+
+    let phone_hint = StaticText::new(
+        Rect::new(53, 8, 68, 9),
+        "(###) ###-####"
+    );
+    dialog.add(Box::new(phone_hint));
+
+    // Date field with validator
+    let date_label = Label::new(
+        Rect::new(12, 10, 28, 11),
+        "~D~ate:"
+    );
+    dialog.add(Box::new(date_label));
+
+    let date_data = Rc::new(RefCell::new(String::new()));
+    let mut date_input = InputLine::new(Rect::new(29, 10, 41, 11), 10, date_data.clone());
+    date_input.set_validator(
+        Rc::new(RefCell::new(
+            PictureValidator::new("##/##/####")
+        ))
+    );
+    dialog.add(Box::new(date_input));
+
+    let date_hint = StaticText::new(
+        Rect::new(42, 10, 68, 11),
+        "##/##/####"
+    );
+    dialog.add(Box::new(date_hint));
+
+    // Product code field
+    let code_label = Label::new(
+        Rect::new(12, 12, 28, 13),
+        "Product ~C~ode:"
+    );
+    dialog.add(Box::new(code_label));
+
+    let code_data = Rc::new(RefCell::new(String::new()));
+    let mut code_input = InputLine::new(Rect::new(29, 12, 42, 13), 9, code_data.clone());
+    code_input.set_validator(
+        Rc::new(RefCell::new(
+            PictureValidator::new("@@@@-####")
+        ))
+    );
+    dialog.add(Box::new(code_input));
+
+    let code_hint = StaticText::new(
+        Rect::new(43, 12, 68, 13),
+        "@@@@-####"
+    );
+    dialog.add(Box::new(code_hint));
+
+    // Explanation text
+    let legend = StaticText::new(
+        Rect::new(12, 14, 68, 16),
+        "Legend: # = digit, @ = letter, ! = any\nLiterals (like /, -, ()) are inserted automatically"
+    );
+    dialog.add(Box::new(legend));
+
+    // OK button
+    let ok_button = Button::new(
+        Rect::new(25, 17, 35, 19),
+        "  ~O~K  ",
+        CM_OK,
+        true
+    );
+    dialog.add(Box::new(ok_button));
+
+    // Cancel button
+    let cancel_button = Button::new(
+        Rect::new(37, 17, 47, 19),
+        "Cancel",
+        CM_CANCEL,
+        false
+    );
+    dialog.add(Box::new(cancel_button));
+
+    // Execute dialog
+    let result = dialog.execute(app);
+
+    if result == CM_OK {
+        println!("\n\nFormatted Data Entered:");
+        println!("======================");
+        println!("Phone: {}", phone_data.borrow());
+        println!("Date: {}", date_data.borrow());
+        println!("Code: {}", code_data.borrow());
+    }
 }

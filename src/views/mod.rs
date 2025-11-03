@@ -36,6 +36,8 @@ pub mod dir_listbox;
 pub mod msgbox;
 pub mod validator;
 pub mod lookup_validator;
+pub mod picture_validator;
+pub mod syntax;
 pub mod help_file;
 pub mod help_viewer;
 pub mod help_window;

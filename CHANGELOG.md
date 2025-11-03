@@ -5,6 +5,103 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2025-11-03
+
+### Added
+- **Syntax Highlighting System** (~450 lines, 7 tests)
+  - **SyntaxHighlighter trait** (src/views/syntax.rs)
+    - Extensible architecture for language-specific highlighting
+    - Token-based coloring system (Keywords, Strings, Comments, Numbers, etc.)
+    - Line-by-line highlighting with efficient token generation
+    - Methods: `language()`, `highlight_line()`, multi-line context support
+  - **TokenType enum** - 11 token types with default color mappings
+    - Keywords (Yellow), Strings (LightRed), Comments (LightCyan)
+    - Numbers (LightMagenta), Operators (White), Types (LightGreen)
+    - Functions (Cyan), Preprocessor (LightCyan), etc.
+  - **RustHighlighter** - Built-in Rust syntax highlighting
+    - Recognizes Rust keywords (fn, let, if, for, match, etc.)
+    - String and character literals with escape sequences
+    - Line comments (//) and block comments (/* */)
+    - Numeric literals (decimal, hex, float)
+    - Type names (i32, String, custom types)
+    - Operators and special characters
+  - **PlainTextHighlighter** - No-op highlighter for plain text
+  - **Editor Integration**
+    - `set_highlighter()` - Attach syntax highlighter to Editor
+    - `clear_highlighter()` - Remove highlighting
+    - `has_highlighter()` - Check if highlighting is enabled
+    - Automatic per-token color rendering in draw method
+    - Preserves all existing Editor functionality (search/replace, undo/redo, etc.)
+
+- **TPXPictureValidator** (Picture Mask Validator) (~360 lines, 11 tests)
+  - **PictureValidator** (src/views/picture_validator.rs - 255 lines, 8 tests)
+    - Validates and formats input according to picture masks
+    - Matches Borland's TPXPictureValidator from validate.h
+    - Mask characters:
+      - `#` - Digit (0-9)
+      - `@` - Alpha (A-Z, a-z)
+      - `!` - Any character
+      - `*` - Optional section marker
+      - Literals - Must match exactly (e.g., `/`, `-`, `(`, `)`)
+    - Methods: `new()`, `format()`, `set_auto_format()`
+    - Auto-formatting mode inserts literals automatically as user types
+    - Example masks:
+      - `"(###) ###-####"` - Phone number: (555) 123-4567
+      - `"##/##/####"` - Date: 12/25/2023
+      - `"@@@@-####"` - Product code: ABCD-1234
+    - Implements Validator trait for InputLine integration
+  - **Helper function**: `picture_validator()` - Creates ValidatorRef
+
+### Examples
+- **editor_demo.rs** - Comprehensive editor demonstration (290 lines)
+  - Menu-driven interface with 4 demonstrations:
+    1. Basic editing (undo/redo/clipboard operations)
+    2. Search and replace functionality
+    3. Syntax highlighting (Rust code with colored tokens)
+    4. File I/O operations (load/save)
+  - Consolidates previous examples: file_editor.rs, full_editor.rs, syntax_highlighting.rs
+  - Shows all Editor features in one interactive demo
+- **validator_demo.rs** - All validator types demonstration (320 lines)
+  - Menu-driven interface with 2 demonstrations:
+    1. FilterValidator and RangeValidator (character filtering, numeric ranges, hex numbers)
+    2. PictureValidator (phone numbers, dates, product codes with format masks)
+  - Consolidates previous examples: validator_demo.rs, picture_validator.rs
+  - Shows all validation patterns with interactive examples
+
+### Changed
+- **Examples reorganization** - Reduced from 19 to 16 examples by consolidation
+  - Removed: file_editor.rs, full_editor.rs, syntax_highlighting.rs (→ editor_demo.rs)
+  - Removed: picture_validator.rs (→ validator_demo.rs)
+  - Updated examples/README.md with new structure and descriptions
+
+### Technical Details
+**Syntax Highlighting** implements a token-based coloring system that works efficiently with the Editor's line-by-line rendering. Each line is parsed into tokens (keyword, string, comment, etc.) with start/end positions. The Editor's draw method iterates through tokens and applies colors accordingly. The system is extensible - new languages can be added by implementing the SyntaxHighlighter trait.
+
+**Design Patterns**:
+- Hook-based architecture for language extensions
+- Token type abstraction for color mapping customization
+- Line-by-line processing for efficiency
+- Optional multi-line state tracking for block comments
+- Integrates seamlessly with existing Editor features
+
+**TPXPictureValidator** provides input formatting and validation using Borland's picture mask pattern. Unlike character filtering (FilterValidator) or range validation (RangeValidator), picture masks define the exact format of input including literal characters. The validator can auto-format input by inserting literals (like parentheses, slashes, dashes) as the user types, or validate completed input against the mask pattern.
+
+**Design Patterns**:
+- Matches Borland's TPXPictureValidator architecture
+- Integrates with InputLine via Validator trait
+- Supports both auto-format and validation-only modes
+- Optional sections with `*` marker (partially implemented)
+- Real-time validation during typing
+
+Reference: Borland Turbo Vision tvalidat.cc, validate.h (picture validators)
+
+### Test Coverage
+- **Syntax Highlighting**: 7 new tests
+  - Token type colors, plain text, Rust keywords, strings, comments, numbers, types
+- **Picture Validator**: 11 new tests
+  - Phone mask, date mask, format functions, alpha mask, optional sections, partial input
+- **Total Tests**: 171 tests passing (up from 154)
+
 ## [0.2.5] - 2025-11-03
 
 ### Added

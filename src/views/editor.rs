@@ -8,6 +8,7 @@ use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 use super::scrollbar::ScrollBar;
 use super::indicator::Indicator;
+use super::syntax::{SyntaxHighlighter, PlainTextHighlighter};
 use std::cmp::min;
 
 // Control key codes
@@ -97,6 +98,8 @@ pub struct Editor {
     last_search_options: SearchOptions,
     // File state (matching Borland's TFileEditor)
     filename: Option<String>,
+    // Syntax highlighting
+    highlighter: Option<Box<dyn SyntaxHighlighter>>,
 }
 
 impl Editor {
@@ -122,6 +125,7 @@ impl Editor {
             last_search: String::new(),
             last_search_options: SearchOptions::new(),
             filename: None,
+            highlighter: None,
         }
     }
 
@@ -170,6 +174,21 @@ impl Editor {
     /// Set auto-indent mode
     pub fn set_auto_indent(&mut self, auto_indent: bool) {
         self.auto_indent = auto_indent;
+    }
+
+    /// Set syntax highlighter
+    pub fn set_highlighter(&mut self, highlighter: Box<dyn SyntaxHighlighter>) {
+        self.highlighter = Some(highlighter);
+    }
+
+    /// Clear syntax highlighter (use plain text)
+    pub fn clear_highlighter(&mut self) {
+        self.highlighter = None;
+    }
+
+    /// Check if syntax highlighting is enabled
+    pub fn has_highlighter(&self) -> bool {
+        self.highlighter.is_some()
     }
 
     /// Toggle insert/overwrite mode
@@ -979,13 +998,13 @@ impl View for Editor {
         let width = content_area.width() as usize;
         let height = content_area.height() as usize;
 
-        let color = colors::EDITOR_NORMAL;
+        let default_color = colors::EDITOR_NORMAL;
 
         for y in 0..height {
             let line_idx = (self.delta.y + y as i16) as usize;
             let mut buf = DrawBuffer::new(width);
 
-            buf.move_char(0, ' ', color, width);
+            buf.move_char(0, ' ', default_color, width);
 
             if line_idx < self.lines.len() {
                 let line = &self.lines[line_idx];
@@ -1003,7 +1022,54 @@ impl View for Editor {
                         .take(end_col_char - start_col)
                         .collect();
 
-                    buf.move_str(0, &visible_text, color);
+                    // Apply syntax highlighting if available
+                    if let Some(ref highlighter) = self.highlighter {
+                        let tokens = highlighter.highlight_line(line, line_idx);
+
+                        // Draw each token with its color
+                        let mut current_col = 0;
+                        for token in tokens {
+                            // Skip tokens before visible area
+                            if token.end <= start_col {
+                                continue;
+                            }
+                            // Stop at tokens past visible area
+                            if token.start >= end_col_char {
+                                break;
+                            }
+
+                            // Calculate visible portion of this token
+                            let token_start = token.start.max(start_col) - start_col;
+                            let token_end = token.end.min(end_col_char) - start_col;
+
+                            // Fill gap before this token with default color
+                            if current_col < token_start {
+                                // Already filled with spaces above
+                                current_col = token_start;
+                            }
+
+                            // Get text for this token
+                            let token_text: String = line
+                                .chars()
+                                .skip(start_col + token_start)
+                                .take(token_end - token_start)
+                                .collect();
+
+                            // Draw token with its color
+                            if !token_text.is_empty() {
+                                buf.move_str(
+                                    token_start,
+                                    &token_text,
+                                    token.token_type.default_color(),
+                                );
+                            }
+
+                            current_col = token_end;
+                        }
+                    } else {
+                        // No highlighting - use default color
+                        buf.move_str(0, &visible_text, default_color);
+                    }
                 }
             }
 

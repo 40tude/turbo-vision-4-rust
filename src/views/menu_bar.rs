@@ -333,27 +333,61 @@ impl View for MenuBar {
                 }
 
                 // Click on dropdown - select item
-                if self.active_menu_idx.is_some() {
-                    // Try standard menu event handling first
-                    if self.handle_menu_event(event) {
-                        // If an item was clicked, execute it
-                        let command = self.menu_state.get_current_item().and_then(|item| {
-                            if let MenuItem::Regular { command, enabled: true, .. } = item {
-                                Some(*command)
-                            } else {
-                                None
-                            }
-                        });
+                if let Some(menu_idx) = self.active_menu_idx {
+                    let mouse_pos = event.mouse.pos;
 
-                        if let Some(cmd) = command {
-                            self.close_menu();
-                            *event = Event::command(cmd);
-                            return;
+                    // Calculate dropdown bounds
+                    let (dropdown_bounds, item_count) = if menu_idx < self.menu_positions.len() {
+                        if let Some(menu) = self.menu_state.get_menu() {
+                            let menu_x = self.menu_positions[menu_idx];
+                            let menu_y = self.bounds.a.y + 1;
+                            let item_count = menu.items.len();
+
+                            // Dropdown bounds: top border + items + bottom border
+                            let bounds = Rect::new(
+                                menu_x,
+                                menu_y,
+                                menu_x + 20,  // Approximate width
+                                menu_y + 1 + item_count as i16 + 1,
+                            );
+                            (Some(bounds), item_count)
+                        } else {
+                            (None, 0)
                         }
                     } else {
-                        // Clicked outside - close
-                        self.close_menu();
-                        event.clear();
+                        (None, 0)
+                    };
+
+                    if let Some(bounds) = dropdown_bounds {
+                        if bounds.contains(mouse_pos) {
+                            // Find which item was clicked
+                            for i in 0..item_count {
+                                let item_rect = self.get_item_rect(i);
+                                if item_rect.contains(mouse_pos) {
+                                    self.menu_state.current = Some(i);
+
+                                    // If an item was clicked, execute it
+                                    let command = self.menu_state.get_current_item().and_then(|item| {
+                                        if let MenuItem::Regular { command, enabled: true, .. } = item {
+                                            Some(*command)
+                                        } else {
+                                            None
+                                        }
+                                    });
+
+                                    if let Some(cmd) = command {
+                                        self.close_menu();
+                                        *event = Event::command(cmd);
+                                        return;
+                                    }
+                                    break;
+                                }
+                            }
+                        } else {
+                            // Clicked outside dropdown - close
+                            self.close_menu();
+                            event.clear();
+                        }
                     }
                 }
             }

@@ -199,7 +199,7 @@ impl Application {
         }
     }
 
-    fn draw(&mut self) {
+    pub fn draw(&mut self) {
         // Draw desktop first, then menu bar on top (so dropdown appears over desktop)
         self.desktop.draw(&mut self.terminal);
 
@@ -216,7 +216,7 @@ impl Application {
         self.desktop.update_cursor(&mut self.terminal);
     }
 
-    fn handle_event(&mut self, event: &mut Event) {
+    pub fn handle_event(&mut self, event: &mut Event) {
         // Menu bar gets first shot
         if let Some(ref mut menu_bar) = self.menu_bar {
             menu_bar.handle_event(event);
@@ -282,7 +282,7 @@ impl Application {
 
     /// Idle processing - broadcasts command set changes
     /// Matches Borland: TProgram::idle() (tprogram.cc:248-257)
-    fn idle(&mut self) {
+    pub fn idle(&mut self) {
         // Check if command set changed and broadcast to all views
         if command_set::command_set_changed() {
             let mut event = Event::broadcast(CM_COMMAND_SET_CHANGED);
