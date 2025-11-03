@@ -129,15 +129,17 @@ See `local-only/ARCHITECTURAL-FINDINGS.md` for detailed analysis of how Borland'
 ===============================================================================
  Language            Files        Lines         Code     Comments       Blanks
 ===============================================================================
- Rust                   59        15034        11530         1261         2243
- |- Markdown            53         1310            5         1144          161
- (Total)                          16344        11535         2405         2404
+ Rust                   61        16030        12239         1391         2400
+ |- Markdown            55         1365            5         1194          166
+ (Total)                          17395        12244         2585         2566
 ===============================================================================
- Total                  59        15034        11530         1261         2243
+ Total                  61        16030        12239         1391         2400
 ===============================================================================
 ```
 
 Generated with [tokei](https://github.com/XAMPPRocky/tokei) - includes inline documentation
+
+**178 tests** - all passing ✅
 
 ## License
 

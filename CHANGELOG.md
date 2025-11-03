@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2025-11-03
+
+### Fixed
+- **Button Broadcast Handling** (CRITICAL BUG FIX)
+  - **Root Cause**: Disabled buttons were checking disabled state before processing broadcasts, causing them to return early and never receive CM_COMMAND_SET_CHANGED broadcasts
+  - **Impact**: Buttons that started disabled (e.g., Cut, Copy, Paste when clipboard empty) would stay disabled forever, breaking the command set system
+  - **Fix**: Moved broadcast handling to the top of `Button::handle_event()`, before disabled check
+  - **Verification**: Confirmed implementation matches Borland's original behavior (tbutton.cc:196, tview.cc:486, tbutton.cc:255-262)
+  - **Documentation**: Added detailed comments referencing Borland source code line numbers
+  - Fixed command_set_demo - Enable/Disable buttons now properly update button states
+
+- **Dialog Event Handling**
+  - Fixed Dialog to accept ANY command as end-modal signal, not just CM_OK/CM_CANCEL/CM_YES/CM_NO
+  - Matches Borland behavior where any command reaching the dialog ends the modal loop
+  - Fixed editor_demo and validator_demo menu dialogs with custom command IDs
+
+- **Editor Demo Modal Windows**
+  - Wrapped all editor demos in modal Windows so they can be used interactively
+  - Added ESC key handling to Window for modal windows (calls end_modal on ESC press)
+  - Fixed editor_demo to use Window with SF_MODAL flag for all four demo modes
+
+### Added
+- **Regression Tests for Button Broadcasts** (7 new tests)
+  - test_disabled_button_receives_broadcast_and_becomes_enabled (main regression test)
+  - test_enabled_button_receives_broadcast_and_becomes_disabled
+  - test_button_creation_with_disabled_command
+  - test_button_creation_with_enabled_command
+  - test_disabled_button_ignores_keyboard_events
+  - test_disabled_button_ignores_mouse_clicks
+  - test_broadcast_does_not_clear_event
+
+### Changed
+- **Test Suite**: 178 tests (was 171) - all passing
+- **Code Size**: 16,030 lines total, 12,239 lines of code (was 15,845 / 12,134)
+
 ## [0.2.6] - 2025-11-03
 
 ### Added
