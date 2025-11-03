@@ -3,6 +3,7 @@ use crate::core::event::{Event, EventType, KB_UP, KB_DOWN, KB_LEFT, KB_RIGHT, KB
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::colors;
 use crate::core::clipboard;
+use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 use super::scrollbar::ScrollBar;
@@ -80,7 +81,7 @@ pub struct Editor {
     cursor: Point,
     delta: Point,
     selection_start: Option<Point>,
-    focused: bool,
+    state: StateFlags,
     v_scrollbar: Option<Box<ScrollBar>>,
     h_scrollbar: Option<Box<ScrollBar>>,
     indicator: Option<Box<Indicator>>,
@@ -105,7 +106,7 @@ impl Editor {
             cursor: Point::zero(),
             delta: Point::zero(),
             selection_start: None,
-            focused: false,
+            state: 0,
             v_scrollbar: None,
             h_scrollbar: None,
             indicator: None,
@@ -970,7 +971,7 @@ impl View for Editor {
         }
 
         // Draw cursor if focused
-        if self.focused {
+        if self.is_focused() {
             let cursor_screen_x = content_area.a.x + (self.cursor.x - self.delta.x);
             let cursor_screen_y = content_area.a.y + (self.cursor.y - self.delta.y);
 
@@ -1011,7 +1012,7 @@ impl View for Editor {
     fn handle_event(&mut self, event: &mut Event) {
         if event.what == EventType::Keyboard {
             // Only handle keyboard events if focused
-            if !self.focused {
+            if !self.is_focused() {
                 return;
             }
 
@@ -1131,12 +1132,19 @@ impl View for Editor {
         true
     }
 
-    fn set_focus(&mut self, focused: bool) {
-        self.focused = focused;
+    // set_focus() now uses default implementation from View trait
+    // which sets/clears SF_FOCUSED flag
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 
     fn update_cursor(&self, terminal: &mut Terminal) {
-        if self.focused {
+        if self.is_focused() {
             // Calculate cursor position on screen using content area (not bounds)
             // to account for indicator and scrollbars
             let content_area = self.get_content_area();

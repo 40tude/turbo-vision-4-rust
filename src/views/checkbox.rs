@@ -19,6 +19,7 @@ use crate::core::draw::DrawBuffer;
 use crate::core::event::{Event, EventType};
 use crate::core::geometry::Rect;
 use crate::core::palette::{Attr, TvColor};
+use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use crate::views::view::{View, write_line_to_terminal};
 
@@ -28,7 +29,7 @@ pub struct CheckBox {
     bounds: Rect,
     label: String,
     checked: bool,
-    focused: bool,
+    state: StateFlags,
 }
 
 impl CheckBox {
@@ -38,7 +39,7 @@ impl CheckBox {
             bounds,
             label: label.to_string(),
             checked: false,
-            focused: false,
+            state: 0,
         }
     }
 
@@ -68,7 +69,7 @@ impl View for CheckBox {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        if event.what == EventType::Keyboard && self.focused {
+        if event.what == EventType::Keyboard && self.is_focused() {
             // Space key toggles
             if event.key_code == ' ' as u16 {
                 self.toggle();
@@ -83,13 +84,13 @@ impl View for CheckBox {
         let mut buffer = DrawBuffer::new(width);
 
         // Determine colors based on focus state
-        let color = if self.focused {
+        let color = if self.is_focused() {
             Attr::new(TvColor::Yellow, TvColor::Blue)
         } else {
             Attr::new(TvColor::Black, TvColor::LightGray)
         };
 
-        let hotkey_color = if self.focused {
+        let hotkey_color = if self.is_focused() {
             Attr::new(TvColor::LightRed, TvColor::Blue)
         } else {
             Attr::new(TvColor::Red, TvColor::LightGray)
@@ -123,8 +124,15 @@ impl View for CheckBox {
         true
     }
 
-    fn set_focus(&mut self, focused: bool) {
-        self.focused = focused;
+    // set_focus() now uses default implementation from View trait
+    // which sets/clears SF_FOCUSED flag
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 }
 

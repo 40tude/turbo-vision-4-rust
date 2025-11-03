@@ -3,6 +3,7 @@ use crate::core::event::{Event, EventType, KB_UP, KB_DOWN, KB_LEFT, KB_RIGHT, KB
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::colors;
 use crate::core::clipboard;
+use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 use super::scrollbar::ScrollBar;
@@ -24,7 +25,7 @@ pub struct Memo {
     cursor: Point,           // Current cursor position (x=col, y=line)
     delta: Point,            // Scroll offset
     selection_start: Option<Point>, // Selection anchor point
-    focused: bool,
+    state: StateFlags,
     v_scrollbar: Option<Box<ScrollBar>>,
     h_scrollbar: Option<Box<ScrollBar>>,
     max_length: Option<usize>, // Maximum length per line (None = unlimited)
@@ -42,7 +43,7 @@ impl Memo {
             cursor: Point::zero(),
             delta: Point::zero(),
             selection_start: None,
-            focused: false,
+            state: 0,
             v_scrollbar: None,
             h_scrollbar: None,
             max_length: None,
@@ -598,7 +599,7 @@ impl View for Memo {
         }
 
         // Draw cursor if focused
-        if self.focused {
+        if self.is_focused() {
             let cursor_screen_x = content_area.a.x + (self.cursor.x - self.delta.x);
             let cursor_screen_y = content_area.a.y + (self.cursor.y - self.delta.y);
 
@@ -636,7 +637,7 @@ impl View for Memo {
         match event.what {
             EventType::Keyboard => {
                 // Only handle keyboard events if focused
-                if !self.focused {
+                if !self.is_focused() {
                     return;
                 }
 
@@ -775,12 +776,19 @@ impl View for Memo {
         true
     }
 
-    fn set_focus(&mut self, focused: bool) {
-        self.focused = focused;
+    // set_focus() now uses default implementation from View trait
+    // which sets/clears SF_FOCUSED flag
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 
     fn update_cursor(&self, terminal: &mut Terminal) {
-        if self.focused {
+        if self.is_focused() {
             // Calculate cursor position on screen
             let cursor_x = self.bounds.a.x + (self.cursor.x - self.delta.x) as i16;
             let cursor_y = self.bounds.a.y + (self.cursor.y - self.delta.y) as i16;

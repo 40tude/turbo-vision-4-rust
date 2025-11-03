@@ -2,6 +2,7 @@ use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_UP, KB_DOWN, KB_PGUP, KB_PGDN, KB_HOME, KB_END, KB_ENTER, MB_LEFT_BUTTON};
 use crate::core::palette::colors;
 use crate::core::draw::DrawBuffer;
+use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use crate::core::command::CommandId;
 use super::view::{View, write_line_to_terminal};
@@ -12,7 +13,7 @@ pub struct ListBox {
     items: Vec<String>,
     selected: Option<usize>,
     top_item: usize,
-    focused: bool,
+    state: StateFlags,
     on_select_command: CommandId,
 }
 
@@ -24,7 +25,7 @@ impl ListBox {
             items: Vec::new(),
             selected: None,
             top_item: 0,
-            focused: false,
+            state: 0,
             on_select_command,
         }
     }
@@ -183,12 +184,12 @@ impl View for ListBox {
         let width = self.bounds.width() as usize;
         let height = self.bounds.height() as usize;
 
-        let color_normal = if self.focused {
+        let color_normal = if self.is_focused() {
             colors::LISTBOX_FOCUSED
         } else {
             colors::LISTBOX_NORMAL
         };
-        let color_selected = if self.focused {
+        let color_selected = if self.is_focused() {
             colors::LISTBOX_SELECTED_FOCUSED
         } else {
             colors::LISTBOX_SELECTED
@@ -228,7 +229,7 @@ impl View for ListBox {
         match event.what {
             EventType::Keyboard => {
                 // Only handle keyboard events if focused
-                if !self.focused {
+                if !self.is_focused() {
                     return;
                 }
                 match event.key_code {
@@ -316,8 +317,15 @@ impl View for ListBox {
         true
     }
 
-    fn set_focus(&mut self, focused: bool) {
-        self.focused = focused;
+    // set_focus() now uses default implementation from View trait
+    // which sets/clears SF_FOCUSED flag
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 
     fn set_list_selection(&mut self, index: usize) {
