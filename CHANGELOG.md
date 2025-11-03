@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-11-03
+
+### Added
+- **Broadcast Enhancement**: Added owner-aware broadcast method to Group
+  - New `broadcast()` method takes optional `owner_index` parameter
+  - Prevents broadcast echo back to the originating view
+  - Matches Borland's `message()` function pattern from tvutil.h
+  - Enables focus-list navigation and sophisticated command routing patterns
+  - Foundation for future inter-view communication features
+
+### Fixed
+- **Menu Example**: Fixed OK button command to use CM_OK instead of 0
+  - Buttons in menu.rs dialogs now properly close when clicked
+  - Added CM_OK to imports
+  - Dialog's handle_event now correctly recognizes CM_OK command
+
+### Technical Details
+The `Group::broadcast()` method implements Borland's message pattern where broadcasts can skip the originator. This prevents circular event loops and enables proper implementation of focus navigation commands (like Ctrl+Tab to cycle through siblings without the current view receiving its own broadcast).
+
+The method signature is `broadcast(&mut self, event: &mut Event, owner_index: Option<usize>)` where owner_index identifies the child that originated the broadcast. This child will be skipped when distributing the event to all children.
+
+Reference: Borland's `void *message(TView *receiver, ...)` in tvutil.h and TGroup::forEach pattern in tgroup.cc:675-689.
+
 ## [0.1.10] - 2025-11-03
 
 ### Added

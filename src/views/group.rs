@@ -196,6 +196,41 @@ impl Group {
         self.end_state
     }
 
+    /// Broadcast an event to all children except the owner
+    /// Matches Borland: TGroup::forEach with message() that takes receiver parameter
+    ///
+    /// The owner parameter prevents the broadcast from echoing back to the originator.
+    /// This is essential for focus-list navigation commands and other broadcast patterns
+    /// where the sender shouldn't receive its own message.
+    ///
+    /// # Arguments
+    /// * `event` - The event to broadcast (typically EventType::Broadcast)
+    /// * `owner_index` - Optional index of the child that originated the broadcast (will be skipped)
+    ///
+    /// # Reference
+    /// Borland's message() function: `local-only/borland-tvision/include/tv/tvutil.h`
+    /// TGroup::forEach pattern: `local-only/borland-tvision/classes/tgroup.cc:675-689`
+    pub fn broadcast(&mut self, event: &mut Event, owner_index: Option<usize>) {
+        for (i, child) in self.children.iter_mut().enumerate() {
+            // Skip the owner if specified
+            if let Some(owner) = owner_index {
+                if i == owner {
+                    continue;
+                }
+            }
+
+            // Send event to this child
+            // Note: Child handle_event may clear or transform the event
+            // So we need to check if it's still active before continuing
+            child.handle_event(event);
+
+            // If event was cleared, stop broadcasting
+            if event.what == EventType::Nothing {
+                break;
+            }
+        }
+    }
+
     /// Draw views starting from a specific index
     /// Used for Borland's drawUnderRect pattern where we only redraw views
     /// that come after (on top of) a moved view
