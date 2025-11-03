@@ -103,8 +103,10 @@ Currently implements:
 - ✅ Window closing (non-modal windows close with close button, modal dialogs convert to cancel)
 - ✅ File Dialog (fully functional with mouse/keyboard support and directory navigation)
 - ✅ ANSI Dump for debugging (dump screen/views to text files with colors)
-- ✅ Input Validators (FilterValidator, RangeValidator with hex/octal support)
-- ✅ Editor with search/replace (case-sensitive, whole-word, find-next, replace-all)
+- ✅ Input Validators (FilterValidator, RangeValidator with hex/octal, LookupValidator)
+- ✅ Editor with search/replace and file I/O (load_file, save_file, save_as)
+- ✅ EditWindow (ready-to-use editor window wrapper)
+- ✅ OS Clipboard integration (cross-platform with arboard)
 
 ## Architecture
 
@@ -128,11 +130,11 @@ See `local-only/ARCHITECTURAL-FINDINGS.md` for detailed analysis of how Borland'
 ===============================================================================
  Language            Files        Lines         Code     Comments       Blanks
 ===============================================================================
- Rust                   60        12516         9584         1151         1781
- |- Markdown            36          661            2          597           62
- (Total)                          13177         9586         1748         1843
+ Rust                   55        14175        10856         1218         2101
+ |- Markdown            49         1251            5         1088          158
+ (Total)                          15426        10861         2306         2259
 ===============================================================================
- Total                  60        12516         9584         1151         1781
+ Total                  55        14175        10856         1218         2101
 ===============================================================================
 ```
 

@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-11-03
+
+### Added
+- **TEditWindow** (src/views/edit_window.rs - 169 lines, 3 tests)
+  - Window wrapper around Editor for ready-to-use editor windows
+  - Delegates file operations: `load_file()`, `save_file()`, `save_as()`, `get_filename()`
+  - Provides editor access methods: `editor()`, `editor_mut()`, `is_modified()`
+  - Automatically adjusts editor bounds when window is resized
+  - Implements View trait with proper event routing to both Window and Editor
+  - Matches Borland's TEditWindow pattern from teditor.h
+
+- **TLookupValidator** (src/views/lookup_validator.rs - 255 lines, 8 tests)
+  - Validates input against a list of valid values
+  - Supports case-sensitive mode via `new()` and case-insensitive via `new_case_insensitive()`
+  - Helper methods: `add_value()`, `remove_value()`, `contains()`, `set_case_sensitive()`
+  - Implements Validator trait for InputLine integration
+  - Allows all characters during typing, validates on completion
+  - Matches Borland's TLookupValidator pattern from validate.h
+
+- **OS Clipboard Integration** (src/core/clipboard.rs - enhanced with arboard 3.3)
+  - Added system clipboard integration via arboard crate
+  - Fallback strategy: attempts OS clipboard first, falls back to in-memory
+  - Cross-platform support (macOS, Linux, Windows)
+  - Functions: `set_clipboard()`, `get_clipboard()`, `has_clipboard_content()`, `clear_clipboard()`
+  - Editor can now copy/paste to/from system clipboard (Ctrl+C, Ctrl+X, Ctrl+V)
+  - Graceful degradation on platforms without clipboard support
+
+### Changed
+- **Documentation**: Updated MISSING_FEATURES.md progress tracking
+  - Marked TFileCollection and TDirCollection as obsolete (use Vec<FileEntry/DirEntry>)
+  - Updated summary: 29 missing components (down from 35), 648 hours remaining
+  - HIGH Priority: COMPLETE (0 hours remaining)
+  - Added Phase 7+ improvements section documenting recent work
+  - Updated statistics: 134 tests passing (up from 126)
+
+- **Cargo.toml**: Added arboard 3.3 dependency for OS clipboard support
+
+### Technical Details
+**TEditWindow** provides a complete editor window solution by composing a Window with an Editor. It matches Borland's TEditWindow pattern where the editor fills the window interior and the window provides the frame and title bar. The implementation properly handles View trait delegation, routing draw and event calls to both the Window (for frame) and Editor (for content).
+
+**TLookupValidator** implements Borland's validation pattern for restricting input to predefined values. Unlike FilterValidator (character-by-character) or RangeValidator (numeric), LookupValidator validates the complete string against a list. This is useful for dropdowns, enum values, or any constrained input set.
+
+**OS Clipboard** integration uses the arboard crate to access the system clipboard across platforms. The fallback strategy ensures the application works even when OS clipboard access fails, maintaining the in-memory clipboard as a reliable backup.
+
+Reference: Borland's TEditWindow (teditor.h), TLookupValidator (validate.h), and clipboard integration patterns.
+
 ## [0.2.2] - 2025-11-03
 
 ### Fixed
