@@ -117,20 +117,26 @@ pub struct Button {
 }
 ```
 
-**Current Implementation (After Fix):**
+**Current Implementation (After Focus Consolidation - v0.2.3):**
 ```rust
 pub struct Button {
-    focused: bool,     // Still separate
-    state: StateFlags, // Now uses state flags
+    state: StateFlags, // ✅ Unified state field (includes SF_FOCUSED)
+}
+
+impl View for Button {
+    // Uses default set_focus() from View trait
+    fn is_focused(&self) -> bool {
+        self.get_state_flag(SF_FOCUSED)
+    }
 }
 ```
 
-**Status:** ⚠️ **Partially Fixed**
-**Impact:** Low - Works correctly but inconsistent
-**Should Address?** Yes - Consider moving `focused` into state flags
-**Importance:** Low
+**Status:** ✅ **Fully Fixed** (v0.2.3)
+**Impact:** None - Now matches Borland architecture
+**Should Address?** No - Complete and working
+**Importance:** Low (Completed)
 
-**Rationale:** Borland stores ALL view state in a single `state` field (including focus). We keep `focused` as a separate field for convenience. This makes the code easier to read but diverges from the original architecture. Should eventually consolidate all state into the `state` field using `SF_FOCUSED` flag.
+**Rationale:** All views now store focus in the unified `state` field using `SF_FOCUSED` flag, matching Borland's TView architecture exactly. The `focused` field has been removed from all views (Button, InputLine, Editor, Memo, ListBox, CheckBox, RadioButton). See `docs/FOCUS_CONSOLIDATION.md` for complete details.
 
 ---
 
@@ -442,7 +448,7 @@ void TButton::press() {
 |-------------|--------|-------------|------------|--------|
 | Enter → Command (not broadcast) | ✅ OK | No | Low | N/A |
 | Event re-queuing via putEvent() | ✅ **Done v0.1.10** | No | High | Complete |
-| Focused field separate from state | ⚠️ Partial | Yes | Low | Low |
+| Focus consolidation into state flags | ✅ **Done v0.2.3** | No | Low | Complete |
 | Command enable/disable system | ✅ **Done v0.1.8** | No | High | Complete |
 | Safe trait-based access | ✅ OK | No | Low | N/A |
 | Broadcast event distribution | ✅ **Done v0.2.0** | No | High | Complete |
@@ -459,15 +465,16 @@ void TButton::press() {
 
 ## Recommended Priorities
 
-### ✅ Completed (High Priority Items)
+### ✅ Completed (All Priority Items)
 1. ~~**Three-phase event processing**~~ - ✅ Completed in v0.1.9
 2. ~~**Command enable/disable system**~~ - ✅ Completed in v0.1.8
 3. ~~**Broadcast event distribution**~~ - ✅ Completed in v0.2.0
 4. ~~**Event re-queuing**~~ - ✅ Completed in v0.1.10
+5. ~~**Consolidate focus into state flags**~~ - ✅ Completed in v0.2.3
 
-### Low Priority (Remaining Items)
-5. **Consolidate focus into state flags** - Cleaner architecture (minor improvement)
-6. **Owner/parent references** - More Borland-like patterns (complex, may not be needed)
+### Optional Items (Not Planned)
+6. **Self-contained modal dialogs** - Works differently but effectively (Low priority)
+7. **Owner/parent references** - Would require major refactoring, current approach is safer (Medium priority)
 
 ---
 
@@ -476,15 +483,16 @@ void TButton::press() {
 This document should be updated as the implementation evolves. When fixing a discrepancy, update its status and explain the resolution.
 
 **Last Updated:** 2025-11-03
-**Rust Implementation Version:** 0.2.2
+**Rust Implementation Version:** 0.2.3
 **Borland Reference:** Turbo Vision 2.0
 
 ## Conclusion
 
-The implementation has successfully addressed all major architectural discrepancies from Borland Turbo Vision:
+The implementation has successfully addressed **all planned architectural discrepancies** from Borland Turbo Vision:
 
 - ✅ **Event System**: Three-phase processing, broadcast distribution, and event re-queuing all implemented
 - ✅ **Command System**: Global command enable/disable with automatic button updates
+- ✅ **State Management**: Focus consolidated into unified state flags (SF_FOCUSED)
 - ✅ **Architecture**: Core patterns match Borland's design while leveraging Rust's safety
 
-The remaining differences are minor (focus in state flags) or intentional design choices (self-contained modal dialogs, no raw owner pointers) that improve safety without sacrificing functionality.
+The remaining differences (self-contained modal dialogs, no raw owner pointers) are **intentional design choices** that improve safety without sacrificing functionality. These are marked as "Maybe" priorities and would require significant refactoring for questionable benefit.
