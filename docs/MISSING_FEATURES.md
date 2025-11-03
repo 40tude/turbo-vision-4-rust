@@ -7,9 +7,9 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 ## Summary Statistics
 
-- **Total Missing Components**: 46 (was 85, implemented 9, skipped 30 obsolete pre-Rust features)
-- **Estimated Total Effort**: 826 hours (~21 weeks at 40 hrs/week)
-- **HIGH Priority**: 11 items (212 hours) - Core functionality
+- **Total Missing Components**: 44 (was 85, implemented 11, skipped 30 obsolete pre-Rust features)
+- **Estimated Total Effort**: 782 hours (~20 weeks at 40 hrs/week)
+- **HIGH Priority**: 9 items (188 hours) - Core functionality
 - **MEDIUM Priority**: 31 items (352 hours) - Extended features
 - **LOW Priority**: 17 items (262 hours) - Nice to have
 
@@ -19,7 +19,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 |----------|-------|----------|--------|
 | Core Views/Controls | 10 | HIGH-MEDIUM | 112h |
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
-| Editor Components | 3 | HIGH-MEDIUM | 52h |
+| Editor Components | 2 | HIGH-MEDIUM | 8h |
 | System Utilities | 10 | MEDIUM | 34h |
 | Helper Classes | 0 | - | 0h |
 | Advanced Features | 10 | HIGH-LOW | 162h |
@@ -67,9 +67,11 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TFileList** - File browser list (12h)
 - **TDirListBox** - Directory tree (14h)
 
-### Editor (32 hours)
-- **TFileEditor** - File editor with load/save (24h)
-- **TEditWindow** - Editor window wrapper (8h)
+### Editor (8 hours remaining)
+- ✅ **TEditor** - Text editor with search/replace (IMPLEMENTED - `src/views/editor.rs`, 1158 lines)
+- ✅ **TMemo** - Multi-line text input (IMPLEMENTED - `src/views/memo.rs`, 911 lines)
+- ❌ **TFileEditor** - File editor with load/save (8h - would just add file I/O to existing Editor)
+- ❌ **TEditWindow** - Editor window wrapper (trivial - just Window + Editor)
 
 ### Application Framework (58 hours)
 - **TProgram** - Base application (20h)
@@ -79,7 +81,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TMouse** - Mouse system (12h)
 - **TEventQueue** - Event queue (10h)
 
-**Total HIGH Priority: 212 hours** (was 282 hours, removed 38 hours of obsolete collections, completed 32 hours: TCluster 8h + History System 24h)
+**Total HIGH Priority: 188 hours** (was 282 hours, removed 38 hours obsolete collections, completed 56 hours: TCluster 8h + History 24h + Editor/Memo 24h)
 
 ## Medium Priority Components (Extended Features)
 
@@ -276,16 +278,15 @@ These items provide high architectural value for relatively low effort:
 - Basic controls: Button, InputLine, StaticText, Label, CheckBox, RadioButton
 - Lists: ListBox with ListViewer trait, SortedListBox with binary search
 - Menus: MenuBar with MenuViewer trait, MenuBox popup menus
-- Dialogs: Dialog, FileDialog (basic), MsgBox
-- Text: Memo, TextView, Editor (basic)
+- Dialogs: Dialog, FileDialog (full-featured), MsgBox
+- Text editing: **Editor with search/replace**, Memo, TextView
 - System: Desktop, StatusLine, Frame, Window, Group
 - Utilities: ScrollBar, Scroller, Indicator, ParamText, Background
 - Validation: Validator trait, FilterValidator, RangeValidator
+- History: HistoryManager, HistoryViewer, HistoryWindow, History button
 - Event system: Three-phase processing, event re-queuing, broadcasts
-- **NEW**: List Components (ListViewer, MenuViewer, MenuBox)
-- **NEW**: Menu/Status data structures (MenuItem, Menu, MenuBuilder, StatusDef, etc.)
-- **NEW**: Cluster trait (base for CheckBox/RadioButton button groups)
-- **NEW**: SortedListBox with binary search (find_exact, find_prefix)
+- Cluster trait (base for CheckBox/RadioButton button groups)
+- SortedListBox with binary search (find_exact, find_prefix)
 
 ### Recent Improvements (TSortedListBox Phase)
 - **SortedListBox**: Sorted list control with binary search capabilities
