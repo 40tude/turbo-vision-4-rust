@@ -1,15 +1,15 @@
 # Missing Features Inventory
 
 *Generated from Borland Turbo Vision source analysis*
-*Last updated: 2025-11-03 (post-v0.2.1)*
+*Last updated: 2025-11-03 (post-v0.2.2)*
 
 This document catalogs missing features compared to the original Borland Turbo Vision framework, providing a roadmap for future development.
 
 ## Summary Statistics
 
-- **Total Missing Components**: 92
-- **Estimated Total Effort**: 1,088 hours (~27 weeks at 40 hrs/week)
-- **HIGH Priority**: 29 items (340 hours) - Core functionality
+- **Total Missing Components**: 85 (was 92, implemented 7)
+- **Estimated Total Effort**: 1,068 hours (~27 weeks at 40 hrs/week)
+- **HIGH Priority**: 22 items (320 hours) - Core functionality
 - **MEDIUM Priority**: 45 items (486 hours) - Extended features
 - **LOW Priority**: 18 items (262 hours) - Nice to have
 
@@ -21,7 +21,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
 | Editor Components | 3 | HIGH-MEDIUM | 52h |
 | System Utilities | 24 | MEDIUM | 168h |
-| Helper Classes | 20 | HIGH-MEDIUM | 160h |
+| Helper Classes | 13 | HIGH-MEDIUM | 140h (was 160h) |
 | Advanced Features | 10 | HIGH-LOW | 162h |
 
 ## High Priority Components (Core Functionality)
@@ -32,13 +32,16 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TNSCollection** - Non-streamable collection (8h)
 - **TNSSortedCollection** - Non-streamable sorted (8h)
 
-### Menu & Status Infrastructure (20 hours)
-- **TSItem** - Linked list node for items (2h)
-- **TMenu** - Menu data structure (6h)
-- **TMenuItem** - Single menu item (4h)
-- **TSubMenu** - Submenu builder (4h)
-- **TStatusDef** - Status line definition (4h)
-- **TStatusItem** - Status line item (3h) (total 7h)
+### Menu & Status Infrastructure (~0 hours remaining)
+- ✅ **MenuItem** - Menu item data structure (IMPLEMENTED in v0.2.2 - `src/core/menu_data.rs`)
+- ✅ **Menu** - Menu data structure (IMPLEMENTED in v0.2.2 - `src/core/menu_data.rs`)
+- ✅ **MenuBuilder** - Fluent builder for menus (IMPLEMENTED in v0.2.2 - `src/core/menu_data.rs`)
+- ✅ **StatusItem** - Status line item (IMPLEMENTED in v0.2.2 - `src/core/status_data.rs`)
+- ✅ **StatusDef** - Status line definition (IMPLEMENTED in v0.2.2 - `src/core/status_data.rs`)
+- ✅ **StatusLine** - Status line configuration (IMPLEMENTED in v0.2.2 - `src/core/status_data.rs`)
+- ✅ **StatusLineBuilder** - Fluent builder for status lines (IMPLEMENTED in v0.2.2 - `src/core/status_data.rs`)
+
+**Note:** Rust implementation uses `Vec` instead of linked lists for type safety. Provides both Borland-compatible API and idiomatic Rust builders.
 
 ### List Components (38 hours)
 - **TListViewer** - Base for list views (16h)
@@ -66,7 +69,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TMouse** - Mouse system (12h)
 - **TEventQueue** - Event queue (10h)
 
-**Total HIGH Priority: 340 hours**
+**Total HIGH Priority: 320 hours** (was 340 hours, completed 20 hours of menu & status infrastructure)
 
 ## Medium Priority Components (Extended Features)
 

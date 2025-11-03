@@ -7,3 +7,5 @@ pub mod palette;
 pub mod clipboard;
 pub mod state;
 pub mod ansi_dump;
+pub mod menu_data;
+pub mod status_data;
