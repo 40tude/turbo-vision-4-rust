@@ -180,17 +180,13 @@ impl View for Dialog {
             EventType::Command => {
                 // Check for commands that should end modal dialogs
                 // Matches Borland: TDialog::handleEvent() (tdialog.cc lines 70-84)
-                use crate::core::command::{CM_OK, CM_YES, CM_NO};
-                match event.command {
-                    CM_OK | CM_CANCEL | CM_YES | CM_NO => {
-                        if (self.state() & SF_MODAL) != 0 {
-                            // End the modal loop
-                            // Borland: endModal(event.message.command); clearEvent(event);
-                            self.window.end_modal(event.command);
-                            event.clear();
-                        }
-                    }
-                    _ => {}
+                // In Borland, ANY command that reaches the dialog (not handled by children)
+                // will end the modal loop. This allows custom command IDs from buttons.
+                if (self.state() & SF_MODAL) != 0 {
+                    // End the modal loop with the command ID as the result
+                    // Borland: endModal(event.message.command); clearEvent(event);
+                    self.window.end_modal(event.command);
+                    event.clear();
                 }
             }
             _ => {}

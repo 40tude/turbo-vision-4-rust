@@ -9,7 +9,6 @@
 
 use turbo_vision::app::Application;
 use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_OK, CM_CANCEL};
 use turbo_vision::views::{
     dialog::Dialog,
     button::Button,
