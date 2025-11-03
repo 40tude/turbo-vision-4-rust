@@ -3,6 +3,7 @@ use crate::core::event::{Event, EventType, KB_ENTER, KB_BACKSPACE, KB_LEFT, KB_R
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::colors;
 use crate::core::clipboard;
+use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 use super::validator::ValidatorRef;
@@ -20,11 +21,11 @@ pub struct InputLine {
     data: Rc<RefCell<String>>,
     cursor_pos: usize,
     max_length: usize,
-    focused: bool,
     sel_start: usize,      // Selection start position
     sel_end: usize,        // Selection end position
     first_pos: usize,      // First visible character position for horizontal scrolling
     validator: Option<ValidatorRef>,  // Optional validator for input validation
+    state: StateFlags,     // View state flags (including SF_FOCUSED)
 }
 
 impl InputLine {
@@ -35,11 +36,11 @@ impl InputLine {
             data,
             cursor_pos,
             max_length,
-            focused: false,
             sel_start: 0,
             sel_end: 0,
             first_pos: 0,
             validator: None,
+            state: 0,
         }
     }
 
@@ -78,9 +79,7 @@ impl InputLine {
         self.data.borrow().clone()
     }
 
-    pub fn set_focused(&mut self, focused: bool) {
-        self.focused = focused;
-    }
+    // set_focused() removed - use set_focus() from View trait instead
 
     /// Select all text
     pub fn select_all(&mut self) {
@@ -151,7 +150,7 @@ impl View for InputLine {
         let width = self.bounds.width() as usize;
         let mut buf = DrawBuffer::new(width);
 
-        let attr = if self.focused {
+        let attr = if self.is_focused() {
             colors::INPUT_FOCUSED
         } else {
             colors::INPUT_NORMAL
@@ -214,7 +213,7 @@ impl View for InputLine {
             if event.command == CM_FILE_FOCUSED {
                 // Only update display if user isn't currently typing
                 // Matches Borland: if( !(state & sfSelected) )
-                if !self.focused {
+                if !self.is_focused() {
                     // The data has already been updated by FileDialog
                     // Just need to update our cursor position and clear selection
                     self.cursor_pos = self.data.borrow().len();
@@ -227,7 +226,7 @@ impl View for InputLine {
             return;
         }
 
-        if !self.focused {
+        if !self.is_focused() {
             return;
         }
 
@@ -387,12 +386,19 @@ impl View for InputLine {
         true
     }
 
-    fn set_focus(&mut self, focused: bool) {
-        self.focused = focused;
+    // set_focus() now uses default implementation from View trait
+    // which sets/clears SF_FOCUSED flag
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
     }
 
     fn update_cursor(&self, terminal: &mut Terminal) {
-        if self.focused {
+        if self.is_focused() {
             // Calculate cursor position on screen
             let cursor_x = self.bounds.a.x as usize + (self.cursor_pos - self.first_pos);
             let cursor_y = self.bounds.a.y;
