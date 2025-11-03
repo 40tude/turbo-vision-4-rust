@@ -254,13 +254,17 @@ impl EscSequenceTracker {
 
 /// Convert crossterm KeyEvent to our KeyCode
 fn crossterm_to_keycode(key: KeyEvent) -> KeyCode {
-    // Handle Ctrl+C
-    if key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, CKC::Char('c')) {
-        return 0x0003;  // Ctrl+C
-    }
-
     match key.code {
         CKC::Char(c) => {
+            // Check for Ctrl modifier first (Ctrl+letter generates ASCII control codes)
+            if key.modifiers.contains(KeyModifiers::CONTROL) {
+                // Ctrl + letter produces ASCII control codes (0x01-0x1A for A-Z)
+                let c_lower = c.to_ascii_lowercase();
+                if c_lower >= 'a' && c_lower <= 'z' {
+                    return (c_lower as u16) - ('a' as u16) + 1;  // Ctrl+A = 0x01, Ctrl+B = 0x02, etc.
+                }
+            }
+
             // Check for Alt modifier
             if key.modifiers.contains(KeyModifiers::ALT) {
                 // Alt + letter
@@ -272,11 +276,6 @@ fn crossterm_to_keycode(key: KeyEvent) -> KeyCode {
                     'x' => return KB_ALT_X,
                     _ => {}
                 }
-            }
-
-            // Check for Ctrl modifier
-            if key.modifiers.contains(KeyModifiers::CONTROL) && c.eq_ignore_ascii_case(&'c') {
-                return 0x0003; // Ctrl+C
             }
 
             c as u16

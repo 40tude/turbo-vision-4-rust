@@ -11,7 +11,7 @@
 // - Ctrl+A: Select all
 // - Ctrl+C/X/V: Copy/Cut/Paste
 // - Ctrl+Z/Y: Undo/Redo
-// - ESC: Exit
+// - ESC ESC: Exit (press ESC twice)
 
 use turbo_vision::app::Application;
 use turbo_vision::core::geometry::Rect;
@@ -27,7 +27,7 @@ fn main() -> std::io::Result<()> {
     let status_bounds = Rect::new(0, terminal_size.1 as i16 - 1, terminal_size.0 as i16, terminal_size.1 as i16);
     let mut status = StaticText::new(
         status_bounds,
-        " File Editor Demo | Ctrl+Z/Y: Undo/Redo | Ctrl+C/X/V: Copy/Cut/Paste | ESC: Exit",
+        " File Editor Demo | Ctrl+Z/Y: Undo/Redo | Ctrl+C/X/V: Copy/Cut/Paste | ESC ESC: Exit",
     );
 
     // Create editor (leave room for status line)
@@ -50,7 +50,7 @@ fn main() -> std::io::Result<()> {
 
     // Event loop
     use std::time::Duration;
-    use turbo_vision::core::event::EventType;
+    use turbo_vision::core::event::{EventType, KB_ESC_ESC};
 
     loop {
         // Draw the editor and status
@@ -64,8 +64,8 @@ fn main() -> std::io::Result<()> {
             // Let editor handle the event
             editor.handle_event(&mut event);
 
-            // Check for ESC to exit
-            if event.what == EventType::Keyboard && event.key_code == 0x001B {
+            // Check for double-ESC to exit
+            if event.what == EventType::Keyboard && event.key_code == KB_ESC_ESC {
                 break;
             }
         }
