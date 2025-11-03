@@ -1,7 +1,7 @@
 // Simple example demonstrating a basic menu bar structure
 
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN};
+use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_OK};
 use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::views::button::Button;
@@ -155,7 +155,7 @@ fn show_message(app: &mut Application, title: &str, message: &str) {
     // Center button horizontally
     let button_width = 10;
     let button_x = (dialog_width - 2 - button_width) / 2;  // -2 for frame
-    let button = Button::new(Rect::new(button_x, 3, button_x + button_width, 5), "  ~O~K  ", 0, true);
+    let button = Button::new(Rect::new(button_x, 3, button_x + button_width, 5), "  ~O~K  ", CM_OK, true);
     dialog.add(Box::new(button));
     dialog.set_initial_focus();
 
@@ -189,7 +189,7 @@ fn show_about(app: &mut Application) {
     // Center button horizontally
     let button_width = 10;
     let button_x = (dialog_width - 2 - button_width) / 2;  // -2 for frame
-    let button = Button::new(Rect::new(button_x, 6, button_x + button_width, 8), "  ~O~K  ", 0, true);
+    let button = Button::new(Rect::new(button_x, 6, button_x + button_width, 8), "  ~O~K  ", CM_OK, true);
     dialog.add(Box::new(button));
     dialog.set_initial_focus();
 
