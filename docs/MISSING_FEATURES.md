@@ -1,15 +1,15 @@
 # Missing Features Inventory
 
 *Generated from Borland Turbo Vision source analysis*
-*Last updated: 2025-11-03 (post-v0.2.2)*
+*Last updated: 2025-11-03 (post-List Components implementation)*
 
 This document catalogs missing features compared to the original Borland Turbo Vision framework, providing a roadmap for future development.
 
 ## Summary Statistics
 
-- **Total Missing Components**: 85 (was 92, implemented 7)
-- **Estimated Total Effort**: 1,068 hours (~27 weeks at 40 hrs/week)
-- **HIGH Priority**: 22 items (320 hours) - Core functionality
+- **Total Missing Components**: 82 (was 85, implemented 3 more)
+- **Estimated Total Effort**: 1,030 hours (~26 weeks at 40 hrs/week)
+- **HIGH Priority**: 19 items (282 hours) - Core functionality
 - **MEDIUM Priority**: 45 items (486 hours) - Extended features
 - **LOW Priority**: 18 items (262 hours) - Nice to have
 
@@ -17,11 +17,11 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 | Category | Count | Priority | Effort |
 |----------|-------|----------|--------|
-| Core Views/Controls | 22 | HIGH-MEDIUM | 220h |
+| Core Views/Controls | 19 | HIGH-MEDIUM | 182h |
 | Specialized Dialogs | 13 | LOW-MEDIUM | 126h |
 | Editor Components | 3 | HIGH-MEDIUM | 52h |
 | System Utilities | 24 | MEDIUM | 168h |
-| Helper Classes | 13 | HIGH-MEDIUM | 140h (was 160h) |
+| Helper Classes | 13 | HIGH-MEDIUM | 140h |
 | Advanced Features | 10 | HIGH-LOW | 162h |
 
 ## High Priority Components (Core Functionality)
@@ -43,10 +43,17 @@ This document catalogs missing features compared to the original Borland Turbo V
 
 **Note:** Rust implementation uses `Vec` instead of linked lists for type safety. Provides both Borland-compatible API and idiomatic Rust builders.
 
-### List Components (38 hours)
-- **TListViewer** - Base for list views (16h)
-- **TMenuView** - Base for menu views (12h)
-- **TMenuBox** - Popup menu container (10h)
+### List Components (~0 hours remaining)
+- ✅ **TListViewer** - Base for list views (IMPLEMENTED - `src/views/list_viewer.rs`)
+- ✅ **TMenuView** - Base for menu views (IMPLEMENTED - `src/views/menu_viewer.rs`)
+- ✅ **TMenuBox** - Popup menu container (IMPLEMENTED - `src/views/menu_box.rs`)
+
+**Implementation Notes:**
+- Hybrid trait + helper struct pattern (ListViewer/MenuViewer traits + State structs)
+- ListBox refactored to use ListViewer trait (eliminated 70+ lines of duplicate navigation)
+- MenuBar refactored to use MenuViewer trait (eliminated 200+ lines of duplicate logic)
+- All navigation behavior now shared through default trait implementations
+- Borland-compatible while being idiomatic Rust
 
 ### Input Controls (26 hours)
 - **TCluster** - Base for radio/checkbox (8h)
@@ -69,7 +76,7 @@ This document catalogs missing features compared to the original Borland Turbo V
 - **TMouse** - Mouse system (12h)
 - **TEventQueue** - Event queue (10h)
 
-**Total HIGH Priority: 320 hours** (was 340 hours, completed 20 hours of menu & status infrastructure)
+**Total HIGH Priority: 282 hours** (was 320 hours, completed 38 hours of List Components)
 
 ## Medium Priority Components (Extended Features)
 
@@ -144,57 +151,65 @@ Complete color editor system:
 
 ## Recommended Implementation Roadmap
 
-### Phase 1: Core Collections (80 hours)
+### ✅ Phase 1: Menu & Status Infrastructure (20 hours) - COMPLETE
+Foundation data structures:
+- ✅ MenuItem, Menu, MenuBuilder (v0.2.2)
+- ✅ StatusItem, StatusDef, StatusLine, StatusLineBuilder (v0.2.2)
+
+### ✅ Phase 2: List Components (38 hours) - COMPLETE
+Proper hierarchy for list and menu controls:
+- ✅ ListViewer trait + ListViewerState (16h)
+- ✅ MenuViewer trait + MenuViewerState (12h)
+- ✅ MenuBox popup container (10h)
+- ✅ ListBox refactored to use ListViewer
+- ✅ MenuBar refactored to use MenuViewer
+
+**Phase 1-2 Complete: 58 hours implemented, ~270 lines of code eliminated through trait-based architecture**
+
+### Phase 3: Core Collections (80 hours)
 Foundation for all other components:
 - TCollection, TSortedCollection, TNSCollection, TNSSortedCollection
-- TSItem, TMenu, TMenuItem, TSubMenu
-- TStatusDef, TStatusItem
+- Essential for proper Borland architecture
 
-### Phase 2: List Infrastructure (40 hours)
-Proper hierarchy for list controls:
-- TListViewer (refactor TListBox)
-- TSortedListBox
+### Phase 4: Sorted Lists (8 hours)
+Extend list infrastructure:
+- TSortedListBox with binary search
 
-### Phase 3: Menu System (32 hours)
-Match Borland architecture:
-- TMenuView, TMenuBox separation
-- Complete menu infrastructure
-
-### Phase 4: History System (32 hours)
+### Phase 5: History System (32 hours)
 Essential for professional UIs:
 - THistory, THistoryViewer, THistoryWindow
 
-### Phase 5: Cluster Controls (16 hours)
+### Phase 6: Cluster Controls (16 hours)
 Architectural improvement:
 - TCluster base class
 - Refactor RadioButton/CheckBox
 
-### Phase 6: File Dialogs (52 hours)
+### Phase 7: File Dialogs (52 hours)
 Complete file system UI:
 - TFileList, TDirListBox
 - TFileInputLine, TFileInfoPane, TChDirDialog
 
-### Phase 7: Editor (52 hours)
+### Phase 8: Editor (52 hours)
 Full-featured text editing:
 - TFileEditor with search/replace
 - TEditWindow, load/save
 
-### Phase 8: Application Framework (56 hours)
+### Phase 9: Application Framework (56 hours)
 Enhanced core infrastructure:
 - TProgram, TApplication
 - TScreen, TDisplay, TMouse, TEventQueue
 
-### Phase 9: Resources & Persistence (90 hours)
+### Phase 10: Resources & Persistence (90 hours)
 Professional app development:
 - Complete streaming system
 - Resource file support
 
-### Phase 10: Help System (56 hours)
+### Phase 11: Help System (56 hours)
 Context-sensitive help:
 - THelpFile, THelpBase
 - THelpWindow, THelpViewer
 
-### Phase 11: Polish (262+ hours)
+### Phase 12: Polish (262+ hours)
 Optional enhancements:
 - Color customization
 - Calculator, validators
@@ -202,10 +217,11 @@ Optional enhancements:
 
 ## Milestone Markers
 
-- **After Phase 5** (252 hours): Most commonly used components complete
-- **After Phase 7** (356 hours): Professional editing applications possible
-- **After Phase 10** (506 hours): Feature parity with Borland's core framework
-- **After Phase 11** (768+ hours): Complete framework with all utilities
+- **After Phase 2** (58 hours): ✅ COMPLETE - List and menu infrastructure solid
+- **After Phase 6** (246 hours): Most commonly used components complete
+- **After Phase 8** (350 hours): Professional editing applications possible
+- **After Phase 11** (500 hours): Feature parity with Borland's core framework
+- **After Phase 12** (762+ hours): Complete framework with all utilities
 
 ## Quick Win Opportunities
 
@@ -218,34 +234,44 @@ These items provide high architectural value for relatively low effort:
 
 **Total: 31 hours for significant architectural improvements**
 
-## Current Implementation Status (v0.2.1)
+## Current Implementation Status (v0.2.3+)
 
 ### What We Have
 - Basic controls: Button, InputLine, StaticText, Label, CheckBox, RadioButton
-- Lists: ListBox (needs TListViewer refactoring)
-- Menus: MenuBar with dropdowns (needs TMenuView/TMenuBox refactoring)
+- Lists: ListBox with ListViewer trait, full navigation support
+- Menus: MenuBar with MenuViewer trait, MenuBox popup menus
 - Dialogs: Dialog, FileDialog (basic), MsgBox
 - Text: Memo, TextView, Editor (basic)
 - System: Desktop, StatusLine, Frame, Window, Group
 - Utilities: ScrollBar, Scroller, Indicator, ParamText, Background
 - Validation: Validator trait, FilterValidator, RangeValidator
 - Event system: Three-phase processing, event re-queuing, broadcasts
+- **NEW**: List Components (ListViewer, MenuViewer, MenuBox)
+- **NEW**: Menu/Status data structures (MenuItem, Menu, MenuBuilder, StatusDef, etc.)
+
+### Recent Improvements (List Components Phase)
+- **ListViewer trait**: Base for all scrollable lists with navigation
+- **MenuViewer trait**: Base for all menu views with item selection
+- **MenuBox**: Borland-compatible popup menu with modal execution
+- **ListBox refactored**: Now uses ListViewer, eliminated 70+ lines
+- **MenuBar refactored**: Now uses MenuViewer, eliminated 200+ lines
+- **Trait-based architecture**: Single source of truth for navigation logic
 
 ### Architectural Gaps
 - Missing collection infrastructure (using Vec instead of TCollection)
-- Menu system doesn't match TMenuView/TMenuBox hierarchy
-- ListBox needs refactoring to extend TListViewer
 - No history system for input fields
 - No resource/streaming system
 - No help system infrastructure
+- Missing TCluster base for RadioButton/CheckBox
 
 ## Next Steps
 
-For v0.2.x series, focus on:
-1. TEditor enhancement with search/replace
-2. Window Min/Max buttons
+For v0.2.3+, consider:
+1. TCluster base class for RadioButton/CheckBox refactoring
+2. TEditor enhancement with search/replace
+3. Window Min/Max buttons
 
-For v0.3.0+, consider starting Phase 1 (Collections) to establish proper architectural foundation before building more complex features.
+For v0.3.0+, consider starting Phase 3 (Collections) to establish proper architectural foundation before building more complex features.
 
 ---
 
