@@ -62,7 +62,9 @@ impl StatusLine {
         let mut x = 1;
         for (idx, item) in self.items.iter().enumerate() {
             if x + item.text.len() + 2 < width {
-                let start_x = x as i16;
+                // Include the space before the first item in the hit area (matches Borland tstatusl.cc:204)
+                // For subsequent items, don't include the previous separator
+                let start_x = if x == 1 { 0 } else { x as i16 };
 
                 // Determine color based on selection
                 let is_selected = selected == Some(idx);
@@ -97,7 +99,8 @@ impl StatusLine {
                     }
                 }
 
-                let end_x = x as i16;
+                // Include first separator space in hit area (matches Borland inc=2 spacing)
+                let end_x = (x + 1) as i16;
                 self.item_positions.push((start_x, end_x));
 
                 buf.move_str(x, " │ ", normal_color);
