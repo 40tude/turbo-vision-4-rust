@@ -784,6 +784,40 @@ impl Editor {
         self.selection_start.is_some()
     }
 
+    /// Check if a position (line, column) is within the current selection
+    fn is_position_selected(&self, line: i16, col: i16) -> bool {
+        if let Some(start) = self.selection_start {
+            let end = self.cursor;
+
+            // Normalize selection bounds (start should be before end)
+            let (start, end) = if start.y < end.y || (start.y == end.y && start.x < end.x) {
+                (start, end)
+            } else {
+                (end, start)
+            };
+
+            // Check if position is within selection
+            if line < start.y || line > end.y {
+                return false;
+            }
+
+            if line == start.y && line == end.y {
+                // Single line selection
+                return col >= start.x && col < end.x;
+            } else if line == start.y {
+                // First line of multi-line selection
+                return col >= start.x;
+            } else if line == end.y {
+                // Last line of multi-line selection
+                return col < end.x;
+            } else {
+                // Middle line of multi-line selection
+                return true;
+            }
+        }
+        false
+    }
+
     fn get_selection(&self) -> Option<String> {
         let start = self.selection_start?;
         let end = self.cursor;
@@ -1069,6 +1103,23 @@ impl View for Editor {
                     } else {
                         // No highlighting - use default color
                         buf.move_str(0, &visible_text, default_color);
+                    }
+                }
+            }
+
+            // Apply selection highlighting
+            // Check each character position in this line to see if it's selected
+            if self.has_selection() {
+                let line_y = (self.delta.y + y as i16) as i16;
+                let start_col = self.delta.x;
+
+                for x in 0..width {
+                    let col = (start_col + x as i16) as i16;
+                    if self.is_position_selected(line_y, col) {
+                        // Highlight this character as selected
+                        if x < buf.data.len() {
+                            buf.data[x].attr = colors::EDITOR_SELECTED;
+                        }
                     }
                 }
             }

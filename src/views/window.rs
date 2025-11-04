@@ -263,9 +263,12 @@ impl View for Window {
         }
 
         // Handle ESC key for modal windows
-        // Modal windows should close when ESC is pressed
-        if event.what == EventType::Keyboard && event.key_code == crate::core::event::KB_ESC {
-            if (self.state & SF_MODAL) != 0 {
+        // Modal windows should close when ESC or ESC ESC is pressed
+        if event.what == EventType::Keyboard {
+            let is_esc = event.key_code == crate::core::event::KB_ESC;
+            let is_esc_esc = event.key_code == crate::core::event::KB_ESC_ESC;
+
+            if (is_esc || is_esc_esc) && (self.state & SF_MODAL) != 0 {
                 // Modal window: ESC ends the modal loop with CM_CANCEL
                 self.end_modal(CM_CANCEL);
                 event.clear();
