@@ -91,6 +91,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added status_line.handle_event() call in rust_editor event loop
   - StatusLine now properly handles mouse clicks and keyboard shortcuts
   - Items now generate commands when clicked or shortcuts pressed
+- **StatusLine Hit Detection** - Fixed "one off to the right" highlighting issue
+  - First item now includes leading space (position 0) in hit area
+  - All items include first separator space after text (matches Borland's inc=2)
+  - Subsequent items don't include previous separator in their hit area
+  - Hit detection now matches Borland TStatusLine behavior (tstatusl.cc:204)
 - **Editor Content Not Saved** - Critical bug where saves would write initial content instead of current edits
 - **Close Button Not Prompting** - Frame's close button now properly triggers save confirmation
 - **Always Prompting on Close** - Now only prompts when editor is actually modified
