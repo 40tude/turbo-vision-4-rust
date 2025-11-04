@@ -70,13 +70,14 @@ fn main() -> std::io::Result<()> {
     let menu_bar = create_menu_bar(width);
     app.set_menu_bar(menu_bar);
 
-    // Create status line
+    // Create status line with functional items
+    // Matches Borland: TStatusLine items can execute commands when clicked or via shortcuts
     let status_line = StatusLine::new(
         Rect::new(0, height as i16 - 1, width as i16, height as i16),
         vec![
-            StatusItem::new("~F10~ Menu", KB_F10, 0),
-            StatusItem::new("~Ctrl+S~ Save", 0, 0),
-            StatusItem::new("~Ctrl+F~ Find", 0, 0),
+            StatusItem::new("~F10~ Menu", KB_F10, 0),  // F10 is handled by MenuBar, this is just informational
+            StatusItem::new("~Ctrl+S~ Save", 0, CM_SAVE),  // Clicking executes CM_SAVE (Ctrl+S handled by menu)
+            StatusItem::new("~Ctrl+F~ Find", 0, CMD_SEARCH),  // Clicking executes CMD_SEARCH
         ],
     );
     app.set_status_line(status_line);
@@ -102,7 +103,13 @@ fn main() -> std::io::Result<()> {
 
         // Poll for events
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
-            // Menu bar handles events first
+            // Status line handles events first (pre-process phase)
+            // Matches Borland: TStatusLine has ofPreProcess flag
+            if let Some(ref mut status_line) = app.status_line {
+                status_line.handle_event(&mut event);
+            }
+
+            // Menu bar handles events (special case for F10 and Alt keys)
             if let Some(ref mut menu_bar) = app.menu_bar {
                 menu_bar.handle_event(&mut event);
 

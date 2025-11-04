@@ -33,7 +33,7 @@ pub struct StatusLine {
 
 impl StatusLine {
     pub fn new(bounds: Rect, items: Vec<StatusItem>) -> Self {
-        use crate::core::state::OF_POST_PROCESS;
+        use crate::core::state::OF_PRE_PROCESS;
 
         Self {
             bounds,
@@ -41,7 +41,7 @@ impl StatusLine {
             item_positions: Vec::new(),
             selected_item: None,
             hint_text: None,
-            options: OF_POST_PROCESS,  // Status line processes in post-process phase
+            options: OF_PRE_PROCESS,  // Status line processes in pre-process phase (matches Borland)
         }
     }
 
