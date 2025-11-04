@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2025-11-03
+
+### Fixed
+- **Keyboard Modifiers Lost in Event System** (CRITICAL BUG FIX)
+  - **Root Cause**: `Terminal::poll_event()` was creating Event with `Event::keyboard(key_code)` which lost modifiers from crossterm's KeyEvent
+  - **Impact**: ALL keyboard modifiers (Shift, Ctrl, Alt) were being stripped, making Shift+Arrow selection completely non-functional
+  - **Discovery**: Through debug testing, found crossterm correctly sent SHIFT but Editor received KeyModifiers(0x0)
+  - **Fix**: Changed Terminal to preserve `key.modifiers` when creating Event structure
+  - **Result**: Shift+Arrow keys now work perfectly with visible cyan selection highlighting
+
+- **Editor Selection Visibility**
+  - Added `is_position_selected()` helper method to check if character is in selection
+  - Modified `draw()` to apply EDITOR_SELECTED color (black on cyan) to selected text
+  - Selection highlighting works with both plain text and syntax-highlighted code
+  - Multi-line selections fully supported
+
+- **Window ESC ESC Handling**
+  - Window now handles both KB_ESC and KB_ESC_ESC to close modal windows
+  - Matches expected Turbo Vision behavior for double-ESC
+
+### Added
+- **examples/key_test.rs** - Diagnostic tool to test keyboard input directly from crossterm
+  - Shows raw KeyCode and KeyModifiers for debugging
+  - Useful for verifying terminal keyboard behavior
+
+### Changed
+- **Test Suite**: 178 tests (all passing)
+- **Code Size**: 16,030 lines total, 12,239 lines of code
+
 ## [0.2.7] - 2025-11-03
 
 ### Fixed
