@@ -8,7 +8,7 @@
 // Borland inheritance: TView → TMenuView → TMenuBar
 // Rust composition: View + MenuViewer → MenuBar
 
-use crate::core::geometry::Rect;
+use crate::core::geometry::{Rect, Point};
 use crate::core::event::{Event, EventType, KB_ALT_F, KB_ALT_H, KB_ENTER, KB_ESC, KB_LEFT, KB_RIGHT, KB_ESC_F, KB_ESC_H, KB_ESC_E, KB_ESC_S, KB_ESC_V, KB_ESC_ESC, MB_LEFT_BUTTON};
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::colors;
@@ -17,6 +17,7 @@ use crate::core::menu_data::{Menu, MenuItem};
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal, draw_shadow};
 use super::menu_viewer::{MenuViewer, MenuViewerState};
+use super::menu_box::MenuBox;
 
 /// SubMenu represents a top-level menu with dropdown items
 pub struct SubMenu {
@@ -74,6 +75,61 @@ impl MenuBar {
     fn close_menu(&mut self) {
         self.active_menu_idx = None;
         self.menu_state = MenuViewerState::new();
+    }
+
+    /// Show a cascading submenu for the currently selected item
+    /// Returns Some(command) if a command was selected, None if cancelled
+    pub fn check_cascading_submenu(&mut self, terminal: &mut Terminal) -> Option<u16> {
+        self.show_cascading_submenu(terminal)
+    }
+
+    /// Show a cascading submenu for the currently selected item (internal)
+    fn show_cascading_submenu(&mut self, terminal: &mut Terminal) -> Option<u16> {
+        // Get the current selected item
+        let current_item = self.menu_state.get_current_item()?;
+
+        // Check if it's a SubMenu item
+        if let MenuItem::SubMenu { menu, .. } = current_item {
+            // Calculate position for the cascading menu
+            let current_idx = self.menu_state.current?;
+            let menu_idx = self.active_menu_idx?;
+
+            // Position submenu to the right of the dropdown
+            let dropdown_x = self.menu_positions.get(menu_idx).copied().unwrap_or(0);
+            let item_y = self.bounds.a.y + 2 + current_idx as i16; // +1 for bar, +1 for top border
+
+            // Calculate dropdown width (similar to draw_dropdown logic)
+            let parent_menu = &self.submenus[menu_idx].menu;
+            let mut max_text_width = 10;
+            for item in &parent_menu.items {
+                match item {
+                    MenuItem::Regular { text, shortcut, .. } => {
+                        let text_len = text.replace('~', "").len();
+                        max_text_width = max_text_width.max(text_len);
+                        if let Some(s) = shortcut {
+                            max_text_width = max_text_width.max(text_len + s.len() + 2);
+                        }
+                    }
+                    MenuItem::SubMenu { text, .. } => {
+                        let text_len = text.replace('~', "").len();
+                        max_text_width = max_text_width.max(text_len + 3);
+                    }
+                    MenuItem::Separator => {}
+                }
+            }
+            let dropdown_width = max_text_width + 4;
+
+            let submenu_x = dropdown_x + dropdown_width as i16 - 1;
+            let position = Point::new(submenu_x, item_y);
+
+            // Create and execute the cascading menu
+            let mut menu_box = MenuBox::new(position, menu.clone());
+            let command = menu_box.execute(terminal);
+
+            return Some(command);
+        }
+
+        None
     }
 
     /// Draw the dropdown menu
@@ -366,7 +422,60 @@ impl View for MenuBar {
                                 if item_rect.contains(mouse_pos) {
                                     self.menu_state.current = Some(i);
 
-                                    // If an item was clicked, execute it
+                                    // Don't execute or show submenu here
+                                    // That will be handled by check_cascading_submenu() or on MouseUp
+                                    event.clear();
+                                    return;
+                                }
+                            }
+                        } else {
+                            // Clicked outside dropdown - close
+                            self.close_menu();
+                            event.clear();
+                        }
+                    }
+                }
+            }
+            EventType::MouseUp => {
+                if let Some(menu_idx) = self.active_menu_idx {
+                    let mouse_pos = event.mouse.pos;
+
+                    // Calculate dropdown bounds (same as MouseDown)
+                    let (dropdown_bounds, item_count) = if menu_idx < self.menu_positions.len() {
+                        if let Some(menu) = self.menu_state.get_menu() {
+                            let menu_x = self.menu_positions[menu_idx];
+                            let menu_y = self.bounds.a.y + 1;
+                            let item_count = menu.items.len();
+
+                            let bounds = Rect::new(
+                                menu_x,
+                                menu_y,
+                                menu_x + 20,
+                                menu_y + 1 + item_count as i16 + 1,
+                            );
+                            (Some(bounds), item_count)
+                        } else {
+                            (None, 0)
+                        }
+                    } else {
+                        (None, 0)
+                    };
+
+                    if let Some(bounds) = dropdown_bounds {
+                        if bounds.contains(mouse_pos) {
+                            // Check if mouse up is on currently selected item
+                            for i in 0..item_count {
+                                let item_rect = self.get_item_rect(i);
+                                if item_rect.contains(mouse_pos) && self.menu_state.current == Some(i) {
+                                    // Check if it's a submenu - don't clear so check_cascading_submenu can handle it
+                                    if let Some(item) = self.menu_state.get_current_item() {
+                                        if matches!(item, MenuItem::SubMenu { .. }) {
+                                            // Don't clear - will be handled by check_cascading_submenu
+                                            return;
+                                        }
+                                    }
+
+                                    // If it's a regular item, execute it
                                     let command = self.menu_state.get_current_item().and_then(|item| {
                                         if let MenuItem::Regular { command, enabled: true, .. } = item {
                                             Some(*command)
@@ -383,10 +492,6 @@ impl View for MenuBar {
                                     break;
                                 }
                             }
-                        } else {
-                            // Clicked outside dropdown - close
-                            self.close_menu();
-                            event.clear();
                         }
                     }
                 }
@@ -447,12 +552,20 @@ impl View for MenuBar {
                             event.clear();
                         }
                         KB_RIGHT => {
-                            // Next menu
+                            // Just move to next menu, don't open submenus automatically
                             self.open_menu((menu_idx + 1) % self.submenus.len());
                             event.clear();
                         }
                         KB_ENTER => {
-                            // Execute current item
+                            // Leave event uncleared if it's a submenu, so check_cascading_submenu can handle it
+                            if let Some(item) = self.menu_state.get_current_item() {
+                                if matches!(item, MenuItem::SubMenu { .. }) {
+                                    // Don't clear - will be handled by check_cascading_submenu
+                                    return;
+                                }
+                            }
+
+                            // Execute current item (if it's a regular item)
                             let command = self.menu_state.get_current_item().and_then(|item| {
                                 if let MenuItem::Regular { command, enabled: true, .. } = item {
                                     Some(*command)

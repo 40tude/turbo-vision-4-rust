@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] - 2025-11-04
+
+### Fixed
+- **MenuBox Mouse Interaction** (CRITICAL BUG FIX - Borland Compatibility)
+  - **Root Cause**: MenuBox executed commands on MouseDown instead of MouseUp, inconsistent with Borland Turbo Vision
+  - **Impact**: Menu items executed before mouse was fully released, preventing proper drag-selection
+  - **Fix**: Following Borland tmenuvie.cc:215-222, MouseDown now only tracks selection, MouseUp executes commands
+  - **Result**: Menu behavior now matches original Turbo Vision exactly
+
+- **MenuBox ESC/ESC ESC Handling**
+  - Both KB_ESC and KB_ESC_ESC now properly close popup menus
+  - Returns command 0 to signal cancellation matching Borland behavior (tmenuvie.cc:264-268)
+
+- **Submenu Auto-Popup Removed** (Borland Compatibility)
+  - **Issue**: Submenus were appearing automatically on hover or right arrow navigation
+  - **Fix**: Following Borland tmenuvie.cc:333-349, submenus now only show on explicit action:
+    - Press Enter on submenu item
+    - Click (MouseUp) on submenu item
+  - KB_RIGHT now only navigates to next top-level menu, doesn't open submenus
+  - Matches original Turbo Vision behavior perfectly
+
+- **Validator Demo Dialog Height**
+  - Increased dialog height from 30 to 34 lines to properly display all fields and buttons
+
+### Added
+- **MenuBar Cascading Submenu Support**
+  - Added `show_cascading_submenu()` method to display nested submenus
+  - Added `check_cascading_submenu()` public method for event loop integration
+  - MenuBox positioned to right of parent dropdown menu
+  - Proper keyboard (Enter) and mouse (Click) activation
+  - Full support for multi-level menu hierarchies
+
+- **Extended Menu Example** (examples/menu.rs)
+  - File menu now includes Recent Files submenu (3 sample files, Clear Recent option)
+  - Edit menu added with Cut/Copy/Paste and Preferences submenu
+  - Preferences submenu contains General, Appearance, and Keyboard Shortcuts
+  - Right-click popup menu on desktop with New File, Open File, Properties
+  - Comprehensive demonstration of all menu features
+  - Status line shows "Right-Click Popup" hint
+
+- **MenuBar MouseUp Event Handling**
+  - Added proper MouseUp event handling matching Borland behavior
+  - Executes commands only when mouse released on selected item
+  - Handles submenu activation on click-release
+
+### Changed
+- **Validator Demo Unified**
+  - Removed initial menu selection dialog
+  - All validators (Filter, Range, Picture) now shown in single comprehensive dialog
+  - Organized into clear sections with dynamic layout
+  - Filter & Range Validators section with 4 different validator types
+  - Picture Mask Validators section with phone, date, and product code examples
+
+### Technical Details
+- **Borland Compatibility**: All menu changes verified against local-only/borland-tvision source code
+- **Files Modified**:
+  - src/views/menu_box.rs (mouse handling, ESC handling)
+  - src/views/menu_bar.rs (cascading menus, MouseUp support, removed auto-popup)
+  - examples/menu.rs (extended with submenus and popup menu)
+  - examples/validator_demo.rs (unified dialog, removed menu)
+
 ## [0.2.8] - 2025-11-03
 
 ### Fixed

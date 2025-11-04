@@ -9,7 +9,7 @@
 // Rust composition: View + MenuViewer → MenuBox
 
 use crate::core::geometry::{Rect, Point};
-use crate::core::event::{Event, EventType, KB_ENTER, KB_ESC, MB_LEFT_BUTTON};
+use crate::core::event::{Event, EventType, KB_ENTER, KB_ESC, KB_ESC_ESC, MB_LEFT_BUTTON};
 use crate::core::palette::colors;
 use crate::core::draw::DrawBuffer;
 use crate::core::state::{StateFlags, SF_SHADOW};
@@ -311,9 +311,9 @@ impl View for MenuBox {
                             }
                         }
                     }
-                    KB_ESC => {
-                        // Cancel menu
-                        *event = Event::command(0); // cmCancel equivalent
+                    KB_ESC | KB_ESC_ESC => {
+                        // Cancel menu - return 0 to signal cancellation
+                        *event = Event::command(0);
                     }
                     _ => {}
                 }
@@ -328,18 +328,39 @@ impl View for MenuBox {
                         return;
                     }
 
-                    // Check if clicked on current item - select it
-                    if let Some(current_idx) = self.menu_state.current {
-                        let item_rect = self.get_item_rect(current_idx);
-                        if item_rect.contains(mouse_pos) {
-                            if let Some(item) = self.menu_state.get_current_item() {
-                                if let MenuItem::Regular { command, enabled: true, .. } = item {
-                                    *event = Event::command(*command);
-                                }
+                    // Track which item is under the mouse
+                    if let Some(menu) = self.menu_state.get_menu() {
+                        for (idx, _item) in menu.items.iter().enumerate() {
+                            let item_rect = self.get_item_rect(idx);
+                            if item_rect.contains(mouse_pos) {
+                                // Update selection to clicked item
+                                self.menu_state.current = Some(idx);
+                                break;
                             }
                         }
                     }
+                    event.clear();
                 }
+            }
+            EventType::MouseUp => {
+                let mouse_pos = event.mouse.pos;
+
+                if event.mouse.buttons & MB_LEFT_BUTTON != 0 {
+                    // Check if clicked outside menu - cancel
+                    if !self.bounds.contains(mouse_pos) {
+                        *event = Event::command(0); // Cancel
+                        return;
+                    }
+                }
+
+                // Execute the currently selected item on mouse up
+                if let Some(item) = self.menu_state.get_current_item() {
+                    if let MenuItem::Regular { command, enabled: true, .. } = item {
+                        *event = Event::command(*command);
+                        return;
+                    }
+                }
+                event.clear();
             }
             _ => {}
         }
