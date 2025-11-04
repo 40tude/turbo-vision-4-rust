@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.7] - 2025-11-03
 
 ### Fixed
+- **Editor Text Selection with Shift+Arrow Keys** (CRITICAL BUG FIX)
+  - **Root Cause**: Event structure didn't track keyboard modifiers (Shift, Ctrl, Alt). Editor had hardcoded `shift_pressed = false` with TODO comment
+  - **Impact**: Shift+Arrow keys, Shift+Home, Shift+End didn't create text selections
+  - **Fix**: Added `key_modifiers` field to Event structure, updated Editor to check for SHIFT modifier
+  - **Features Now Working**:
+    - Shift+Arrow keys create text selection
+    - Shift+Home selects from cursor to start of line
+    - Shift+End selects from cursor to end of line
+    - Shift+PgUp/PgDn select full pages
+    - Moving without Shift clears selection (expected behavior)
+
 - **Button Broadcast Handling** (CRITICAL BUG FIX)
   - **Root Cause**: Disabled buttons were checking disabled state before processing broadcasts, causing them to return early and never receive CM_COMMAND_SET_CHANGED broadcasts
   - **Impact**: Buttons that started disabled (e.g., Cut, Copy, Paste when clipboard empty) would stay disabled forever, breaking the command set system
