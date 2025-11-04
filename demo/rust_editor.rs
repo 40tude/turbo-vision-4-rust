@@ -11,25 +11,18 @@
 use std::path::PathBuf;
 use std::fs;
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_OK, CM_CANCEL, CM_YES, CM_NO, CM_CLOSE};
+use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_CANCEL, CM_YES, CM_NO, CM_CLOSE};
 use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::button::Button;
-use turbo_vision::views::dialog::Dialog;
 use turbo_vision::views::file_dialog::FileDialog;
 use turbo_vision::views::editor::Editor;
-use turbo_vision::views::input_line::InputLine;
-use turbo_vision::views::label::Label;
 use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::static_text::StaticText;
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
 use turbo_vision::views::window::Window;
 use turbo_vision::views::View;
 use turbo_vision::views::syntax::RustHighlighter;
-use turbo_vision::views::msgbox::{confirmation_box, message_box_ok, message_box_error};
-use std::rc::Rc;
-use std::cell::RefCell;
+use turbo_vision::views::msgbox::{confirmation_box, message_box_ok, message_box_error, search_box, search_replace_box, goto_line_box};
 
 // Custom command IDs
 const CMD_SAVE_AS: u16 = 105;
@@ -207,13 +200,22 @@ fn main() -> std::io::Result<()> {
                         }
                     }
                     CMD_SEARCH => {
-                        show_search_dialog(&mut app);
+                        if let Some(search_text) = search_box(&mut app, "Search") {
+                            // TODO: Implement actual search in editor
+                            show_message(&mut app, "Search", &format!("Searching for: {}", search_text));
+                        }
                     }
                     CMD_REPLACE => {
-                        show_replace_dialog(&mut app);
+                        if let Some((find_text, replace_text)) = search_replace_box(&mut app, "Replace") {
+                            // TODO: Implement actual replace in editor
+                            show_message(&mut app, "Replace", &format!("Replace '{}' with '{}'", find_text, replace_text));
+                        }
                     }
                     CMD_GOTO_LINE => {
-                        show_goto_line_dialog(&mut app);
+                        if let Some(line_num) = goto_line_box(&mut app, "Go to Line") {
+                            // TODO: Implement actual goto line in editor
+                            show_message(&mut app, "Go to Line", &format!("Going to line: {}", line_num));
+                        }
                     }
                     CMD_ANALYZE => {
                         analyze_with_rust_analyzer(&mut app, &editor_state);
@@ -417,128 +419,6 @@ fn show_file_save_dialog(app: &mut Application) -> Option<PathBuf> {
     file_dialog.execute(app)
 }
 
-fn show_search_dialog(app: &mut Application) {
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 50;
-    let dialog_height = 8;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut dialog = Dialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Search"
-    );
-
-    let label = Label::new(Rect::new(2, 2, 20, 3), "~F~ind:");
-    dialog.add(Box::new(label));
-
-    let search_data = Rc::new(RefCell::new(String::new()));
-    let input = InputLine::new(Rect::new(2, 3, dialog_width - 4, 4), 100, search_data.clone());
-    dialog.add(Box::new(input));
-
-    let ok_button = Button::new(Rect::new(15, 5, 25, 7), "  ~O~K  ", CM_OK, true);
-    dialog.add(Box::new(ok_button));
-
-    let cancel_button = Button::new(Rect::new(27, 5, 37, 7), " Cancel", CM_CANCEL, false);
-    dialog.add(Box::new(cancel_button));
-
-    dialog.set_initial_focus();
-
-    let result = dialog.execute(app);
-
-    if result == CM_OK {
-        let search_text = search_data.borrow().clone();
-        if !search_text.is_empty() {
-            // TODO: Implement actual search in editor
-            show_message(app, "Search", &format!("Searching for: {}", search_text));
-        }
-    }
-}
-
-fn show_replace_dialog(app: &mut Application) {
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 50;
-    let dialog_height = 12;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut dialog = Dialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Replace"
-    );
-
-    let label1 = Label::new(Rect::new(2, 2, 20, 3), "~F~ind:");
-    dialog.add(Box::new(label1));
-
-    let find_data = Rc::new(RefCell::new(String::new()));
-    let input1 = InputLine::new(Rect::new(2, 3, dialog_width - 4, 4), 100, find_data.clone());
-    dialog.add(Box::new(input1));
-
-    let label2 = Label::new(Rect::new(2, 5, 20, 6), "~R~eplace with:");
-    dialog.add(Box::new(label2));
-
-    let replace_data = Rc::new(RefCell::new(String::new()));
-    let input2 = InputLine::new(Rect::new(2, 6, dialog_width - 4, 7), 100, replace_data.clone());
-    dialog.add(Box::new(input2));
-
-    let ok_button = Button::new(Rect::new(15, 9, 25, 11), "  ~O~K  ", CM_OK, true);
-    dialog.add(Box::new(ok_button));
-
-    let cancel_button = Button::new(Rect::new(27, 9, 37, 11), " Cancel", CM_CANCEL, false);
-    dialog.add(Box::new(cancel_button));
-
-    dialog.set_initial_focus();
-
-    let result = dialog.execute(app);
-
-    if result == CM_OK {
-        let find_text = find_data.borrow().clone();
-        let replace_text = replace_data.borrow().clone();
-        if !find_text.is_empty() {
-            // TODO: Implement actual replace in editor
-            show_message(app, "Replace", &format!("Replace '{}' with '{}'", find_text, replace_text));
-        }
-    }
-}
-
-fn show_goto_line_dialog(app: &mut Application) {
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 40;
-    let dialog_height = 8;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut dialog = Dialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Go to Line"
-    );
-
-    let label = Label::new(Rect::new(2, 2, 20, 3), "~L~ine number:");
-    dialog.add(Box::new(label));
-
-    let line_data = Rc::new(RefCell::new(String::new()));
-    let input = InputLine::new(Rect::new(2, 3, dialog_width - 4, 4), 10, line_data.clone());
-    dialog.add(Box::new(input));
-
-    let ok_button = Button::new(Rect::new(10, 5, 20, 7), "  ~O~K  ", CM_OK, true);
-    dialog.add(Box::new(ok_button));
-
-    let cancel_button = Button::new(Rect::new(22, 5, 32, 7), " Cancel", CM_CANCEL, false);
-    dialog.add(Box::new(cancel_button));
-
-    dialog.set_initial_focus();
-
-    let result = dialog.execute(app);
-
-    if result == CM_OK {
-        let line_text = line_data.borrow().clone();
-        if let Ok(line_num) = line_text.parse::<usize>() {
-            // TODO: Implement actual goto line in editor
-            show_message(app, "Go to Line", &format!("Going to line: {}", line_num));
-        }
-    }
-}
-
 fn analyze_with_rust_analyzer(app: &mut Application, state: &EditorState) {
     // For now, just show a message about rust-analyzer integration
     // In a real implementation, we would:
@@ -560,28 +440,7 @@ fn show_message(app: &mut Application, _title: &str, message: &str) {
 }
 
 fn show_about_dialog(app: &mut Application) {
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 40;
-    let dialog_height = 10;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut dialog = Dialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "About"
-    );
-
-    let text = StaticText::new_centered(
-        Rect::new(2, 3, dialog_width - 4, 5),
-        "Lonbard Turbo Rust"
-    );
-    dialog.add(Box::new(text));
-
-    let button = Button::new(Rect::new(15, 6, 25, 8), "  ~O~K  ", CM_OK, true);
-    dialog.add(Box::new(button));
-
-    dialog.set_initial_focus();
-    dialog.execute(app);
+    message_box_ok(app, "Lonbard Turbo Rust");
 }
 
 fn show_error(app: &mut Application, _title: &str, message: &str) {

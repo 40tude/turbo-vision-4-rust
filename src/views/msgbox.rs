@@ -219,3 +219,192 @@ pub fn input_box_rect(app: &mut Application, bounds: Rect, title: &str, label: &
         None
     }
 }
+
+/// Display a search dialog that prompts the user for search text
+///
+/// Returns Some(search_text) if OK was pressed, None if cancelled
+///
+/// # Example
+/// ```
+/// use turbo_vision::views::msgbox::search_box;
+///
+/// if let Some(text) = search_box(&mut app, "Search") {
+///     // Perform search with text
+/// }
+/// ```
+pub fn search_box(app: &mut Application, title: &str) -> Option<String> {
+    // Calculate dialog size
+    let width = 50;
+    let height = 9;
+
+    // Center on screen
+    let (screen_w, screen_h) = app.terminal.size();
+    let x = (screen_w as i16 - width) / 2;
+    let y = (screen_h as i16 - height) / 2;
+
+    let bounds = Rect::new(x, y, x + width, y + height);
+
+    let mut dialog = Dialog::new(bounds, title);
+
+    // Create shared data for input line
+    let data = Rc::new(RefCell::new(String::new()));
+
+    // Add label
+    let label_bounds = Rect::new(2, 2, 20, 3);
+    dialog.add(Box::new(Label::new(label_bounds, "~F~ind:")));
+
+    // Add input line
+    let input_bounds = Rect::new(2, 3, width - 4, 4);
+    dialog.add(Box::new(InputLine::new(input_bounds, 100, data.clone())));
+
+    // Add OK button
+    let ok_bounds = Rect::new(15, 5, 25, 7);
+    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+
+    // Add Cancel button
+    let cancel_bounds = Rect::new(27, 5, 37, 7);
+    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+
+    dialog.set_initial_focus();
+
+    let result = dialog.execute(app);
+
+    if result == CM_OK {
+        let text = data.borrow().clone();
+        if !text.is_empty() {
+            Some(text)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+/// Display a search and replace dialog that prompts for find and replace text
+///
+/// Returns Some((find_text, replace_text)) if OK was pressed, None if cancelled
+///
+/// # Example
+/// ```
+/// use turbo_vision::views::msgbox::search_replace_box;
+///
+/// if let Some((find, replace)) = search_replace_box(&mut app, "Replace") {
+///     // Perform search and replace
+/// }
+/// ```
+pub fn search_replace_box(app: &mut Application, title: &str) -> Option<(String, String)> {
+    // Calculate dialog size
+    let width = 50;
+    let height = 13;
+
+    // Center on screen
+    let (screen_w, screen_h) = app.terminal.size();
+    let x = (screen_w as i16 - width) / 2;
+    let y = (screen_h as i16 - height) / 2;
+
+    let bounds = Rect::new(x, y, x + width, y + height);
+
+    let mut dialog = Dialog::new(bounds, title);
+
+    // Create shared data for input lines
+    let find_data = Rc::new(RefCell::new(String::new()));
+    let replace_data = Rc::new(RefCell::new(String::new()));
+
+    // Add find label
+    let label1_bounds = Rect::new(2, 2, 20, 3);
+    dialog.add(Box::new(Label::new(label1_bounds, "~F~ind:")));
+
+    // Add find input line
+    let input1_bounds = Rect::new(2, 3, width - 4, 4);
+    dialog.add(Box::new(InputLine::new(input1_bounds, 100, find_data.clone())));
+
+    // Add replace label
+    let label2_bounds = Rect::new(2, 5, 20, 6);
+    dialog.add(Box::new(Label::new(label2_bounds, "~R~eplace with:")));
+
+    // Add replace input line
+    let input2_bounds = Rect::new(2, 6, width - 4, 7);
+    dialog.add(Box::new(InputLine::new(input2_bounds, 100, replace_data.clone())));
+
+    // Add OK button
+    let ok_bounds = Rect::new(15, 9, 25, 11);
+    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+
+    // Add Cancel button
+    let cancel_bounds = Rect::new(27, 9, 37, 11);
+    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+
+    dialog.set_initial_focus();
+
+    let result = dialog.execute(app);
+
+    if result == CM_OK {
+        let find_text = find_data.borrow().clone();
+        if !find_text.is_empty() {
+            let replace_text = replace_data.borrow().clone();
+            Some((find_text, replace_text))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+/// Display a goto line dialog that prompts for a line number
+///
+/// Returns Some(line_number) if OK was pressed, None if cancelled or invalid
+///
+/// # Example
+/// ```
+/// use turbo_vision::views::msgbox::goto_line_box;
+///
+/// if let Some(line) = goto_line_box(&mut app, "Go to Line") {
+///     // Jump to line number
+/// }
+/// ```
+pub fn goto_line_box(app: &mut Application, title: &str) -> Option<usize> {
+    // Calculate dialog size
+    let width = 40;
+    let height = 8;
+
+    // Center on screen
+    let (screen_w, screen_h) = app.terminal.size();
+    let x = (screen_w as i16 - width) / 2;
+    let y = (screen_h as i16 - height) / 2;
+
+    let bounds = Rect::new(x, y, x + width, y + height);
+
+    let mut dialog = Dialog::new(bounds, title);
+
+    // Create shared data for input line
+    let data = Rc::new(RefCell::new(String::new()));
+
+    // Add label
+    let label_bounds = Rect::new(2, 2, 20, 3);
+    dialog.add(Box::new(Label::new(label_bounds, "~L~ine number:")));
+
+    // Add input line
+    let input_bounds = Rect::new(2, 3, width - 4, 4);
+    dialog.add(Box::new(InputLine::new(input_bounds, 10, data.clone())));
+
+    // Add OK button
+    let ok_bounds = Rect::new(10, 5, 20, 7);
+    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+
+    // Add Cancel button
+    let cancel_bounds = Rect::new(22, 5, 32, 7);
+    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+
+    dialog.set_initial_focus();
+
+    let result = dialog.execute(app);
+
+    if result == CM_OK {
+        let text = data.borrow().clone();
+        text.parse::<usize>().ok()
+    } else {
+        None
+    }
+}
