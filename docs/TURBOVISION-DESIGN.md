@@ -8,18 +8,422 @@
 
 ## Table of Contents
 
-1. [Implementation Status](#implementation-status)
-2. [Focus Architecture](#focus-architecture)
-3. [Event System Architecture](#event-system-architecture)
-4. [State Management](#state-management)
-5. [Modal Dialog Execution](#modal-dialog-execution)
-6. [Owner/Parent Communication](#ownerparent-communication)
-7. [Syntax Highlighting System](#syntax-highlighting-system)
-8. [Validation System](#validation-system)
-9. [FileDialog Implementation](#filedialog-implementation)
-10. [Screen Dump System](#screen-dump-system)
-11. [Command Set System](#command-set-system)
-12. [Architecture Comparisons](#architecture-comparisons)
+1. [Class Hierarchy and Architecture](#class-hierarchy-and-architecture)
+2. [Implementation Status](#implementation-status)
+3. [Focus Architecture](#focus-architecture)
+4. [Event System Architecture](#event-system-architecture)
+5. [State Management](#state-management)
+6. [Modal Dialog Execution](#modal-dialog-execution)
+7. [Owner/Parent Communication](#ownerparent-communication)
+8. [Syntax Highlighting System](#syntax-highlighting-system)
+9. [Validation System](#validation-system)
+10. [FileDialog Implementation](#filedialog-implementation)
+11. [Screen Dump System](#screen-dump-system)
+12. [Command Set System](#command-set-system)
+13. [Architecture Comparisons](#architecture-comparisons)
+
+---
+
+# Class Hierarchy and Architecture
+
+## Borland Turbo Vision Class Hierarchy
+
+```
+TObject (Base)
+    │
+    ├─> TView (Base view class)
+    │    │
+    │    ├─> TGroup (Container)
+    │    │    │
+    │    │    ├─> TWindow (Windowed container)
+    │    │    │    │
+    │    │    │    └─> TDialog (Modal dialog)
+    │    │    │
+    │    │    └─> TDeskTop (Desktop manager)
+    │    │
+    │    ├─> TFrame (Window border)
+    │    │
+    │    ├─> TScrollBar (Scrollbar widget)
+    │    │
+    │    ├─> TStaticText (Static label)
+    │    │
+    │    ├─> TButton (Push button)
+    │    │
+    │    ├─> TInputLine (Single-line input)
+    │    │    │
+    │    │    └─> TEditor (Multi-line editor - NOT inherited!)
+    │    │
+    │    ├─> TListViewer (Base for lists)
+    │    │    │
+    │    │    ├─> TListBox (Selection list)
+    │    │    │
+    │    │    └─> TFileList (File browser list)
+    │    │
+    │    ├─> TCluster (Button group base)
+    │    │    │
+    │    │    ├─> TCheckBoxes (Checkbox group)
+    │    │    │
+    │    │    └─> TRadioButtons (Radio button group)
+    │    │
+    │    ├─> TMenuBar (Menu bar)
+    │    │
+    │    ├─> TStatusLine (Status bar)
+    │    │
+    │    └─> TIndicator (Position indicator)
+    │
+    └─> TApplication (Main app class)
+```
+
+## Rust Turbo Vision Architecture
+
+**Key Difference: Composition over Inheritance**
+
+```
+┌─────────────────────────────────────────────┐
+│            View Trait                       │
+│  (Base behavior - no data)                  │
+│                                             │
+│  fn bounds() -> Rect                        │
+│  fn draw(&mut self, terminal)               │
+│  fn handle_event(&mut self, event)          │
+│  fn can_focus() -> bool                     │
+│  fn set_focus(&mut self, focused)           │
+│  fn state() -> StateFlags                   │
+│  fn options() -> OptionsFlags               │
+└─────────────────────────────────────────────┘
+                    △
+                    │ implements
+        ┌───────────┴───────────┐
+        │                       │
+        │                       │
+┌───────┴────────┐      ┌──────┴─────────┐
+│  Leaf Views    │      │  Container     │
+│  (Components)  │      │  Views         │
+│                │      │                │
+│  • Button      │      │  • Group       │
+│  • InputLine   │      │  • Window      │
+│  • Label       │      │  • Dialog      │
+│  • StaticText  │      │  • Desktop     │
+│  • CheckBox    │      │  • Application │
+│  • RadioButton │      └────────────────┘
+│  • ScrollBar   │              │
+│  • Indicator   │              │ contains
+│  • Editor      │              │
+│  • ListBox     │              ▼
+│  • MenuBar     │      children: Vec<Box<dyn View>>
+│  • StatusLine  │
+└────────────────┘
+```
+
+## Borland vs Rust: Inheritance vs Composition
+
+### Borland (C++ Inheritance)
+
+```
+TDialog (inherits TWindow)
+   ├─> TWindow (inherits TGroup)
+   │    ├─> TGroup (inherits TView)
+   │    │    ├─> TView (base class)
+   │    │    │    ├─ bounds: TRect
+   │    │    │    ├─ state: ushort
+   │    │    │    └─ owner: TGroup*
+   │    │    │
+   │    │    └─ children: TView*  (linked list)
+   │    │
+   │    └─ frame: TFrame*
+   │
+   └─ All inherited fields accessible directly
+```
+
+### Rust (Composition)
+
+```
+Dialog
+   ├─> window: Window  (composed, not inherited!)
+   │    ├─> group: Group
+   │    │    ├─ bounds: Rect
+   │    │    ├─ state: StateFlags
+   │    │    └─ children: Vec<Box<dyn View>>
+   │    │
+   │    └─ frame: Frame
+   │
+   └─ Delegates View trait methods to window
+```
+
+## Key Architectural Patterns
+
+### 1. Container Hierarchy (Borland → Rust)
+
+```
+Borland:                          Rust:
+═══════                           ═════
+
+TView                             View trait
+  └─> TGroup                        └─> Group struct
+        └─> TWindow                       └─> Window struct
+              └─> TDialog                       └─> Dialog struct
+
+Inheritance Chain                 Composition Chain
+(is-a relationships)              (has-a relationships)
+```
+
+### 2. Event Flow (Both Systems)
+
+```
+User Input
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Terminal                           │
+│  (Captures keyboard/mouse)          │
+└──────────────┬──────────────────────┘
+               │ Event
+               ▼
+┌─────────────────────────────────────┐
+│  Application                        │
+│  (Main event loop)                  │
+└──────────────┬──────────────────────┘
+               │ Event
+               ▼
+┌─────────────────────────────────────┐
+│  Desktop                            │
+│  (Z-order, modal scope)             │
+└──────────────┬──────────────────────┘
+               │ Event
+               ▼
+┌─────────────────────────────────────┐
+│  Dialog/Window                      │
+│  (Container)                        │
+└──────────────┬──────────────────────┘
+               │ Event
+               ▼
+┌─────────────────────────────────────┐
+│  Group (Three-Phase Processing)    │
+│                                     │
+│  Phase 1: PreProcess                │
+│    └─> StatusLine (OF_PRE_PROCESS)  │
+│                                     │
+│  Phase 2: Focused View              │
+│    └─> Button, InputLine, Editor    │
+│                                     │
+│  Phase 3: PostProcess               │
+│    └─> Button (OF_POST_PROCESS)     │
+└─────────────────────────────────────┘
+```
+
+### 3. Parent Communication Patterns
+
+```
+Borland (Raw Pointers):              Rust (Event Transformation):
+═══════════════════════              ═══════════════════════════
+
+Button                               Button
+  ├─> owner: TDialog*                  ├─> command: CommandId
+  │                                    │
+  └─> press()                          └─> handle_event(&mut event)
+        │                                    │
+        └─> message(owner,                  └─> *event = Event::command(cmd)
+                evBroadcast,                      │
+                command,                          │ (bubbles up)
+                this);                            │
+              │                                   ▼
+              │                              Dialog receives
+              ▼                              transformed event
+        Dialog receives
+        via pointer call
+
+Unsafe but flexible                  Safe and idiomatic
+Circular references                  Call stack unwinding
+```
+
+## Syntax Highlighting Architecture
+
+### Editor with Syntax Highlighting Integration
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         Editor                               │
+│                                                              │
+│  Fields:                                                     │
+│  ├─ lines: Vec<String>         (text content)               │
+│  ├─ cursor: Point              (cursor position)            │
+│  ├─ selection: Option<Selection>  (text selection)          │
+│  ├─ undo_stack: Vec<Action>    (undo/redo)                  │
+│  ├─ highlighter: Option<Box<dyn SyntaxHighlighter>>  ◄──┐   │
+│  ├─ scrollbar_v: Option<ScrollBar>                       │   │
+│  ├─ scrollbar_h: Option<ScrollBar>                       │   │
+│  └─ indicator: Option<Indicator>                         │   │
+│                                                           │   │
+│  Methods:                                                 │   │
+│  ├─ set_highlighter(h: Box<dyn SyntaxHighlighter>)   ◄──┤   │
+│  ├─ clear_highlighter()                                  │   │
+│  ├─ has_highlighter() -> bool                            │   │
+│  └─ draw(&mut self, terminal)  ◄─────────────────────┐   │   │
+│         │                                            │   │   │
+│         └─> if let Some(ref highlighter) = self.highlighter │   │
+│                 │                                    │   │   │
+│                 └─> tokens = highlighter.highlight_line(line)  │
+│                         │                            │   │   │
+│                         └─> for token in tokens      │   │   │
+│                                  │                   │   │   │
+│                                  └─> draw with color │   │   │
+└──────────────────────────────────────────────────────┼───┼───┘
+                                                      │   │
+                                                      │   │
+┌─────────────────────────────────────────────────────┼───┼───┐
+│         SyntaxHighlighter Trait                     │   │   │
+│                                                     │   │   │
+│  fn language(&self) -> &str                         │   │   │
+│  fn highlight_line(&self, line: &str, line_num) -> Vec<Token> │
+│  fn is_multiline_context(&self, line_num) -> bool  │   │   │
+│  fn update_multiline_state(&mut self, line, ...)   │   │   │
+└─────────────────────────────────────────────────────┼───┼───┘
+                        △                             │   │
+                        │ implements                  │   │
+        ┌───────────────┴───────────────┐             │   │
+        │                               │             │   │
+┌───────┴────────────┐        ┌─────────┴──────────┐  │   │
+│  RustHighlighter   │        │ PlainTextHighlighter│  │   │
+│                    │        │                     │  │   │
+│  • Keywords        │        │  • No coloring      │  │   │
+│  • Strings         │        │  • Default color    │  │   │
+│  • Comments        │        │  • Minimal overhead │  │   │
+│  • Numbers         │        └─────────────────────┘  │   │
+│  • Types           │                                 │   │
+│  • Functions       │                                 │   │
+│  • Operators       │         ┌──────────────────────┘   │
+└────────────────────┘         │                          │
+                               │                          │
+                    ┌──────────▼──────────────────────────▼──┐
+                    │         Token Structure                 │
+                    │                                         │
+                    │  start: usize    (character position)   │
+                    │  end: usize      (character position)   │
+                    │  token_type: TokenType                  │
+                    │      │                                  │
+                    │      └─> default_color() -> Attr        │
+                    │            │                            │
+                    │            └─> Yellow    (Keyword)      │
+                    │                LightRed  (String)       │
+                    │                LightCyan (Comment)      │
+                    │                Cyan      (Function)     │
+                    │                ...                      │
+                    └─────────────────────────────────────────┘
+```
+
+### Syntax Highlighting Flow
+
+```
+1. Editor::draw() called
+       │
+       ▼
+2. For each visible line:
+       │
+       ▼
+3. Check if highlighter is set?
+       │
+       ├─ YES ─> 4. Call highlighter.highlight_line(line, line_num)
+       │             │
+       │             ▼
+       │         5. Highlighter returns Vec<Token>
+       │             │
+       │             ▼
+       │         6. For each token:
+       │             ├─> Extract token text from line
+       │             ├─> Get token color: token.token_type.default_color()
+       │             └─> buf.move_str(pos, text, color)
+       │
+       └─ NO ──> 7. Use default color for entire line
+                     │
+                     └─> buf.move_str(0, line, default_color)
+```
+
+### Example: RustHighlighter Processing
+
+```
+Input Line:
+  "fn main() {"
+
+RustHighlighter.highlight_line():
+  │
+  ▼
+Tokens Generated:
+  ┌─────────────────────────────────────┐
+  │ Token 1:                            │
+  │   start: 0,  end: 2                 │
+  │   token_type: Keyword               │
+  │   text: "fn"                        │
+  │   color: Yellow                     │
+  ├─────────────────────────────────────┤
+  │ Token 2:                            │
+  │   start: 3,  end: 7                 │
+  │   token_type: Function              │
+  │   text: "main"                      │
+  │   color: Cyan                       │
+  ├─────────────────────────────────────┤
+  │ Token 3:                            │
+  │   start: 7,  end: 8                 │
+  │   token_type: Operator              │
+  │   text: "("                         │
+  │   color: White                      │
+  ├─────────────────────────────────────┤
+  │ Token 4:                            │
+  │   start: 8,  end: 9                 │
+  │   token_type: Operator              │
+  │   text: ")"                         │
+  │   color: White                      │
+  ├─────────────────────────────────────┤
+  │ Token 5:                            │
+  │   start: 10, end: 11                │
+  │   token_type: Operator              │
+  │   text: "{"                         │
+  │   color: White                      │
+  └─────────────────────────────────────┘
+       │
+       ▼
+  Rendered as:
+  [Yellow]fn[White] [Cyan]main[White]()[White] {
+```
+
+## Component Ownership Model
+
+### Borland (Manual Memory Management)
+
+```
+TDialog
+   │
+   │ owns via raw pointer
+   ▼
+TButton* button = new TButton(...);
+dialog->insert(button);
+   │
+   │ dialog responsible for:
+   │  - calling delete button
+   │  - managing lifetime
+   │  - handling dangling pointers
+   │
+   └─> delete this;  // Manual cleanup
+```
+
+### Rust (Automatic Memory Management)
+
+```
+Dialog
+   │
+   │ owns via Box<dyn View>
+   ▼
+let button = Box::new(Button::new(...));
+dialog.add(button);
+   │
+   │ Dialog struct contains:
+   │  window: Window {
+   │    group: Group {
+   │      children: Vec<Box<dyn View>>  ◄─── Ownership transfer
+   │    }
+   │  }
+   │
+   └─> } // Drop automatically cleans up entire tree
+```
 
 ---
 
