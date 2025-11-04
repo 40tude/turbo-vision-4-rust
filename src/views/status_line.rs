@@ -59,12 +59,11 @@ impl StatusLine {
         // Clear previous item positions
         self.item_positions.clear();
 
-        let mut x = 1;
+        let mut x = 0;  // Start at position 0 (Borland starts at i=0)
         for (idx, item) in self.items.iter().enumerate() {
-            if x + item.text.len() + 2 < width {
-                // Include the space before the first item in the hit area (matches Borland tstatusl.cc:204)
-                // For subsequent items, don't include the previous separator
-                let start_x = if x == 1 { 0 } else { x as i16 };
+            if x + item.text.len() + 4 < width {  // Need space for: space + text + space + separator
+                // Hit area starts at the leading space (matches Borland tstatusl.cc:204)
+                let start_x = x as i16;
 
                 // Determine color based on selection
                 let is_selected = selected == Some(idx);
@@ -78,6 +77,10 @@ impl StatusLine {
                 } else {
                     colors::STATUS_SHORTCUT
                 };
+
+                // Draw leading space (Borland: b.moveChar(i, ' ', color, 1))
+                buf.put_char(x, ' ', normal_color);
+                x += 1;
 
                 // Parse ~X~ for highlighting - everything between tildes is highlighted
                 let mut chars = item.text.chars();
@@ -99,20 +102,25 @@ impl StatusLine {
                     }
                 }
 
-                // Include first separator space in hit area (matches Borland inc=2 spacing)
-                let end_x = (x + 1) as i16;
+                // Draw trailing space (Borland: b.moveChar(i+l+1, ' ', color, 1))
+                buf.put_char(x, ' ', normal_color);
+                x += 1;
+
+                // Hit area ends after the trailing space (matches Borland inc=2 spacing)
+                let end_x = x as i16;
                 self.item_positions.push((start_x, end_x));
 
-                buf.move_str(x, " │ ", normal_color);
-                x += 3;
+                // Separator is always drawn in normal color, never highlighted
+                buf.move_str(x, "│ ", colors::STATUS_NORMAL);
+                x += 2;
             }
         }
 
         // Display hint text if available and there's space
         if let Some(ref hint) = self.hint_text {
-            if x + hint.len() + 3 < width {
-                buf.move_str(x, " - ", colors::STATUS_NORMAL);
-                x += 3;
+            if x + hint.len() + 2 < width {
+                buf.move_str(x, "- ", colors::STATUS_NORMAL);
+                x += 2;
                 let hint_len = (width - x).min(hint.len());
                 for (i, ch) in hint.chars().take(hint_len).enumerate() {
                     buf.put_char(x + i, ch, colors::STATUS_NORMAL);

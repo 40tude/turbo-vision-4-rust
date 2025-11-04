@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2025-11-04
+
+### Fixed
+- **StatusLine Drawing and Hit Detection** - Fixed highlighting extending into separator
+  - StatusLine now draws leading and trailing spaces around text (matches Borland tstatusl.cc:143-145)
+  - Selection highlight includes spaces before and after text, but not the separator
+  - Separator "│ " always drawn in normal color, never highlighted
+  - Hit detection properly includes leading space and text with trailing space
+  - Matches Borland TStatusLine drawing and hit detection behavior exactly
+
+### Technical Details
+The StatusLine highlighting bug was caused by not matching Borland's exact drawing pattern. In Borland TStatusLine::drawSelect (tstatusl.cc:143-145), each status item is drawn as:
+1. Space before text (in selection color when selected)
+2. The text itself (with proper shortcut highlighting)
+3. Space after text (in selection color when selected)
+4. Separator (always in normal color)
+
+Previously, we were drawing the text directly without surrounding spaces, and the separator was being drawn with the selection color. This caused the selection highlight to extend into the separator. The fix now exactly replicates Borland's drawing sequence.
+
 ## [0.2.10] - 2025-11-04
 
 ### Added
