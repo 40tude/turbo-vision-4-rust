@@ -1,895 +1,793 @@
-# Chapter 6 — Creating Data Entry Forms (Rust Edition)
+# Chapter 5: Creating Data-Entry Forms
 
-**Version:** 0.2.11
-**Updated:** 2025-11-04
+Up to this point, all the objects you've used have been standard Turbo Vision objects, with the exception of the application object, which you've extended considerably. That gives you an idea of the power of Turbo Vision, but at some point you'll definitely want to create some custom functionality. In this chapter, you'll:
 
-Now that you understand windows and data collections, it's time to create interactive data entry forms. This chapter shows how to build dialog boxes with input fields, labels, buttons, and validators—the building blocks of user interfaces.
+- Create a data-entry dialog
+- Send messages between views
+- Use control objects
+- Validate entered data
 
-In this chapter, you'll learn:
-
-- Creating custom dialog windows
-- Adding input controls (InputLine, Label, Button)
-- Working with checkboxes and radio buttons
-- Setting and reading control values with shared state
-- Validating user input
-- Managing dialog lifecycle
+Over the next several steps, you'll implement a simple inventory system for a small business. The program isn't meant to be truly useful, but it illustrates a lot of useful principles you will want to use in your Turbo Vision applications.
 
 ---
 
-## Understanding Data Entry in Turbo Vision
+## Step 8: Creating a Data-Entry Dialog
 
-### Dialog Boxes vs. Windows
+Data entry usually takes place in a dialog box. In this example, the dialog box you'll create will not be modal like the standard message boxes. Rather than executing it with its own event loop, you'll add it to the desktop as a regular window. A Turbo Vision dialog is just a specialized kind of window—`Dialog` wraps a `Window`, which in turn contains a `Group` for managing child views.
 
-In Turbo Vision, a **Dialog** is a specialized type of Window:
+Creating your data-entry dialog will happen in three parts:
 
-- **Windows** - Can be modal or modeless, resizable, movable
-- **Dialogs** - Typically modal, centered, fixed size
-- Both can contain controls (buttons, input fields, etc.)
+- Creating a function to build the dialog
+- Preventing duplicate dialogs
+- Adding controls to the dialog
 
-### Modal vs. Modeless
+### Creating a Function to Build the Dialog
 
-**Modal dialogs:**
-- Block interaction with other windows
-- Used with `dialog.execute(app)`
-- Return a command when closed (CM_OK, CM_CANCEL)
+Because you're going to make a number of customizations to your data-entry dialog, you'll create a function that constructs and configures it. The application needs to keep track of the order dialog, so you might store a reference to it in your application state.
 
-**Modeless dialogs:**
-- Allow interaction with other windows
-- Used with `app.desktop.add(Box::new(dialog))`
-- Behave like regular windows
+You'll also add a response to the menu command `CM_ORDER_WIN`, which is bound to the Examine item on the Orders menu. When you choose Orders | Examine, you want the order-entry dialog to appear, so you'll teach the application to handle that command.
 
----
-
-## Step 1: Creating a Custom Dialog
-
-Let's create an order entry form for a simple inventory system.
-
-### Defining the Dialog Structure
+First, define the custom command:
 
 ```rust
-// order_dialog.rs
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::event::Event;
-use turbo_vision::core::command::CommandId;
+// Custom commands for order management
+const CM_ORDER_WIN: u16 = 200;
+const CM_ORDER_NEW: u16 = 201;
+const CM_ORDER_SAVE: u16 = 202;
+const CM_ORDER_CANCEL: u16 = 203;
+const CM_ORDER_NEXT: u16 = 204;
+const CM_ORDER_PREV: u16 = 205;
+const CM_FIND_ORDER_WINDOW: u16 = 206;
+```
+
+Then create a function to build the order dialog:
+
+```rust
 use turbo_vision::views::dialog::Dialog;
+use turbo_vision::core::geometry::Rect;
+
+fn create_order_dialog() -> Dialog {
+    let bounds = Rect::new(0, 0, 60, 17);
+    let mut dialog = Dialog::new(bounds, "Orders");
+
+    // Center the dialog on the desktop
+    dialog.set_centered(true);
+
+    // Note: Controls will be added in the next section
+
+    dialog
+}
+```
+
+In your main event loop, handle the `CM_ORDER_WIN` command:
+
+```rust
+// In your main loop
+if event.what == EventType::Command {
+    match event.command {
+        CM_ORDER_WIN => {
+            open_order_window(&mut app);
+            event.clear();
+        }
+        _ => {}
+    }
+}
+```
+
+And implement the `open_order_window` function:
+
+```rust
+fn open_order_window(app: &mut Application) {
+    // Create and insert the dialog
+    let order_dialog = create_order_dialog();
+    app.desktop.add(Box::new(order_dialog));
+}
+```
+
+If you run the program now, you'll notice several changes. First, if you choose Orders | Examine, a dialog box appears in the middle of the desktop, with the title "Orders". The `set_centered(true)` method ensures the dialog centers itself on the desktop.
+
+### Limiting Open Dialogs
+
+What happens if you choose Orders | Examine while there's already an order dialog open? The `open_order_window` function creates a new order dialog and inserts it into the desktop. Now you have two order dialogs, which is no problem for the desktop to manage, but this could cause confusion. You need to make sure you don't open a new order dialog if there's already one open. Instead, bring the open dialog to the front.
+
+### Sending Messages
+
+A reliable way to find out if there's an order dialog open is to use **broadcast messages**. Turbo Vision gives you the ability to send messages to views. Messages are special events, much like commands, which carry information to a specific view object and allow the receiving view to send information back.
+
+A broadcast message is a message that gets sent to all subviews in a group. By defining a special message that only order dialogs know how to handle, you'll be able to determine whether an order dialog is open.
+
+However, the current Rust implementation takes a simpler approach: you can track whether a dialog is open by checking the desktop's children directly. Here's a practical implementation:
+
+```rust
+use turbo_vision::views::View;
+
+fn find_order_window(app: &Application) -> bool {
+    // Check if any child of the desktop is an order dialog
+    // In practice, you might use a more sophisticated approach,
+    // such as storing a weak reference or using the dialog's title
+    for view in app.desktop.children() {
+        if view.title() == Some("Orders") {
+            return true;
+        }
+    }
+    false
+}
+
+fn open_order_window(app: &mut Application) {
+    if !find_order_window(app) {
+        // No order window open, create one
+        let order_dialog = create_order_dialog();
+        app.desktop.add(Box::new(order_dialog));
+    } else {
+        // Dialog already exists, bring it to front
+        // The desktop automatically manages focus when you select a window
+        for i in 0..app.desktop.child_count() {
+            if let Some(view) = app.desktop.child_at(i) {
+                if view.title() == Some("Orders") {
+                    app.desktop.select_view(i);
+                    break;
+                }
+            }
+        }
+    }
+}
+```
+
+**Note on Broadcasting**: The original Pascal Turbo Vision had a sophisticated message broadcasting system where views could send messages to the desktop, which would forward them to all children. While the Rust implementation supports event broadcasting through `Group::broadcast()`, the pattern shown above is more idiomatic and straightforward for this use case.
+
+### Adding Controls to the Dialog
+
+In order to use the data-entry dialog you've created, you need to give it data-entry fields. These fields are made up of various kinds of Turbo Vision controls. Controls are the specialized views that enable users to enter or manipulate data in a dialog box, such as buttons, check boxes, and input lines.
+
+Adding a control to a dialog takes these steps:
+
+1. Creating shared data storage (for input fields)
+2. Setting the boundaries of the control
+3. Creating the control object
+4. Adding the control to the dialog
+
+Before you actually create the controls, you need to consider how data flows in and out of them. In the Rust implementation, **data is shared between the dialog and your application using `Rc<RefCell<T>>`**. This is different from the original Pascal implementation which used `SetData` and `GetData` methods.
+
+Here's how to create a complete order dialog with various controls:
+
+```rust
+use std::rc::Rc;
+use std::cell::RefCell;
 use turbo_vision::views::input_line::InputLine;
 use turbo_vision::views::label::Label;
 use turbo_vision::views::button::Button;
-use turbo_vision::views::checkbox::Checkbox;
+use turbo_vision::views::checkbox::CheckBox;
 use turbo_vision::views::radiobutton::RadioButton;
-use turbo_vision::views::view::View;
-use turbo_vision::terminal::Terminal;
-use std::rc::Rc;
-use std::cell::RefCell;
+use turbo_vision::views::static_text::StaticText;
 
-// Custom commands for this dialog
-pub const CMD_ORDER_SAVE: u16 = 3001;
-pub const CMD_ORDER_CANCEL: u16 = 3002;
-
-pub struct OrderDialog {
-    dialog: Dialog,
-    // Shared data for controls
+// Data storage for the order dialog
+struct OrderData {
     order_num: Rc<RefCell<String>>,
-    customer: Rc<RefCell<String>>,
-    product: Rc<RefCell<String>>,
+    order_date: Rc<RefCell<String>>,
+    stock_num: Rc<RefCell<String>>,
     quantity: Rc<RefCell<String>>,
-    payment_method: Rc<RefCell<u16>>,  // 0=Cash, 1=Check, 2=Card
-    received: Rc<RefCell<bool>>,
+    payment_method: Vec<RadioButton>,
+    received: CheckBox,
 }
 
-impl OrderDialog {
-    pub fn new() -> Self {
-        // Create dialog centered on screen
-        let bounds = Rect::new(10, 5, 70, 20);
-        let mut dialog = Dialog::new(bounds, "Order Entry");
-
-        // Shared data cells
-        let order_num = Rc::new(RefCell::new(String::new()));
-        let customer = Rc::new(RefCell::new(String::new()));
-        let product = Rc::new(RefCell::new(String::new()));
-        let quantity = Rc::new(RefCell::new(String::new()));
-        let payment_method = Rc::new(RefCell::new(0u16));
-        let received = Rc::new(RefCell::new(false));
-
-        let mut y = 2;
-
-        // Order Number field
-        dialog.add(Box::new(Label::new(
-            Rect::new(2, y, 15, y + 1),
-            "~O~rder #:"
-        )));
-        dialog.add(Box::new(InputLine::new(
-            Rect::new(16, y, 28, y + 1),
-            10,
-            order_num.clone()
-        )));
-        y += 2;
-
-        // Customer field
-        dialog.add(Box::new(Label::new(
-            Rect::new(2, y, 15, y + 1),
-            "~C~ustomer:"
-        )));
-        dialog.add(Box::new(InputLine::new(
-            Rect::new(16, y, 56, y + 1),
-            50,
-            customer.clone()
-        )));
-        y += 2;
-
-        // Product field
-        dialog.add(Box::new(Label::new(
-            Rect::new(2, y, 15, y + 1),
-            "~P~roduct:"
-        )));
-        dialog.add(Box::new(InputLine::new(
-            Rect::new(16, y, 56, y + 1),
-            50,
-            product.clone()
-        )));
-        y += 2;
-
-        // Quantity field
-        dialog.add(Box::new(Label::new(
-            Rect::new(2, y, 15, y + 1),
-            "~Q~uantity:"
-        )));
-        dialog.add(Box::new(InputLine::new(
-            Rect::new(16, y, 26, y + 1),
-            10,
-            quantity.clone()
-        )));
-        y += 2;
-
-        // Payment method (radio buttons)
-        dialog.add(Box::new(Label::new(
-            Rect::new(2, y, 20, y + 1),
-            "Payment Method:"
-        )));
-        y += 1;
-
-        let radio1 = RadioButton::new(
-            Rect::new(4, y, 16, y + 1),
-            "~C~ash",
-            0,
-            payment_method.clone()
-        );
-        dialog.add(Box::new(radio1));
-
-        let radio2 = RadioButton::new(
-            Rect::new(17, y, 29, y + 1),
-            "C~h~eck",
-            1,
-            payment_method.clone()
-        );
-        dialog.add(Box::new(radio2));
-
-        let radio3 = RadioButton::new(
-            Rect::new(30, y, 42, y + 1),
-            "Credi~t~ Card",
-            2,
-            payment_method.clone()
-        );
-        dialog.add(Box::new(radio3));
-        y += 2;
-
-        // Received checkbox
-        let checkbox = Checkbox::new(
-            Rect::new(4, y, 20, y + 1),
-            "~R~eceived",
-            received.clone()
-        );
-        dialog.add(Box::new(checkbox));
-        y += 2;
-
-        // Buttons
-        let save_btn = Button::new(
-            Rect::new(20, y, 30, y + 2),
-            "~S~ave",
-            turbo_vision::core::command::CM_OK,
-            true  // default button
-        );
-        dialog.add(Box::new(save_btn));
-
-        let cancel_btn = Button::new(
-            Rect::new(32, y, 42, y + 2),
-            "~A~bort",
-            turbo_vision::core::command::CM_CANCEL,
-            false
-        );
-        dialog.add(Box::new(cancel_btn));
-
-        Self {
-            dialog,
-            order_num,
-            customer,
-            product,
-            quantity,
-            payment_method,
-            received,
+impl OrderData {
+    fn new() -> Self {
+        OrderData {
+            order_num: Rc::new(RefCell::new(String::new())),
+            order_date: Rc::new(RefCell::new(String::new())),
+            stock_num: Rc::new(RefCell::new(String::new())),
+            quantity: Rc::new(RefCell::new(String::new())),
+            payment_method: Vec::new(),
+            received: CheckBox::new(Rect::new(0, 0, 1, 1), "Placeholder"),
         }
-    }
-
-    /// Set dialog values from an Order struct
-    pub fn set_data(&mut self, order: &Order) {
-        *self.order_num.borrow_mut() = order.order_num.clone();
-        *self.customer.borrow_mut() = order.customer.clone();
-        *self.product.borrow_mut() = order.product.clone();
-        *self.quantity.borrow_mut() = order.quantity.to_string();
-        *self.payment_method.borrow_mut() = order.payment_method;
-        *self.received.borrow_mut() = order.received;
-    }
-
-    /// Get dialog values into an Order struct
-    pub fn get_data(&self) -> Order {
-        Order {
-            order_num: self.order_num.borrow().clone(),
-            customer: self.customer.borrow().clone(),
-            product: self.product.borrow().clone(),
-            quantity: self.quantity.borrow().parse().unwrap_or(0),
-            payment_method: *self.payment_method.borrow(),
-            received: *self.received.borrow(),
-        }
-    }
-
-    /// Execute the dialog (modal)
-    pub fn execute(&mut self, app: &mut turbo_vision::app::Application) -> u16 {
-        self.dialog.execute(app)
     }
 }
 
-// Data structure
-#[derive(Debug, Clone)]
-pub struct Order {
-    pub order_num: String,
-    pub customer: String,
-    pub product: String,
-    pub quantity: u32,
-    pub payment_method: u16,
-    pub received: bool,
-}
+fn create_order_dialog() -> (Dialog, OrderData) {
+    let bounds = Rect::new(0, 0, 60, 17);
+    let mut dialog = Dialog::new(bounds, "Orders");
+    dialog.set_centered(true);
 
-impl Order {
-    pub fn new() -> Self {
-        Self {
-            order_num: String::new(),
-            customer: String::new(),
-            product: String::new(),
-            quantity: 0,
-            payment_method: 0,
-            received: false,
+    let mut data = OrderData::new();
+    let mut y = 2;
+
+    // Order number field
+    let mut r = Rect::new(13, y, 23, y + 1);
+    let order_input = InputLine::new(r, 8, data.order_num.clone());
+    dialog.add(Box::new(order_input));
+
+    r = Rect::new(2, y, 12, y + 1);
+    let label = Label::new(r, "~O~rder #:");
+    dialog.add(Box::new(label));
+
+    // Date field
+    r = Rect::new(43, y, 53, y + 1);
+    let date_input = InputLine::new(r, 8, data.order_date.clone());
+    dialog.add(Box::new(date_input));
+
+    r = Rect::new(26, y, 41, y + 1);
+    let label = Label::new(r, "~D~ate of order:");
+    dialog.add(Box::new(label));
+
+    y += 2;
+
+    // Stock number field
+    r = Rect::new(13, y, 23, y + 1);
+    let stock_input = InputLine::new(r, 8, data.stock_num.clone());
+    dialog.add(Box::new(stock_input));
+
+    r = Rect::new(2, y, 12, y + 1);
+    let label = Label::new(r, "~S~tock #:");
+    dialog.add(Box::new(label));
+
+    // Quantity field
+    r = Rect::new(46, y, 53, y + 1);
+    let qty_input = InputLine::new(r, 5, data.quantity.clone());
+    dialog.add(Box::new(qty_input));
+
+    r = Rect::new(26, y, 44, y + 1);
+    let label = Label::new(r, "~Q~uantity ordered:");
+    dialog.add(Box::new(label));
+
+    y += 2;
+
+    // Payment method label
+    r = Rect::new(2, y, 21, y + 1);
+    let label = Label::new(r, "~P~ayment method:");
+    dialog.add(Box::new(label));
+
+    y += 1;
+
+    // Payment method radio buttons
+    let payment_group = 1; // Group ID for radio buttons
+    let mut x = 3;
+    let payment_options = ["Cash", "Check", "P.O.", "Account"];
+
+    for option in &payment_options {
+        r = Rect::new(x, y, x + option.len() as i32 + 4, y + 1);
+        let radio = RadioButton::new(r, option, payment_group);
+        dialog.add(Box::new(radio));
+        x += option.len() as i32 + 4;
+    }
+
+    y += 2;
+
+    // Received checkbox
+    r = Rect::new(22, y, 37, y + 1);
+    let received = CheckBox::new(r, "~R~eceived");
+    dialog.add(Box::new(received));
+
+    y += 2;
+
+    // Notes label
+    r = Rect::new(2, y, 9, y + 1);
+    let label = Label::new(r, "Notes:");
+    dialog.add(Box::new(label));
+
+    y += 1;
+
+    // Notes field (multi-line text area)
+    // Note: The current implementation doesn't have a Memo control yet,
+    // but you could use a larger InputLine or implement a custom view
+    r = Rect::new(3, y, 57, y + 3);
+    let notes_data = Rc::new(RefCell::new(String::new()));
+    let notes_input = InputLine::new(r, 255, notes_data);
+    dialog.add(Box::new(notes_input));
+
+    y += 4;
+
+    // Buttons at the bottom
+    r = Rect::new(2, y, 12, y + 2);
+    let btn_new = Button::new(r, "  ~N~ew  ", CM_ORDER_NEW, false);
+    dialog.add(Box::new(btn_new));
+
+    r = Rect::new(13, y, 23, y + 2);
+    let btn_save = Button::new(r, "  ~S~ave  ", CM_ORDER_SAVE, true);
+    dialog.add(Box::new(btn_save));
+
+    r = Rect::new(24, y, 34, y + 2);
+    let btn_revert = Button::new(r, " Re~v~ert ", CM_ORDER_CANCEL, false);
+    dialog.add(Box::new(btn_revert));
+
+    r = Rect::new(35, y, 45, y + 2);
+    let btn_next = Button::new(r, "  N~e~xt  ", CM_ORDER_NEXT, false);
+    dialog.add(Box::new(btn_next));
+
+    r = Rect::new(46, y, 56, y + 2);
+    let btn_prev = Button::new(r, "  ~P~rev  ", CM_ORDER_PREV, false);
+    dialog.add(Box::new(btn_prev));
+
+    // Set initial focus to first input field
+    dialog.set_initial_focus();
+
+    (dialog, data)
+}
+```
+
+**Important Notes**:
+
+1. **Tab Order**: The order in which you add controls is very important, because it determines the tab order for the dialog box. Tab order indicates where the input focus goes when the user presses Tab.
+
+2. **Shared Data**: Input fields use `Rc<RefCell<String>>` to share data between the dialog and your application. This allows you to read and write values even while the dialog is displayed.
+
+3. **Labels and Accelerators**: Labels can include accelerator keys (marked with `~`). When the user presses Alt+key, focus moves to the associated control.
+
+4. **Buttons**: The fourth parameter to `Button::new()` indicates whether it's the default button (activated by pressing Enter).
+
+If you run the application now, you'll find that you have a fully functional data entry dialog. You can type data into the input lines, manipulate the radio buttons and checkboxes, and use Tab to move between fields.
+
+**See Also**: For complete working examples, see:
+- `examples/dialog_example.rs` — Basic dialog creation
+- `examples/validator_demo.rs` — Dialog with all control types
+- `src/views/dialog.rs` — Dialog implementation details
+
+---
+
+## Step 9: Setting and Reading Control Values
+
+Now that you have a data-entry dialog, you need to be able to set initial values for the controls and read the data when the user makes changes. You've created the user interface, so now you need to manage the data flow. This step covers:
+
+- Understanding data sharing with Rc<RefCell<T>>
+- Setting initial values
+- Reading values from controls
+- Responding to button commands
+
+### Understanding Data Sharing: Rc<RefCell<T>> Pattern
+
+**Architectural Difference**: The original Pascal Turbo Vision used `SetData` and `GetData` methods to transfer data between a dialog and a record structure. The Rust implementation uses a different, more idiomatic approach: **shared ownership through `Rc<RefCell<T>>`**.
+
+Here's how it works:
+
+1. **Create shared data** wrapped in `Rc<RefCell<T>>`
+2. **Clone the `Rc`** when creating controls (this creates a new reference, not a copy of the data)
+3. **Read data** using `data.borrow()`
+4. **Write data** using `data.borrow_mut()`
+5. **Data is live** — changes are visible immediately to all holders of the `Rc`
+
+This pattern is more powerful than `SetData`/`GetData` because:
+- No explicit transfer needed — data is always synchronized
+- Multiple views can share the same data
+- Compile-time borrow checking prevents data races
+- Zero-cost abstraction (no runtime overhead)
+
+### Setting Initial Values
+
+To set initial values for controls, you simply modify the shared data before or after creating the dialog:
+
+```rust
+fn open_order_window_with_data(app: &mut Application) {
+    let (mut dialog, data) = create_order_dialog();
+
+    // Set initial values by modifying the shared data
+    *data.order_num.borrow_mut() = String::from("42");
+    *data.stock_num.borrow_mut() = String::from("AAA-9999");
+    *data.order_date.borrow_mut() = String::from("01/15/61");
+    *data.quantity.borrow_mut() = String::from("1");
+
+    // Set checkbox state (if you stored a reference)
+    // data.received.set_checked(false);
+
+    // Add dialog to desktop
+    app.desktop.add(Box::new(dialog));
+}
+```
+
+Because the `InputLine` controls share references to the same `Rc<RefCell<String>>` objects, they'll automatically display these values when the dialog appears.
+
+### Reading Control Values
+
+Reading values is equally straightforward — you can access the shared data at any time:
+
+```rust
+fn save_order_data(data: &OrderData) {
+    // Read current values from the shared data
+    let order_num = data.order_num.borrow().clone();
+    let stock_num = data.stock_num.borrow().clone();
+    let order_date = data.order_date.borrow().clone();
+    let quantity = data.quantity.borrow().clone();
+
+    // Get checkbox state
+    let received = data.received.is_checked();
+
+    // Save to database, file, etc.
+    println!("Saving order #{}", order_num);
+    println!("  Stock: {}", stock_num);
+    println!("  Date: {}", order_date);
+    println!("  Quantity: {}", quantity);
+    println!("  Received: {}", received);
+}
+```
+
+### Responding to Button Commands
+
+In a non-modal dialog (one that's added to the desktop rather than executed with `execute()`), you need to handle button commands in your main event loop:
+
+```rust
+// In your main event loop
+if event.what == EventType::Command {
+    match event.command {
+        CM_ORDER_SAVE => {
+            save_order_data(&order_data);
+            event.clear();
         }
+        CM_ORDER_NEW => {
+            clear_order_data(&order_data);
+            event.clear();
+        }
+        CM_ORDER_CANCEL => {
+            revert_order_data(&order_data, &original_values);
+            event.clear();
+        }
+        _ => {}
     }
 }
 ```
 
-### Using the Dialog
+Where helper functions might look like:
 
 ```rust
-// main.rs
-use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_OK, CM_CANCEL};
+fn clear_order_data(data: &OrderData) {
+    *data.order_num.borrow_mut() = String::new();
+    *data.stock_num.borrow_mut() = String::new();
+    *data.order_date.borrow_mut() = String::new();
+    *data.quantity.borrow_mut() = String::new();
+}
 
-mod order_dialog;
-use order_dialog::{OrderDialog, Order};
+fn revert_order_data(data: &OrderData, original: &OrderData) {
+    *data.order_num.borrow_mut() = original.order_num.borrow().clone();
+    *data.stock_num.borrow_mut() = original.stock_num.borrow().clone();
+    *data.order_date.borrow_mut() = original.order_date.borrow().clone();
+    *data.quantity.borrow_mut() = original.quantity.borrow().clone();
+}
+```
 
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
+### Modal Dialogs vs. Non-Modal Dialogs
 
-    // Create dialog with initial data
-    let mut dialog = OrderDialog::new();
-    let mut order = Order::new();
-    order.customer = "Acme Corp".to_string();
-    order.product = "Widget".to_string();
-    order.quantity = 100;
+If you're using a **modal dialog** (one that runs its own event loop via `dialog.execute()`), the pattern is slightly different:
 
-    dialog.set_data(&order);
+```rust
+fn get_order_info(app: &mut Application) -> Option<OrderData> {
+    let (mut dialog, data) = create_order_dialog();
 
-    // Execute dialog (modal - blocks until closed)
-    let result = dialog.execute(&mut app);
+    // Set initial values
+    *data.order_num.borrow_mut() = String::from("42");
 
-    if result == CM_OK {
-        // User clicked Save - get the data
-        let order = dialog.get_data();
-        println!("Order saved: {:?}", order);
+    // Execute the dialog modally
+    let result = dialog.execute(app);
+
+    // Check if user clicked OK/Save
+    if result == CM_ORDER_SAVE {
+        // Return the data
+        Some(data)
     } else {
-        println!("Order cancelled");
+        // User cancelled
+        None
     }
-
-    Ok(())
 }
 ```
 
----
+In this pattern, `execute()` runs until the user clicks a button, then returns the command ID. You can then decide what to do based on which button was clicked.
 
-## Step 2: Understanding Shared State with Rc<RefCell<T>>
+**Key Differences**:
+- **Modal**: Blocks until closed, returns command ID
+- **Non-modal**: Runs alongside other windows, commands handled in main loop
 
-Rust's ownership system requires careful handling of shared mutable state in dialogs.
-
-### The Pattern
-
-```rust
-// Create shared data
-let name_data = Rc::new(RefCell::new(String::new()));
-
-// Share with input line
-let input = InputLine::new(bounds, 50, name_data.clone());
-dialog.add(Box::new(input));
-
-// Later, read the value
-let value = name_data.borrow().clone();
-
-// Or modify it
-*name_data.borrow_mut() = "New value".to_string();
-```
-
-### Why Rc<RefCell<T>>?
-
-- **Rc** - Reference counting allows multiple owners
-- **RefCell** - Enables interior mutability (mutation through shared reference)
-- **Together** - Multiple controls can share the same data
-
-### Comparison with Pascal
-
-| Pascal | Rust |
-|--------|------|
-| `TInputLine` stores string directly | `InputLine` uses `Rc<RefCell<String>>` |
-| `GetData()`/`SetData()` with records | Direct access to shared data |
-| Pointer-based sharing | Reference-counted sharing |
-| Manual memory management | Automatic cleanup |
+**See Also**:
+- `examples/dialog_example.rs` — Modal dialog execution
+- `examples/validator_demo.rs` — Complete data sharing example (lines 68-267)
 
 ---
 
-## Step 3: Adding Validators
+## Step 10: Validating Data Entry
 
-Validators ensure users enter correct data before the dialog closes.
+Now that you have a working data-entry dialog where you can display, enter, and change data, you can address the issue of validating that data. Validating is the process of assuring that a field contains correct data. Turbo Vision gives you the ability to validate individual fields or entire screens of data.
 
-### Built-in Validators
+In general, you need to validate only input line controls—they are the only controls that allow free-form input.
 
-The Rust implementation provides three main validators:
+Validating a data field takes only two steps:
 
-1. **FilterValidator** - Allow only specific characters
-2. **RangeValidator** - Numeric range validation
-3. **PictureValidator** - Format mask validation
+- Assigning validator objects
+- Calling validation methods
 
-### Example: Filter Validator
+### Assigning Validator Objects
+
+The Rust implementation provides validator objects in `src/views/validator.rs` and `src/views/picture_validator.rs`. Every `InputLine` can have a validator that checks its contents against criteria such as a numeric range, a list of allowed characters, or a "picture" format.
+
+There are three main types of validators:
+
+1. **FilterValidator** — Restricts input to allowed characters
+2. **RangeValidator** — Validates numeric ranges
+3. **PictureValidator** — Validates against a format template
+
+#### Using FilterValidator
+
+The simplest validator restricts input to a specific set of characters:
 
 ```rust
-use turbo_vision::views::validator::FilterValidator;
-use std::rc::Rc;
-use std::cell::RefCell;
+use turbo_vision::views::validator::{Validator, FilterValidator};
 
-// Only allow digits
+// Create an input line for numeric input only
 let quantity_data = Rc::new(RefCell::new(String::new()));
-let quantity_validator = Rc::new(RefCell::new(
-    FilterValidator::new("0123456789")
-));
-
 let mut quantity_input = InputLine::new(
-    Rect::new(16, y, 26, y + 1),
-    10,
+    Rect::new(46, 4, 53, 5),
+    5,
     quantity_data.clone()
 );
-quantity_input.set_validator(quantity_validator);
+
+// Only allow digits
+let validator = FilterValidator::new("0123456789");
+quantity_input.set_validator(Box::new(validator));
 
 dialog.add(Box::new(quantity_input));
 ```
 
-### Example: Range Validator
+Now the quantity field will only accept numeric digits.
+
+#### Using RangeValidator
+
+For numeric fields with specific ranges:
 
 ```rust
 use turbo_vision::views::validator::RangeValidator;
 
-// Number between 1 and 999
-let quantity_data = Rc::new(RefCell::new(String::from("1")));
-let range_validator = Rc::new(RefCell::new(
-    RangeValidator::new(1, 999)
-));
+// Order number must be between 1 and 99999
+let order_data = Rc::new(RefCell::new(String::new()));
+let mut order_input = InputLine::new(
+    Rect::new(13, 2, 23, 3),
+    8,
+    order_data.clone()
+);
 
-let mut input = InputLine::with_validator(
-    bounds,
+let validator = RangeValidator::new(1, 99999);
+order_input.set_validator(Box::new(validator));
+
+dialog.add(Box::new(order_input));
+```
+
+The `RangeValidator` will:
+- Allow only numeric input during typing
+- Check that the final value is within range
+- Support decimal, hexadecimal (0x prefix), and octal (0 prefix) formats
+
+#### Using PictureValidator
+
+For fields that must match a specific format (like dates or product codes):
+
+```rust
+use turbo_vision::views::picture_validator::PictureValidator;
+
+// Date field: MM/DD/YY or MM/DD/YYYY
+let date_data = Rc::new(RefCell::new(String::new()));
+let mut date_input = InputLine::new(
+    Rect::new(43, 2, 53, 3),
     10,
-    quantity_data.clone(),
-    range_validator
+    date_data.clone()
 );
 
-dialog.add(Box::new(input));
-```
+// Picture: # = digit, {} = optional
+let validator = PictureValidator::new("##/##/{##}##");
+date_input.set_validator(Box::new(validator));
 
-### Example: Picture Validator
+dialog.add(Box::new(date_input));
 
-```rust
-use turbo_vision::views::picture_validator::PictureValidator;
-
-// Phone number format: (###) ###-####
-let phone_data = Rc::new(RefCell::new(String::new()));
-let phone_validator = Rc::new(RefCell::new(
-    PictureValidator::new("(###) ###-####")
-));
-
-let mut phone_input = InputLine::with_validator(
-    bounds,
-    15,
-    phone_data.clone(),
-    phone_validator
+// Stock number field: AAA-9999 (3 letters, dash, 4 digits)
+let stock_data = Rc::new(RefCell::new(String::new()));
+let mut stock_input = InputLine::new(
+    Rect::new(13, 4, 23, 5),
+    8,
+    stock_data.clone()
 );
 
-dialog.add(Box::new(phone_input));
+// @ = letter, # = digit
+let validator = PictureValidator::new("@@@-####");
+stock_input.set_validator(Box::new(validator));
+
+dialog.add(Box::new(stock_input));
 ```
 
-### Picture Validator Patterns
+**Picture Validator Format Characters**:
+- `#` — Requires a digit (0-9)
+- `@` — Requires a letter (A-Z, a-z)
+- `!` — Allows any character
+- `{` `}` — Marks optional section
+- Any other character — Literal (auto-inserted)
 
-| Pattern | Meaning | Example |
-|---------|---------|---------|
-| `#` | Digit (0-9) | `###` → `"123"` |
-| `@` | Letter (A-Z, a-z) | `@@@@` → `"ABCD"` |
-| `!` | Letter (uppercase) | `!!!` → `"ABC"` |
-| `&` | Any character | `&&&` → `"A1$"` |
-| Literal | Must match exactly | `(###) ###-####` |
+The picture validator will:
+- Auto-insert literal characters (like `/` and `-`)
+- Only allow valid characters in each position
+- Validate the complete format when the user finishes editing
 
-Common patterns:
-- Phone: `"(###) ###-####"` → `"(555) 123-4567"`
-- Date: `"##/##/####"` → `"12/25/2025"`
-- SSN: `"###-##-####"` → `"123-45-6789"`
-- Product code: `"@@@@-####"` → `"ABCD-1234"`
+### Complete Example with Validators
 
----
-
-## Complete Example: Order Entry System
-
-Here's a complete, working order entry system with validation:
+Here's a complete order dialog with all validators applied:
 
 ```rust
-// complete_order_system.rs
-use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_OK, CM_CANCEL, CM_QUIT};
-use turbo_vision::core::event::{EventType, KB_ALT_X, KB_F2};
-use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::status_line::{StatusLine, StatusItem};
-use turbo_vision::views::dialog::Dialog;
-use turbo_vision::views::input_line::InputLine;
-use turbo_vision::views::label::Label;
-use turbo_vision::views::button::Button;
-use turbo_vision::views::checkbox::Checkbox;
-use turbo_vision::views::radiobutton::RadioButton;
-use turbo_vision::views::static_text::StaticText;
-use turbo_vision::views::validator::{FilterValidator, RangeValidator};
-use turbo_vision::views::picture_validator::PictureValidator;
-use turbo_vision::views::msgbox::{message_box_ok, confirmation_box};
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::time::Duration;
+fn create_validated_order_dialog() -> (Dialog, OrderData) {
+    let bounds = Rect::new(0, 0, 60, 17);
+    let mut dialog = Dialog::new(bounds, "Orders");
+    dialog.set_centered(true);
 
-// Commands
-const CMD_NEW_ORDER: u16 = 3001;
-const CMD_EDIT_ORDER: u16 = 3002;
+    let mut data = OrderData::new();
+    let mut y = 2;
 
-#[derive(Debug, Clone)]
-struct Order {
-    order_num: String,
-    date: String,
-    customer: String,
-    product: String,
-    quantity: String,
-    price: String,
-    payment_method: u16,
-    received: bool,
+    // Order number: 1-99999
+    let mut r = Rect::new(13, y, 23, y + 1);
+    let mut order_input = InputLine::new(r, 8, data.order_num.clone());
+    order_input.set_validator(Box::new(RangeValidator::new(1, 99999)));
+    dialog.add(Box::new(order_input));
+
+    r = Rect::new(2, y, 12, y + 1);
+    dialog.add(Box::new(Label::new(r, "~O~rder #:")));
+
+    // Date: MM/DD/YY or MM/DD/YYYY
+    r = Rect::new(43, y, 53, y + 1);
+    let mut date_input = InputLine::new(r, 10, data.order_date.clone());
+    date_input.set_validator(Box::new(PictureValidator::new("##/##/{##}##")));
+    dialog.add(Box::new(date_input));
+
+    r = Rect::new(26, y, 41, y + 1);
+    dialog.add(Box::new(Label::new(r, "~D~ate:")));
+
+    y += 2;
+
+    // Stock number: AAA-9999
+    r = Rect::new(13, y, 23, y + 1);
+    let mut stock_input = InputLine::new(r, 8, data.stock_num.clone());
+    stock_input.set_validator(Box::new(PictureValidator::new("@@@-####")));
+    dialog.add(Box::new(stock_input));
+
+    r = Rect::new(2, y, 12, y + 1);
+    dialog.add(Box::new(Label::new(r, "~S~tock #:")));
+
+    // Quantity: 1-99999
+    r = Rect::new(46, y, 53, y + 1);
+    let mut qty_input = InputLine::new(r, 5, data.quantity.clone());
+    qty_input.set_validator(Box::new(RangeValidator::new(1, 99999)));
+    dialog.add(Box::new(qty_input));
+
+    r = Rect::new(26, y, 44, y + 1);
+    dialog.add(Box::new(Label::new(r, "~Q~uantity:")));
+
+    // ... rest of dialog controls ...
+
+    dialog.set_initial_focus();
+    (dialog, data)
 }
+```
 
-impl Order {
-    fn new() -> Self {
-        Self {
-            order_num: String::new(),
-            date: String::new(),
-            customer: String::new(),
-            product: String::new(),
-            quantity: String::from("1"),
-            price: String::from("0.00"),
-            payment_method: 0,
-            received: false,
-        }
+### When Validation Occurs
+
+Validation can occur at different times:
+
+1. **During typing** — `is_valid_input()` checks each keystroke
+2. **When focus changes** — Can validate when Tab is pressed
+3. **On demand** — Explicitly call validation before saving
+
+#### Validation During Typing
+
+Validators automatically restrict input as the user types. For example:
+- `FilterValidator` only allows specified characters
+- `RangeValidator` only allows digits (and 0x/0 prefixes)
+- `PictureValidator` only allows valid characters for each position
+
+#### Validation When Focus Changes
+
+You can force validation when the user tabs out of a field by setting a flag (this feature may need to be implemented in your custom dialog):
+
+```rust
+// Pseudocode - implementation depends on your event handling
+if moving_to_next_field {
+    if !input.validate() {
+        // Stay on this field
+        keep_focus();
     }
 }
+```
 
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
+**Note**: Use this sparingly, as it can be intrusive. Only force validation on tab when entering invalid data would waste the user's time.
 
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
+#### Validation on Demand
 
-    let status_line = create_status_line(height, width);
-    app.set_status_line(status_line);
+The most useful approach is to validate before saving:
 
-    let mut current_order = Order::new();
-
-    app.running = true;
-    while app.running {
-        // Draw
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
-        }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
-        }
-        let _ = app.terminal.flush();
-
-        // Handle events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // PreProcess
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
-
-            // Menu bar
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Desktop
-            app.desktop.handle_event(&mut event);
-
-            // Commands
-            if event.what == EventType::Command {
-                match event.command {
-                    CM_QUIT => {
-                        app.running = false;
-                    }
-                    CMD_NEW_ORDER => {
-                        current_order = Order::new();
-                        if let Some(order) = show_order_dialog(&mut app, &current_order) {
-                            current_order = order;
-                            message_box_ok(&mut app, "Success", "Order created!");
-                        }
-                    }
-                    CMD_EDIT_ORDER => {
-                        if let Some(order) = show_order_dialog(&mut app, &current_order) {
-                            current_order = order;
-                            message_box_ok(&mut app, "Success", "Order updated!");
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+```rust
+fn save_order_data(data: &OrderData) -> Result<(), String> {
+    // Validate all fields before saving
+    let order_num = data.order_num.borrow();
+    if order_num.is_empty() {
+        return Err("Order number is required".to_string());
     }
 
+    if let Ok(num) = order_num.parse::<i32>() {
+        if num < 1 || num > 99999 {
+            return Err("Order number must be between 1 and 99999".to_string());
+        }
+    } else {
+        return Err("Order number must be numeric".to_string());
+    }
+
+    // Validate other fields...
+
+    // All valid, proceed with save
+    println!("Saving order #{}", order_num);
     Ok(())
 }
 
-fn show_order_dialog(app: &mut Application, initial_data: &Order) -> Option<Order> {
-    let mut dialog = Dialog::new(Rect::new(5, 3, 75, 22), "Order Entry");
-
-    // Title
-    let title = StaticText::new_centered(
-        Rect::new(2, 1, 68, 2),
-        "Enter Order Information"
-    );
-    dialog.add(Box::new(title));
-
-    let mut y = 3;
-
-    // Order Number (digits only, range 1-99999)
-    dialog.add(Box::new(Label::new(
-        Rect::new(2, y, 15, y + 1),
-        "~O~rder #:"
-    )));
-    let order_num_data = Rc::new(RefCell::new(initial_data.order_num.clone()));
-    let order_num_validator = Rc::new(RefCell::new(RangeValidator::new(1, 99999)));
-    let order_num_input = InputLine::with_validator(
-        Rect::new(16, y, 26, y + 1),
-        10,
-        order_num_data.clone(),
-        order_num_validator
-    );
-    dialog.add(Box::new(order_num_input));
-
-    // Date (picture validator MM/DD/YYYY)
-    dialog.add(Box::new(Label::new(
-        Rect::new(35, y, 45, y + 1),
-        "~D~ate:"
-    )));
-    let date_data = Rc::new(RefCell::new(initial_data.date.clone()));
-    let date_validator = Rc::new(RefCell::new(PictureValidator::new("##/##/####")));
-    let date_input = InputLine::with_validator(
-        Rect::new(46, y, 58, y + 1),
-        10,
-        date_data.clone(),
-        date_validator
-    );
-    dialog.add(Box::new(date_input));
-    y += 2;
-
-    // Customer (no validation)
-    dialog.add(Box::new(Label::new(
-        Rect::new(2, y, 15, y + 1),
-        "~C~ustomer:"
-    )));
-    let customer_data = Rc::new(RefCell::new(initial_data.customer.clone()));
-    let customer_input = InputLine::new(
-        Rect::new(16, y, 66, y + 1),
-        50,
-        customer_data.clone()
-    );
-    dialog.add(Box::new(customer_input));
-    y += 2;
-
-    // Product (no validation)
-    dialog.add(Box::new(Label::new(
-        Rect::new(2, y, 15, y + 1),
-        "~P~roduct:"
-    )));
-    let product_data = Rc::new(RefCell::new(initial_data.product.clone()));
-    let product_input = InputLine::new(
-        Rect::new(16, y, 66, y + 1),
-        50,
-        product_data.clone()
-    );
-    dialog.add(Box::new(product_input));
-    y += 2;
-
-    // Quantity (range 1-9999)
-    dialog.add(Box::new(Label::new(
-        Rect::new(2, y, 15, y + 1),
-        "~Q~uantity:"
-    )));
-    let quantity_data = Rc::new(RefCell::new(initial_data.quantity.clone()));
-    let quantity_validator = Rc::new(RefCell::new(RangeValidator::new(1, 9999)));
-    let quantity_input = InputLine::with_validator(
-        Rect::new(16, y, 26, y + 1),
-        10,
-        quantity_data.clone(),
-        quantity_validator
-    );
-    dialog.add(Box::new(quantity_input));
-
-    // Price (digits and decimal point)
-    dialog.add(Box::new(Label::new(
-        Rect::new(35, y, 45, y + 1),
-        "P~r~ice:"
-    )));
-    let price_data = Rc::new(RefCell::new(initial_data.price.clone()));
-    let price_validator = Rc::new(RefCell::new(FilterValidator::new("0123456789.")));
-    let price_input = InputLine::with_validator(
-        Rect::new(46, y, 58, y + 1),
-        10,
-        price_data.clone(),
-        price_validator
-    );
-    dialog.add(Box::new(price_input));
-    y += 2;
-
-    // Payment method (radio buttons)
-    dialog.add(Box::new(Label::new(
-        Rect::new(2, y, 20, y + 1),
-        "Payment ~M~ethod:"
-    )));
-    y += 1;
-
-    let payment_method = Rc::new(RefCell::new(initial_data.payment_method));
-
-    let cash_radio = RadioButton::new(
-        Rect::new(4, y, 16, y + 1),
-        "C~a~sh",
-        0,
-        payment_method.clone()
-    );
-    dialog.add(Box::new(cash_radio));
-
-    let check_radio = RadioButton::new(
-        Rect::new(17, y, 29, y + 1),
-        "C~h~eck",
-        1,
-        payment_method.clone()
-    );
-    dialog.add(Box::new(check_radio));
-
-    let card_radio = RadioButton::new(
-        Rect::new(30, y, 50, y + 1),
-        "Credit Car~d~",
-        2,
-        payment_method.clone()
-    );
-    dialog.add(Box::new(card_radio));
-    y += 2;
-
-    // Received checkbox
-    let received = Rc::new(RefCell::new(initial_data.received));
-    let received_checkbox = Checkbox::new(
-        Rect::new(4, y, 20, y + 1),
-        "~R~eceived",
-        received.clone()
-    );
-    dialog.add(Box::new(received_checkbox));
-    y += 2;
-
-    // Buttons
-    let save_btn = Button::new(
-        Rect::new(24, y, 34, y + 2),
-        "~S~ave",
-        CM_OK,
-        true
-    );
-    dialog.add(Box::new(save_btn));
-
-    let cancel_btn = Button::new(
-        Rect::new(36, y, 46, y + 2),
-        "~A~bort",
-        CM_CANCEL,
-        false
-    );
-    dialog.add(Box::new(cancel_btn));
-
-    // Execute dialog
-    let result = dialog.execute(app);
-
-    if result == CM_OK {
-        // Collect data
-        Some(Order {
-            order_num: order_num_data.borrow().clone(),
-            date: date_data.borrow().clone(),
-            customer: customer_data.borrow().clone(),
-            product: product_data.borrow().clone(),
-            quantity: quantity_data.borrow().clone(),
-            price: price_data.borrow().clone(),
-            payment_method: *payment_method.borrow(),
-            received: *received.borrow(),
-        })
-    } else {
-        None
+// In event handler
+CM_ORDER_SAVE => {
+    match save_order_data(&order_data) {
+        Ok(()) => {
+            // Show success message
+            show_message_box(&mut app, "Order saved successfully");
+        }
+        Err(msg) => {
+            // Show error message
+            show_error_box(&mut app, &msg);
+        }
     }
-}
-
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
-
-    let file_items = vec![
-        MenuItem::with_shortcut("~N~ew Order", CMD_NEW_ORDER, 0, "", 0),
-        MenuItem::with_shortcut("~E~dit Order", CMD_EDIT_ORDER, 0, "", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    menu_bar.add_submenu(SubMenu::new("~F~ile", Menu::from_items(file_items)));
-
-    menu_bar
-}
-
-fn create_status_line(height: u16, width: u16) -> StatusLine {
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        vec![
-            StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-            StatusItem::new("~F2~ New", KB_F2, CMD_NEW_ORDER),
-        ],
-    )
+    event.clear();
 }
 ```
 
----
+### Displaying Validation Errors
 
-## Best Practices
+When validation fails, you should inform the user. The Rust implementation provides message box functions:
 
-### 1. Data Management
-
-**Use Rc<RefCell<T>> for shared state:**
 ```rust
-// Good - shared state
-let name = Rc::new(RefCell::new(String::new()));
-let input = InputLine::new(bounds, 50, name.clone());
+use turbo_vision::views::dialogs::{message_box, MessageBoxKind};
 
-// Later access
-let value = name.borrow().clone();
-```
-
-### 2. Validation
-
-**Validate early and clearly:**
-```rust
-// Attach validators to input lines
-input.set_validator(Rc::new(RefCell::new(
-    RangeValidator::new(1, 100)
-)));
-
-// Check validation before processing
-if !input.validate() {
-    message_box_error(app, "Invalid input!");
-    return;
+fn show_error_box(app: &mut Application, message: &str) {
+    message_box(
+        app,
+        "Validation Error",
+        message,
+        MessageBoxKind::Error
+    );
 }
 ```
 
-### 3. Tab Order
+You can also create a custom validation error dialog that highlights the problematic field and provides specific guidance.
 
-**Add controls in the order users should tab through them:**
-```rust
-dialog.add(Box::new(name_input));      // Tab 1
-dialog.add(Box::new(address_input));   // Tab 2
-dialog.add(Box::new(city_input));      // Tab 3
-dialog.add(Box::new(ok_button));       // Tab 4
-dialog.add(Box::new(cancel_button));   // Tab 5
-```
+### Validator Examples
 
-### 4. Default Buttons
+For complete, working examples of all validator types, see:
+- **`examples/validator_demo.rs`** — Comprehensive demonstration showing:
+  - FilterValidator for phone numbers and product codes
+  - RangeValidator for age and price fields
+  - PictureValidator for dates, times, and formatted codes
+  - How to handle validation errors
+  - Modal dialog data flow with shared state
 
-**Mark the primary action as default:**
-```rust
-let save_btn = Button::new(
-    bounds,
-    "~S~ave",
-    CM_OK,
-    true  // This is the default button (activated by Enter)
-);
-```
-
-### 5. Labels
-
-**Always link labels to their controls:**
-```rust
-// Bad - no association
-dialog.add(Box::new(Label::new(bounds, "Name:")));
-
-// Good - implicit association through positioning
-// (Current implementation uses position-based association)
-```
+This example (lines 68-267) is the definitive reference for implementing validated data-entry dialogs in the Rust implementation.
 
 ---
 
 ## Summary
 
-In this chapter, you learned:
+You've now created a complete data-entry interface with proper validation. The techniques you've learned here form the foundation for building sophisticated user interfaces in Turbo Vision applications:
 
-### Dialog Creation:
-- Creating custom dialog boxes
-- Adding controls (InputLine, Label, Button, Checkbox, RadioButton)
-- Modal vs. modeless dialogs
-- Dialog lifecycle and execution
+**Key Concepts Covered**:
 
-### Data Management:
-- Using `Rc<RefCell<T>>` for shared state
-- Setting initial values
-- Reading values after dialog closes
-- Passing data structs in and out
+1. **Dialog Creation** — Using `Dialog::new()` and adding controls
+2. **Data Sharing** — Using `Rc<RefCell<T>>` for bidirectional data flow
+3. **Control Types** — InputLine, Button, CheckBox, RadioButton, Label
+4. **Validation** — FilterValidator, RangeValidator, PictureValidator
+5. **Event Handling** — Responding to button commands and user input
 
-### Validation:
-- FilterValidator for character filtering
-- RangeValidator for numeric ranges
-- PictureValidator for format masks
-- Attaching validators to input lines
+**Architectural Differences from Pascal**:
 
-### Best Practices:
-- Proper tab order
-- Default buttons
-- Clear labeling
-- Early validation
-- Error handling
+| Pascal Pattern | Rust Pattern |
+|----------------|--------------|
+| `TOrderWindow = object(TDialog)` | `Dialog` struct (composition) |
+| `SetData(OrderInfo)` | `Rc<RefCell<T>>` shared data |
+| `GetData(OrderInfo)` | Direct access via `borrow()` |
+| `Message(Desktop, evBroadcast, ...)` | Direct desktop child iteration |
+| Type registration for streaming | No built-in persistence |
 
----
+The Rust implementation emphasizes:
+- **Type safety** through compile-time checking
+- **Shared ownership** instead of explicit data transfer
+- **Composition** over inheritance
+- **Explicit state management** rather than implicit streaming
 
-## See Also
-
-- **Chapter 5** - Managing Data Collections (CRUD operations)
-- **examples/validator_demo.rs** - All validator types
-- **examples/dialogs_demo.rs** - Standard dialog examples
-- **src/views/input_line.rs** - InputLine implementation
-- **src/views/validator.rs** - Validator trait and implementations
-- **src/views/picture_validator.rs** - Picture mask patterns
-
----
-
-## Next Steps
-
-Build on these concepts to create:
-- Multi-page dialogs with tab controls
-- Complex validation rules
-- Lookup validators (database-backed)
-- Custom control types
-- Wizard-style interfaces
+These patterns provide the same functionality as the Pascal original while leveraging Rust's modern language features for safety and performance.

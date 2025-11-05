@@ -1,517 +1,685 @@
-# Chapter 5 — Managing Data Collections (Rust Edition)
+# Chapter 6: Managing Data Collections
 
-**Version:** 0.2.11
-**Updated:** 2025-11-04
+Now that you have a working data-entry window, it makes sense to connect it with a database. Keep in mind that this example is intended to teach you about Turbo Vision, not about database management or inventory control. Some aspects of the program are necessarily simplified to allow you to focus on Turbo Vision without too much attention to the underlying database.
 
-Now that you understand how to create windows, dialogs, and data entry forms, it's time to connect them with real data. This chapter shows how to manage collections of data records and create custom views to display information.
+To connect your data-entry window with the database, you'll do the following:
 
-In this chapter, you'll learn:
+- Manage a collection of data records
+- Display, modify, change and add records
+- Enable and disable commands as appropriate
+- Create a customized view
 
-- Managing collections of data in Rust
-- Loading and saving data with serde
-- Navigating through records (next/previous)
-- Adding and canceling record edits
-- Creating custom views from scratch
-- Implementing the View trait
+## Step 11: Managing Collections of Data
 
----
+**Progress:** Step 1 → Step 2 → Step 3 → Step 4 → Step 5 → Step 6 → Step 7 → Step 8 → Step 9 → Step 10 → **Step 11: Collections** → Step 12
 
-## Understanding Pascal's Collections
+Rust provides powerful collection types that handle data management efficiently. The standard `Vec<T>` type serves as the primary collection mechanism, offering type-safe, growable arrays with excellent performance characteristics.
 
-Before diving into Rust solutions, let's understand what Pascal's `TCollection` provided.
+In this step, you'll do the following:
 
-### Pascal's TCollection
+- Create data structures
+- Load data from files or initialize collections
+- Display data records
+- Move from record to record
+- Add new records
+- Cancel edits
 
-In Borland Pascal, `TCollection` was a dynamic array of object pointers:
+### Understanding Collections in Turbo Vision Rust
 
-```pascal
-type
-  PCollection = ^TCollection;
-  TCollection = object (TObject)
-    Items: PItemList;      { array of pointers }
-    Count: Integer;         { number of items }
-    Limit: Integer;         { array capacity }
+The original Pascal Turbo Vision used `TCollection`, a specialized object-oriented collection type with stream persistence. The Rust implementation uses standard Rust collections, primarily `Vec<T>`, which provides:
 
-    function At(Index: Integer): Pointer;
-    procedure Insert(Item: Pointer);
-    procedure Delete(Item: Pointer);
-  end;
-```
+- **Type Safety**: Collections are strongly typed at compile time
+- **Memory Safety**: Rust's ownership system prevents common collection bugs
+- **Performance**: Zero-cost abstractions with efficient memory layouts
+- **Iterator Patterns**: Powerful functional-style iteration and transformation
 
-Key features:
-- **Dynamic growth** - Automatically expanded when full
-- **Pointer storage** - Held pointers to any object type
-- **Stream support** - Could save/load entire collections
-- **Type-unsafe** - Required typecasting (`POrderObj(coll.At(i))`)
+Various parts of the codebase demonstrate collection usage:
 
-### Example Pascal Usage
-
-```pascal
-// Create collection
-OrderColl := New(TCollection, Init(10, 10));
-
-// Add items
-OrderColl^.Insert(New(POrderObj, Init));
-
-// Access items (with typecast)
-Order := POrderObj(OrderColl^.At(0))^;
-
-// Save to stream
-OrderFile.Init('ORDERS.DAT', stCreate, 1024);
-OrderFile.Put(OrderColl);
-OrderFile.Done;
-```
-
----
-
-## Rust Approach: Vec<T> and Type Safety
-
-Rust provides built-in collection types that are safer and more ergonomic than Pascal's TCollection.
-
-### Using Vec<T>
-
+**Menu Items** (`src/core/menu_data.rs:178-255`):
 ```rust
-// Type-safe vector of orders
-let mut orders: Vec<Order> = Vec::new();
+pub struct Menu {
+    pub items: Vec<MenuItem>,
+    pub default_index: Option<usize>,
+}
 
-// Add items
-orders.push(Order::new());
+impl Menu {
+    pub fn add(&mut self, item: MenuItem) {
+        self.items.push(item);
+    }
 
-// Access items (no typecast needed!)
-let order = &orders[0];
-
-// Iterator support
-for order in &orders {
-    println!("{}", order.customer);
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
 }
 ```
 
-### Why Vec<T> is Better
+**History Lists** (`src/core/history.rs:27-96`):
+```rust
+pub struct HistoryList {
+    items: Vec<String>,
+    max_items: usize,
+}
 
-| Feature | Pascal TCollection | Rust Vec<T> |
-|---------|-------------------|-------------|
-| Type safety | Typecasts required | Compile-time type checking |
-| Ownership | Manual memory management | Automatic with Drop |
-| Bounds checking | Runtime errors | Panic in debug, undefined in release |
-| Iterator support | Manual loops | Rich iterator API |
-| Serialization | Custom stream code | Serde derives |
+impl HistoryList {
+    pub fn add(&mut self, item: String) {
+        self.items.insert(0, item);  // Most recent first
+        if self.items.len() > self.max_items {
+            self.items.truncate(self.max_items);
+        }
+    }
 
----
+    pub fn get(&self, index: usize) -> Option<&String> {
+        self.items.get(index)
+    }
+}
+```
 
-## Example: Building a Data Management System
+**View Collections** (`src/views/group.rs:10-88`):
+```rust
+pub struct Group {
+    children: Vec<Box<dyn View>>,
+    focused: usize,
+}
 
-Let's build a complete example that manages customer orders, similar to the Pascal tutorial but with modern Rust patterns.
+impl Group {
+    pub fn add(&mut self, view: Box<dyn View>) {
+        self.children.push(view);
+    }
 
-### Step 1: Define the Data Model
+    pub fn child_at(&self, index: usize) -> &dyn View {
+        &*self.children[index]
+    }
+}
+```
+
+### Creating Data Structures
+
+For your order entry system, you need structures to hold order data. Unlike Pascal, which required wrapper objects for stream persistence, Rust lets you define your data types directly:
 
 ```rust
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
+// Order data structure
+#[derive(Clone, Debug)]
 pub struct Order {
-    pub order_id: u32,
     pub customer: String,
-    pub product: String,
+    pub item_number: String,
+    pub item_description: String,
     pub quantity: u32,
-    pub price: f64,
-    pub date: String,
+    pub unit_price: f64,
+    pub total: f64,
 }
 
 impl Order {
     pub fn new() -> Self {
         Self {
-            order_id: 0,
             customer: String::new(),
-            product: String::new(),
+            item_number: String::new(),
+            item_description: String::new(),
             quantity: 0,
-            price: 0.0,
-            date: String::new(),
+            unit_price: 0.0,
+            total: 0.0,
         }
     }
 
-    pub fn total(&self) -> f64 {
-        self.quantity as f64 * self.price
+    pub fn calculate_total(&mut self) {
+        self.total = self.quantity as f64 * self.unit_price;
     }
 }
 
-impl Default for Order {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-```
-
-### Step 2: Create a Data Manager
-
-```rust
-use std::fs;
-use std::io;
-
-pub struct OrderManager {
+// Application state to manage orders
+pub struct OrderDatabase {
     orders: Vec<Order>,
     current_index: usize,
-    data_file: PathBuf,
-    modified: bool,
 }
 
-impl OrderManager {
-    pub fn new(data_file: PathBuf) -> Self {
+impl OrderDatabase {
+    pub fn new() -> Self {
         Self {
             orders: Vec::new(),
             current_index: 0,
-            data_file,
-            modified: false,
         }
     }
 
-    /// Load orders from file
-    pub fn load(&mut self) -> io::Result<()> {
-        if self.data_file.exists() {
-            let json = fs::read_to_string(&self.data_file)?;
-            self.orders = serde_json::from_str(&json)?;
-            self.modified = false;
-        }
-        Ok(())
-    }
-
-    /// Save orders to file
-    pub fn save(&mut self) -> io::Result<()> {
-        let json = serde_json::to_string_pretty(&self.orders)?;
-        fs::write(&self.data_file, json)?;
-        self.modified = false;
-        Ok(())
-    }
-
-    /// Get current order
-    pub fn current(&self) -> Option<&Order> {
+    pub fn current_order(&self) -> Option<&Order> {
         self.orders.get(self.current_index)
     }
 
-    /// Get mutable reference to current order
-    pub fn current_mut(&mut self) -> Option<&mut Order> {
+    pub fn current_order_mut(&mut self) -> Option<&mut Order> {
         self.orders.get_mut(self.current_index)
     }
 
-    /// Move to next order
-    pub fn next(&mut self) -> bool {
-        if self.current_index + 1 < self.orders.len() {
-            self.current_index += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Move to previous order
-    pub fn prev(&mut self) -> bool {
-        if self.current_index > 0 {
-            self.current_index -= 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Add new order
-    pub fn add(&mut self, order: Order) {
+    pub fn add_order(&mut self, order: Order) {
         self.orders.push(order);
-        self.current_index = self.orders.len() - 1;
-        self.modified = true;
     }
 
-    /// Update current order
-    pub fn update_current(&mut self, order: Order) {
-        if let Some(current) = self.current_mut() {
-            *current = order;
-            self.modified = true;
-        }
-    }
-
-    /// Delete current order
-    pub fn delete_current(&mut self) -> Option<Order> {
-        if self.current_index < self.orders.len() {
-            let order = self.orders.remove(self.current_index);
-            if self.current_index >= self.orders.len() && self.current_index > 0 {
-                self.current_index -= 1;
-            }
-            self.modified = true;
-            Some(order)
-        } else {
-            None
-        }
-    }
-
-    /// Get total count
     pub fn count(&self) -> usize {
         self.orders.len()
-    }
-
-    /// Get current index (1-based for display)
-    pub fn current_number(&self) -> usize {
-        self.current_index + 1
-    }
-
-    /// Check if at first record
-    pub fn is_first(&self) -> bool {
-        self.current_index == 0
-    }
-
-    /// Check if at last record
-    pub fn is_last(&self) -> bool {
-        self.current_index + 1 >= self.orders.len()
-    }
-
-    /// Check if modified
-    pub fn is_modified(&self) -> bool {
-        self.modified
     }
 }
 ```
 
-### Step 3: Integrate with Turbo Vision
+**Key Points**:
+- No separate "wrapper object" needed—`Order` is the data structure
+- `#[derive(Clone, Debug)]` provides useful functionality automatically
+- Collections own their data (Rust's ownership system manages memory)
+- Methods provide controlled access to collection contents
 
+### Loading and Initializing the Collection
+
+The Rust implementation doesn't use the stream-based persistence system from the original Pascal version (see Chapter 4 for details on persistence approaches). Instead, you have several options for initializing your data:
+
+**Option 1: In-Memory Initialization**
 ```rust
-// tutorial_10.rs - Data collection management
-use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW};
-use turbo_vision::core::event::EventType;
-use turbo_vision::views::msgbox::message_box_ok;
-use std::time::Duration;
-use std::path::PathBuf;
+fn load_sample_orders() -> OrderDatabase {
+    let mut db = OrderDatabase::new();
 
-// Define custom commands
-const CMD_ORDER_NEXT: u16 = 2001;
-const CMD_ORDER_PREV: u16 = 2002;
-const CMD_ORDER_SAVE: u16 = 2003;
-const CMD_ORDER_NEW: u16 = 2004;
+    db.add_order(Order {
+        customer: "Acme Corp".to_string(),
+        item_number: "WDG-001".to_string(),
+        item_description: "Super Widget".to_string(),
+        quantity: 10,
+        unit_price: 49.99,
+        total: 499.90,
+    });
 
-mod order_manager;
-use order_manager::{Order, OrderManager};
+    db.add_order(Order {
+        customer: "TechStart Inc".to_string(),
+        item_number: "GAD-042".to_string(),
+        item_description: "Digital Gadget".to_string(),
+        quantity: 5,
+        unit_price: 125.00,
+        total: 625.00,
+    });
 
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
+    db
+}
+```
 
-    // Initialize data manager
-    let mut manager = OrderManager::new(PathBuf::from("orders.json"));
-    if let Err(e) = manager.load() {
-        message_box_ok(&mut app, "Info",
-            &format!("No existing data file. Starting fresh.\n{}", e));
+**Option 2: Plain Text File I/O**
+```rust
+use std::fs;
+use std::io::{self, BufRead};
+
+impl OrderDatabase {
+    pub fn load_from_csv(path: &str) -> io::Result<Self> {
+        let mut db = Self::new();
+        let file = fs::File::open(path)?;
+        let reader = io::BufReader::new(file);
+
+        for line in reader.lines().skip(1) {  // Skip header
+            let line = line?;
+            let fields: Vec<&str> = line.split(',').collect();
+
+            if fields.len() >= 5 {
+                let quantity: u32 = fields[3].parse().unwrap_or(0);
+                let unit_price: f64 = fields[4].parse().unwrap_or(0.0);
+
+                let mut order = Order {
+                    customer: fields[0].to_string(),
+                    item_number: fields[1].to_string(),
+                    item_description: fields[2].to_string(),
+                    quantity,
+                    unit_price,
+                    total: 0.0,
+                };
+                order.calculate_total();
+                db.add_order(order);
+            }
+        }
+
+        Ok(db)
     }
 
-    // Create menu bar and status line
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
+    pub fn save_to_csv(&self, path: &str) -> io::Result<()> {
+        let mut content = String::from("Customer,Item Number,Description,Quantity,Unit Price,Total\n");
 
-    let status_line = create_status_line(height, width, &manager);
-    app.set_status_line(status_line);
-
-    // Main event loop
-    app.running = true;
-    while app.running {
-        // Draw
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
+        for order in &self.orders {
+            content.push_str(&format!(
+                "{},{},{},{},{:.2},{:.2}\n",
+                order.customer,
+                order.item_number,
+                order.item_description,
+                order.quantity,
+                order.unit_price,
+                order.total
+            ));
         }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
+
+        fs::write(path, content)?;
+        Ok(())
+    }
+}
+```
+
+**Option 3: Using Serde (if you add it to your project)**
+
+If your application needs robust serialization, you could add the `serde` crate:
+
+```rust
+// In Cargo.toml:
+// serde = { version = "1.0", features = ["derive"] }
+// serde_json = "1.0"
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Order {
+    // ... fields ...
+}
+
+impl OrderDatabase {
+    pub fn load_from_json(path: &str) -> io::Result<Self> {
+        let content = fs::read_to_string(path)?;
+        let orders: Vec<Order> = serde_json::from_str(&content)?;
+        Ok(Self {
+            orders,
+            current_index: 0,
+        })
+    }
+
+    pub fn save_to_json(&self, path: &str) -> io::Result<()> {
+        let content = serde_json::to_string_pretty(&self.orders)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+}
+```
+
+### Displaying a Record
+
+Now that you have a collection of order records in memory, you can use them to provide data to the order window. Initialize your application with the order database:
+
+```rust
+pub struct TutorApp {
+    desktop: Desktop,
+    order_database: OrderDatabase,
+    order_dialog: Option<Box<Dialog>>,
+}
+
+impl TutorApp {
+    pub fn new() -> Self {
+        // Load orders (using whichever method you chose)
+        let order_database = load_sample_orders();
+        // Or: OrderDatabase::load_from_csv("orders.csv").unwrap_or_else(|_| OrderDatabase::new());
+
+        Self {
+            desktop: Desktop::new(),
+            order_database,
+            order_dialog: None,
         }
-        let _ = app.terminal.flush();
+    }
+}
+```
 
-        // Handle events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // Phase 1: PreProcess
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
+When opening the order window, populate it with the current order data:
 
-            // Menu bar
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
+```rust
+fn open_order_window(&mut self) {
+    if self.order_dialog.is_some() {
+        // Dialog already open, just bring to front
+        return;
+    }
 
-            // Phase 2: Focused
-            app.desktop.handle_event(&mut event);
+    let mut dialog = create_order_dialog();
 
-            // Application commands
-            if event.what == EventType::Command {
+    // Set dialog data from current order
+    if let Some(order) = self.order_database.current_order() {
+        set_order_dialog_data(&mut dialog, order);
+    }
+
+    self.order_dialog = Some(Box::new(dialog));
+    self.desktop.add(self.order_dialog.as_ref().unwrap().clone());
+
+    // Enable/disable navigation commands appropriately
+    self.update_command_state();
+}
+
+fn set_order_dialog_data(dialog: &mut Dialog, order: &Order) {
+    // Assuming you've stored references to your input controls
+    // This example shows the concept - actual implementation
+    // depends on how you structured your dialog
+
+    // Find and update each control by ID
+    if let Some(customer_input) = dialog.find_view_by_id(ID_CUSTOMER) {
+        customer_input.set_text(&order.customer);
+    }
+    if let Some(item_input) = dialog.find_view_by_id(ID_ITEM_NUMBER) {
+        item_input.set_text(&order.item_number);
+    }
+    // ... etc for other fields
+}
+```
+
+### Saving the Record
+
+When the user saves data, you need to retrieve values from the dialog and update the collection:
+
+```rust
+fn save_order_data(&mut self) {
+    if let Some(dialog) = &self.order_dialog {
+        // Validate dialog first
+        if !dialog.valid(CM_CLOSE) {
+            return;
+        }
+
+        // Get data from dialog controls
+        let order = get_order_from_dialog(dialog);
+
+        // Update the current order in the database
+        if let Some(current) = self.order_database.current_order_mut() {
+            *current = order;
+        }
+
+        // Save to disk if using file persistence
+        let _ = self.order_database.save_to_csv("orders.csv");
+    }
+}
+
+fn get_order_from_dialog(dialog: &Dialog) -> Order {
+    let mut order = Order::new();
+
+    if let Some(input) = dialog.find_view_by_id(ID_CUSTOMER) {
+        order.customer = input.get_text();
+    }
+    if let Some(input) = dialog.find_view_by_id(ID_ITEM_NUMBER) {
+        order.item_number = input.get_text();
+    }
+    // ... get other fields
+
+    order.calculate_total();
+    order
+}
+```
+
+### Moving from Record to Record
+
+Now that you can edit records, you need navigation commands to move between them. Define command handlers in your application's event loop:
+
+```rust
+const CM_ORDER_NEXT: u16 = 204;
+const CM_ORDER_PREV: u16 = 205;
+
+impl TutorApp {
+    pub fn handle_event(&mut self, event: &mut Event) {
+        match event.what {
+            EventType::Command => {
                 match event.command {
-                    CM_QUIT => {
-                        if manager.is_modified() {
-                            message_box_ok(&mut app, "Warning",
-                                "Don't forget to save your changes!");
-                        }
-                        app.running = false;
+                    CM_ORDER_NEXT => {
+                        self.show_next_order();
+                        event.clear();
                     }
-                    CMD_ORDER_NEXT => {
-                        if manager.next() {
-                            show_current_order(&mut app, &manager);
-                        }
-                    }
-                    CMD_ORDER_PREV => {
-                        if manager.prev() {
-                            show_current_order(&mut app, &manager);
-                        }
-                    }
-                    CMD_ORDER_SAVE => {
-                        if let Err(e) = manager.save() {
-                            message_box_ok(&mut app, "Error",
-                                &format!("Failed to save: {}", e));
-                        } else {
-                            message_box_ok(&mut app, "Success", "Orders saved!");
-                        }
-                    }
-                    CMD_ORDER_NEW => {
-                        let new_order = Order::new();
-                        manager.add(new_order);
-                        show_current_order(&mut app, &manager);
+                    CM_ORDER_PREV => {
+                        self.show_prev_order();
+                        event.clear();
                     }
                     _ => {}
                 }
             }
+            _ => {}
         }
     }
 
-    Ok(())
-}
-
-fn show_current_order(app: &mut Application, manager: &OrderManager) {
-    if let Some(order) = manager.current() {
-        let msg = format!(
-            "Order #{} of {}\n\n\
-             Customer: {}\n\
-             Product: {}\n\
-             Quantity: {}\n\
-             Price: ${:.2}\n\
-             Total: ${:.2}",
-            manager.current_number(),
-            manager.count(),
-            order.customer,
-            order.product,
-            order.quantity,
-            order.price,
-            order.total()
-        );
-        message_box_ok(app, "Current Order", &msg);
-    } else {
-        message_box_ok(app, "Info", "No orders in database");
-    }
-}
-
-fn create_menu_bar(width: u16) -> turbo_vision::views::menu_bar::MenuBar {
-    use turbo_vision::core::menu_data::{Menu, MenuItem};
-    use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-    use turbo_vision::core::event::KB_ALT_X;
-
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
-
-    let file_items = vec![
-        MenuItem::with_shortcut("~N~ew Order", CMD_ORDER_NEW, 0, "", 0),
-        MenuItem::with_shortcut("~S~ave", CMD_ORDER_SAVE, 0, "", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    menu_bar.add_submenu(SubMenu::new("~F~ile", Menu::from_items(file_items)));
-
-    menu_bar
-}
-
-fn create_status_line(
-    height: u16,
-    width: u16,
-    manager: &OrderManager,
-) -> turbo_vision::views::status_line::StatusLine {
-    use turbo_vision::views::status_line::{StatusLine, StatusItem};
-    use turbo_vision::core::event::{KB_ALT_X, KB_F2};
-
-    let mut items = vec![
-        StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-        StatusItem::new("~F2~ Save", KB_F2, CMD_ORDER_SAVE),
-    ];
-
-    if !manager.is_first() {
-        items.push(StatusItem::new("~PgUp~ Prev", 0x2149, CMD_ORDER_PREV));
-    }
-    if !manager.is_last() {
-        items.push(StatusItem::new("~PgDn~ Next", 0x2151, CMD_ORDER_NEXT));
+    fn show_next_order(&mut self) {
+        if self.order_database.current_index < self.order_database.count() - 1 {
+            self.order_database.current_index += 1;
+            self.update_order_display();
+            self.update_command_state();
+        }
     }
 
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        items,
-    )
+    fn show_prev_order(&mut self) {
+        if self.order_database.current_index > 0 {
+            self.order_database.current_index -= 1;
+            self.update_order_display();
+            self.update_command_state();
+        }
+    }
+
+    fn update_order_display(&mut self) {
+        if let Some(dialog) = &mut self.order_dialog {
+            if let Some(order) = self.order_database.current_order() {
+                set_order_dialog_data(dialog, order);
+            }
+        }
+    }
+
+    fn update_command_state(&mut self) {
+        let db = &self.order_database;
+
+        // Enable/disable previous command
+        if db.current_index > 0 {
+            enable_command(CM_ORDER_PREV);
+        } else {
+            disable_command(CM_ORDER_PREV);
+        }
+
+        // Enable/disable next command
+        if db.current_index < db.count() - 1 {
+            enable_command(CM_ORDER_NEXT);
+        } else {
+            disable_command(CM_ORDER_NEXT);
+        }
+    }
+}
+```
+
+By enabling and disabling commands at the right times, your response methods don't have to check whether it's appropriate to respond. This is good for two reasons:
+
+- **Simpler Code**: If `CM_ORDER_NEXT` is always disabled when you're viewing the last order, your response to `CM_ORDER_NEXT` doesn't have to check if there's a next order.
+- **Better UX**: Users know what's happening. It's much better to disable an inappropriate command than to offer it and then either ignore it or display an error message.
+
+### Adding New Records
+
+Adding a new record involves creating an empty `Order`, displaying it in the dialog, and inserting it into the collection when saved:
+
+```rust
+const CM_ORDER_NEW: u16 = 201;
+
+impl TutorApp {
+    fn enter_new_order(&mut self) {
+        // Make sure dialog is open
+        if self.order_dialog.is_none() {
+            self.open_order_window();
+        }
+
+        // Create new empty order
+        let new_order = Order::new();
+
+        // Display it in the dialog
+        if let Some(dialog) = &mut self.order_dialog {
+            set_order_dialog_data(dialog, &new_order);
+        }
+
+        // Set the index to point past the last record
+        // This signals we're adding a new record
+        self.order_database.current_index = self.order_database.count();
+
+        // Disable navigation while entering new record
+        disable_command(CM_ORDER_NEXT);
+        disable_command(CM_ORDER_PREV);
+        disable_command(CM_ORDER_NEW);
+    }
+
+    fn save_order_data(&mut self) {
+        if let Some(dialog) = &self.order_dialog {
+            if !dialog.valid(CM_CLOSE) {
+                return;
+            }
+
+            let order = get_order_from_dialog(dialog);
+
+            // Check if this is a new order or an update
+            if self.order_database.current_index >= self.order_database.count() {
+                // New order - add to collection
+                self.order_database.add_order(order);
+                // Keep current_index pointing to the new order
+            } else {
+                // Existing order - update it
+                if let Some(current) = self.order_database.current_order_mut() {
+                    *current = order;
+                }
+            }
+
+            // Save to disk
+            let _ = self.order_database.save_to_csv("orders.csv");
+
+            // Re-enable commands
+            self.update_command_state();
+            enable_command(CM_ORDER_NEW);
+        }
+    }
+}
+```
+
+Notice the pattern: when adding a new record, you set `current_index` to equal the collection count (pointing past the end). This signals that you're in "new record" mode. When saving, you check this condition to decide whether to add or update.
+
+### Canceling Edits
+
+One last feature is the ability to cancel changes, either when modifying an existing record or when adding a new one:
+
+```rust
+const CM_ORDER_CANCEL: u16 = 203;
+
+impl TutorApp {
+    fn cancel_order(&mut self) {
+        let db = &mut self.order_database;
+
+        if db.current_index < db.count() {
+            // Existing order - just reload the data
+            self.update_order_display();
+        } else {
+            // New order being added - go back to last record
+            if db.count() > 0 {
+                db.current_index = db.count() - 1;
+                self.update_order_display();
+            } else {
+                // No orders at all - show empty dialog
+                if let Some(dialog) = &mut self.order_dialog {
+                    let empty_order = Order::new();
+                    set_order_dialog_data(dialog, &empty_order);
+                }
+            }
+        }
+
+        // Re-enable commands
+        self.update_command_state();
+        enable_command(CM_ORDER_NEW);
+    }
 }
 ```
 
 ---
 
-## Creating a Custom View: Counter Display
+## Step 12: Creating a Custom View
 
-One of the most powerful features of Turbo Vision is the ability to create custom views. Let's create a counter view that displays "Record X of Y".
+**Progress:** Step 1 → Step 2 → Step 3 → Step 4 → Step 5 → Step 6 → Step 7 → Step 8 → Step 9 → Step 10 → Step 11 → **Step 12: Custom View**
 
-### Understanding Custom Views
+One thing you've probably noticed in using this simple database is that you can't tell which record you're looking at (unless it happens to be the first or last record) or how many total records exist. A much nicer way to handle this is to show the user the number of the current record and the total record count. Since Turbo Vision doesn't provide such a view for you, you'll create one yourself.
 
-Every custom view must:
-1. Implement the `View` trait
-2. Maintain its own state
-3. Draw itself when requested
-4. Handle events if interactive
+To create your view, you'll do the following:
 
-### Step 1: Define the Counter View Structure
+- Create the internal counting engine
+- Construct the view
+- Give the view its appearance
+- Add the view to the order window
+
+These steps are universal to all custom views. Every view must be able to:
+
+- Cover its full rectangular area
+- Respond to events in that area
+- Draw itself on the screen when told to
+- Perform any internal functions
+
+### Understanding the View Trait
+
+In Rust Turbo Vision, all views implement the `View` trait (`src/core/view.rs`). This trait defines the essential methods every view must provide:
 
 ```rust
-// counter_view.rs
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::event::Event;
-use turbo_vision::core::draw::DrawBuffer;
-use turbo_vision::core::palette::colors;
-use turbo_vision::terminal::Terminal;
-use turbo_vision::views::view::{View, write_line_to_terminal};
+pub trait View {
+    // Required methods
+    fn bounds(&self) -> Rect;
+    fn set_bounds(&mut self, bounds: Rect);
+    fn draw(&mut self, terminal: &mut Terminal);
+    fn handle_event(&mut self, event: &mut Event);
 
-pub struct CounterView {
+    // Optional methods with default implementations
+    fn can_focus(&self) -> bool { false }
+    fn focused(&self) -> bool { false }
+    fn set_focused(&mut self, _focused: bool) {}
+    // ... many more
+}
+```
+
+### Creating the Counting Engine
+
+The counter view needs to track two pieces of data: the current record number and the total number of records. You'll create a struct with these fields and methods to manipulate them:
+
+```rust
+use turbo_vision::core::geometry::Rect;
+use turbo_vision::core::view::View;
+use turbo_vision::core::event::Event;
+use turbo_vision::terminal::Terminal;
+use turbo_vision::core::draw_buffer::DrawBuffer;
+use std::cell::Cell;
+
+pub struct CountView {
     bounds: Rect,
-    current: usize,
-    total: usize,
+    current: Cell<usize>,
+    count: Cell<usize>,
 }
 
-impl CounterView {
+impl CountView {
     pub fn new(bounds: Rect) -> Self {
         Self {
             bounds,
-            current: 1,
-            total: 0,
+            current: Cell::new(1),
+            count: Cell::new(0),
         }
     }
 
-    pub fn set_current(&mut self, current: usize) {
-        self.current = current;
+    pub fn set_count(&self, new_count: usize) {
+        self.count.set(new_count);
+        // In a real implementation, you'd call draw_view() here
+        // to trigger a redraw
     }
 
-    pub fn set_total(&mut self, total: usize) {
-        self.total = total;
+    pub fn inc_count(&self) {
+        self.set_count(self.count.get() + 1);
     }
 
-    pub fn update(&mut self, current: usize, total: usize) {
-        self.current = current;
-        self.total = total;
+    pub fn dec_count(&self) {
+        if self.count.get() > 0 {
+            self.set_count(self.count.get() - 1);
+        }
+    }
+
+    pub fn set_current(&self, new_current: usize) {
+        self.current.set(new_current);
+        // Trigger redraw
+    }
+
+    pub fn inc_current(&self) {
+        self.set_current(self.current.get() + 1);
+    }
+
+    pub fn dec_current(&self) {
+        if self.current.get() > 0 {
+            self.set_current(self.current.get() - 1);
+        }
     }
 }
 ```
 
-### Step 2: Implement the View Trait
+**Key Points**:
+- We use `Cell<usize>` for interior mutability—this allows updating the counts from methods that take `&self`
+- The methods provide a clean API for manipulating the counter state
+- After changing values, we should trigger a redraw (implementation details depend on your application structure)
+
+### Drawing the View
+
+Every view must implement the `draw` method, which renders the view's current state to the terminal. For the counter view, we'll display something like "- 3 - of 10":
 
 ```rust
-impl View for CounterView {
+impl View for CountView {
     fn bounds(&self) -> Rect {
         self.bounds
     }
@@ -522,34 +690,35 @@ impl View for CounterView {
 
     fn draw(&mut self, terminal: &mut Terminal) {
         let width = self.bounds.width() as usize;
+        let current = self.current.get();
+        let count = self.count.get();
+
+        // Create the display string
+        let display = format!(" -{}- of {} ", current, count);
+
+        // Choose color based on whether we're out of range
+        let color = if current > count {
+            // Highlight if current exceeds count (adding new record)
+            0x4E  // Red background
+        } else {
+            0x1F  // Normal colors
+        };
+
+        // Create a draw buffer for the line
         let mut buf = DrawBuffer::new(width);
 
-        // Fill with spaces
-        buf.move_char(0, ' ', colors::FRAME_PASSIVE, width);
+        // Fill with spaces first
+        buf.move_char(0, ' ', color, width);
 
-        // Format the display text
-        let text = if self.total > 0 {
-            format!(" -{}- of {} ", self.current, self.total)
-        } else {
-            " No records ".to_string()
-        };
-
-        // Choose color based on state
-        let color = if self.current > self.total {
-            colors::ERROR_TEXT  // Highlight if out of range
-        } else {
-            colors::FRAME_PASSIVE
-        };
-
-        // Center the text
-        let text_len = text.len();
-        let start = if width > text_len {
-            (width - text_len) / 2
+        // Center the display string
+        let start_pos = if display.len() < width {
+            (width - display.len()) / 2
         } else {
             0
         };
 
-        buf.move_str(start, &text, color);
+        // Write the display string
+        buf.move_str(start_pos, &display, color);
 
         // Write to terminal
         write_line_to_terminal(
@@ -561,410 +730,268 @@ impl View for CounterView {
     }
 
     fn handle_event(&mut self, _event: &mut Event) {
-        // Counter doesn't handle events
+        // Counter view is display-only, doesn't handle events
+    }
+
+    fn can_focus(&self) -> bool {
+        false  // Counter can't receive focus
     }
 }
 ```
 
-### Step 3: Using the Counter View
+### Real-World Example: Broadcast Demo Counter
+
+The codebase includes a practical example in `examples/broadcast_demo.rs:26-116`, which shows a button with counter displays:
 
 ```rust
-use turbo_vision::views::window::Window;
-
-fn create_order_window_with_counter(
-    manager: &OrderManager,
-) -> Window {
-    let mut window = Window::new(
-        Rect::new(10, 5, 70, 20),
-        "Order Details"
-    );
-
-    // Add counter view on the window frame
-    // Position it at bottom of frame
-    let counter_bounds = Rect::new(20, 14, 40, 15);
-    let mut counter = CounterView::new(counter_bounds);
-    counter.update(manager.current_number(), manager.count());
-
-    window.add(Box::new(counter));
-
-    // Add other controls...
-
-    window
-}
-```
-
-### Advanced: Interactive Counter View
-
-Here's a more advanced counter that responds to clicks:
-
-```rust
-use turbo_vision::core::event::{EventType, MouseEvent};
-
-pub struct ClickableCounterView {
+struct BroadcastButton {
     bounds: Rect,
-    current: usize,
-    total: usize,
-    on_click: Option<Box<dyn Fn(usize) + Send>>,
+    label: String,
+    command: CommandId,
+    broadcast_count: Cell<u32>,  // Counter tracking broadcasts
+    click_count: Cell<u32>,      // Counter tracking clicks
 }
 
-impl ClickableCounterView {
-    pub fn new(bounds: Rect) -> Self {
-        Self {
-            bounds,
-            current: 1,
-            total: 0,
-            on_click: None,
+impl View for BroadcastButton {
+    fn draw(&mut self, terminal: &mut Terminal) {
+        let width = self.bounds.width() as usize;
+        let height = self.bounds.height();
+
+        for y in 0..height {
+            let mut buf = DrawBuffer::new(width);
+
+            if y == 0 {
+                // Draw label
+                let text = format!("{:^width$}", self.label);
+                buf.move_str(0, &text, 0x1F);
+            } else if y == 1 {
+                // Draw click counter
+                let text = format!("{:^width$}",
+                    format!("Clicks: {}", self.click_count.get()));
+                buf.move_str(0, &text, 0x1E);
+            } else if y == 2 {
+                // Draw broadcast counter
+                let text = format!("{:^width$}",
+                    format!("RX: {}", self.broadcast_count.get()));
+                buf.move_str(0, &text, 0x1D);
+            }
+
+            write_line_to_terminal(terminal,
+                self.bounds.a.x,
+                self.bounds.a.y + y as i16,
+                &buf);
         }
     }
 
-    pub fn on_click<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(usize) + Send + 'static,
-    {
-        self.on_click = Some(Box::new(callback));
-        self
-    }
-
-    // ... set_current, set_total methods ...
-}
-
-impl View for ClickableCounterView {
-    fn bounds(&self) -> Rect {
-        self.bounds
-    }
-
-    fn set_bounds(&mut self, bounds: Rect) {
-        self.bounds = bounds;
-    }
-
-    fn draw(&mut self, terminal: &mut Terminal) {
-        // Same as before...
-    }
-
     fn handle_event(&mut self, event: &mut Event) {
-        if event.what == EventType::MouseDown {
-            let mouse_pos = event.mouse.position;
-            if self.bounds.contains(mouse_pos) {
-                if let Some(ref callback) = self.on_click {
-                    callback(self.current);
+        match event.what {
+            EventType::MouseDown => {
+                // Increment click counter
+                self.click_count.set(self.click_count.get() + 1);
+                *event = Event::command(self.command);
+            }
+            EventType::Broadcast => {
+                if event.command == CMD_BROADCAST_TEST {
+                    // Increment broadcast counter
+                    self.broadcast_count.set(
+                        self.broadcast_count.get() + 1
+                    );
                 }
-                event.clear();
+            }
+            _ => {}
+        }
+    }
+}
+```
+
+This example demonstrates several important patterns:
+- Using `Cell<T>` for mutable counters in an immutable context
+- Drawing multiple lines with different content and colors
+- Responding to both user events and broadcast events
+- Combining display and interactive functionality
+
+### Adding the Counter to Your Dialog
+
+To add the counter view to your order dialog, create it during dialog construction:
+
+```rust
+fn create_order_dialog(order_count: usize) -> Dialog {
+    let bounds = Rect::new(0, 0, 60, 17);
+    let mut dialog = Dialog::new(bounds, "Orders");
+
+    // Add input controls here...
+    // (customer, item number, etc.)
+
+    // Add counter view at the top of the frame
+    let counter_bounds = Rect::new(5, 0, 20, 1);  // Top of dialog
+    let counter = CountView::new(counter_bounds);
+    counter.set_count(order_count);
+    counter.set_current(1);
+
+    dialog.insert(Box::new(counter));
+
+    dialog
+}
+```
+
+### Manipulating the Counter
+
+Update the counter whenever you navigate records or add new ones:
+
+```rust
+impl TutorApp {
+    fn update_order_display(&mut self) {
+        if let Some(dialog) = &mut self.order_dialog {
+            // Update dialog controls with order data
+            if let Some(order) = self.order_database.current_order() {
+                set_order_dialog_data(dialog, order);
+            }
+
+            // Update counter display
+            if let Some(counter) = dialog.find_view_by_type::<CountView>() {
+                counter.set_current(self.order_database.current_index + 1);
+                counter.set_count(self.order_database.count());
             }
         }
     }
 
-    fn can_focus(&self) -> bool {
-        true  // Allow focus for keyboard interaction
+    fn save_order_data(&mut self) {
+        if let Some(dialog) = &self.order_dialog {
+            if !dialog.valid(CM_CLOSE) {
+                return;
+            }
+
+            let order = get_order_from_dialog(dialog);
+
+            if self.order_database.current_index >= self.order_database.count() {
+                // New order - add to collection
+                self.order_database.add_order(order);
+
+                // Update counter to reflect new total
+                if let Some(counter) = dialog.find_view_by_type::<CountView>() {
+                    counter.inc_count();
+                }
+            } else {
+                // Update existing order
+                if let Some(current) = self.order_database.current_order_mut() {
+                    *current = order;
+                }
+            }
+
+            self.update_command_state();
+        }
     }
 }
 ```
 
 ---
 
-## Complete Example: Order Management Application
+## Where to Now?
 
-Here's a complete, working application that combines everything:
+There are many additions and changes you could make to your tutorial application to make it more useful. Here are some suggestions:
+
+### Additional Features to Consider
+
+**Multiple Dialog Types**
+- Implement modal dialogs for supplier and stock item databases
+- Use different dialog types for different data entry needs
+- Modal dialogs can handle their own command responses
+
+**Lookup Validation**
+- Create validators that check against existing data
+- Ensure stock numbers match actual inventory items
+- Validate supplier IDs against a supplier database
+- See Chapter 5 for validator patterns
+
+**Sorted Collections**
+The codebase includes `SortedListBox` (`src/views/sorted_listbox.rs:30-232`), which demonstrates maintaining a collection in sorted order:
 
 ```rust
-// order_app.rs - Complete order management application
-use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_QUIT, CM_OK};
-use turbo_vision::core::event::{EventType, KB_ALT_X, KB_F2};
-use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::status_line::{StatusLine, StatusItem};
-use turbo_vision::views::dialog::Dialog;
-use turbo_vision::views::input_line::InputLine;
-use turbo_vision::views::label::Label;
-use turbo_vision::views::button::Button;
-use turbo_vision::views::msgbox::{message_box_ok, confirmation_box};
-use std::time::Duration;
-use std::path::PathBuf;
-
-mod order_manager;
-mod counter_view;
-
-use order_manager::{Order, OrderManager};
-use counter_view::CounterView;
-
-// Commands
-const CMD_ORDER_NEXT: u16 = 2001;
-const CMD_ORDER_PREV: u16 = 2002;
-const CMD_ORDER_SAVE: u16 = 2003;
-const CMD_ORDER_NEW: u16 = 2004;
-const CMD_ORDER_EDIT: u16 = 2005;
-const CMD_ORDER_DELETE: u16 = 2006;
-
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
-
-    let mut manager = OrderManager::new(PathBuf::from("orders.json"));
-    let _ = manager.load();
-
-    // Add sample data if empty
-    if manager.count() == 0 {
-        add_sample_data(&mut manager);
-    }
-
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
-
-    app.running = true;
-    while app.running {
-        // Update status line based on current state
-        let status_line = create_dynamic_status_line(height, width, &manager);
-        app.set_status_line(status_line);
-
-        // Draw
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
-        }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
-        }
-        let _ = app.terminal.flush();
-
-        // Handle events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // PreProcess
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
-
-            // Menu bar
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Desktop
-            app.desktop.handle_event(&mut event);
-
-            // Commands
-            if event.what == EventType::Command {
-                handle_command(&mut app, &mut manager, event.command);
-            }
-        }
-    }
-
-    // Prompt to save on exit
-    if manager.is_modified() {
-        let result = confirmation_box(&mut app, "Save changes before exit?");
-        if result == turbo_vision::core::command::CM_YES {
-            let _ = manager.save();
-        }
-    }
-
-    Ok(())
+pub struct SortedListBox {
+    items: Vec<String>,
+    // ... other fields
 }
 
-fn handle_command(app: &mut Application, manager: &mut OrderManager, command: u16) {
-    match command {
-        CM_QUIT => {
-            app.running = false;
-        }
-        CMD_ORDER_NEXT => {
-            manager.next();
-        }
-        CMD_ORDER_PREV => {
-            manager.prev();
-        }
-        CMD_ORDER_SAVE => {
-            if let Err(e) = manager.save() {
-                message_box_ok(app, "Error", &format!("Save failed: {}", e));
-            } else {
-                message_box_ok(app, "Success", "Orders saved successfully!");
-            }
-        }
-        CMD_ORDER_NEW => {
-            if let Some(order) = show_order_dialog(app, None, manager) {
-                manager.add(order);
-                message_box_ok(app, "Success", "New order added!");
-            }
-        }
-        CMD_ORDER_EDIT => {
-            if let Some(current) = manager.current().cloned() {
-                if let Some(edited) = show_order_dialog(app, Some(current), manager) {
-                    manager.update_current(edited);
-                    message_box_ok(app, "Success", "Order updated!");
-                }
-            }
-        }
-        CMD_ORDER_DELETE => {
-            let result = confirmation_box(app, "Delete current order?");
-            if result == turbo_vision::core::command::CM_YES {
-                manager.delete_current();
-                message_box_ok(app, "Success", "Order deleted!");
-            }
-        }
-        _ => {}
-    }
-}
-
-fn show_order_dialog(
-    app: &mut Application,
-    order: Option<Order>,
-    manager: &OrderManager,
-) -> Option<Order> {
-    let mut dialog = Dialog::new(Rect::new(15, 5, 65, 18), "Order Details");
-
-    // Add counter at top
-    let counter_bounds = Rect::new(15, 0, 35, 1);
-    let mut counter = CounterView::new(counter_bounds);
-    counter.update(manager.current_number(), manager.count());
-    dialog.add(Box::new(counter));
-
-    // Labels and inputs
-    dialog.add(Box::new(Label::new(Rect::new(2, 2, 12, 3), "Customer:")));
-    let customer_input = InputLine::new(Rect::new(14, 2, 46, 3), 50);
-    dialog.add(Box::new(customer_input));
-
-    dialog.add(Box::new(Label::new(Rect::new(2, 4, 12, 5), "Product:")));
-    let product_input = InputLine::new(Rect::new(14, 4, 46, 5), 50);
-    dialog.add(Box::new(product_input));
-
-    // Buttons
-    let ok_btn = Button::new(Rect::new(15, 10, 25, 12), "  ~O~K  ", CM_OK, true);
-    dialog.add(Box::new(ok_btn));
-
-    let cancel_btn = Button::new(
-        Rect::new(27, 10, 37, 12),
-        "~C~ancel",
-        turbo_vision::core::command::CM_CANCEL,
-        false
-    );
-    dialog.add(Box::new(cancel_btn));
-
-    // Set initial data
-    if let Some(ref o) = order {
-        // TODO: Set dialog data from order
+impl SortedListBox {
+    pub fn add_item(&mut self, item: String) {
+        // Binary search to find insertion point
+        let insertion_point = self.find_insertion_point(&item);
+        self.items.insert(insertion_point, item);
     }
 
-    let result = dialog.execute(app);
-
-    if result == CM_OK {
-        // TODO: Get data from dialog
-        Some(Order::new())
-    } else {
-        None
+    pub fn find_exact(&self, text: &str) -> Option<usize> {
+        // Binary search for exact match
+        self.items.binary_search_by(|item|
+            item.as_str().cmp(text)
+        ).ok()
     }
-}
-
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
-
-    let file_items = vec![
-        MenuItem::with_shortcut("~N~ew", CMD_ORDER_NEW, 0, "", 0),
-        MenuItem::with_shortcut("~E~dit", CMD_ORDER_EDIT, 0, "", 0),
-        MenuItem::with_shortcut("~D~elete", CMD_ORDER_DELETE, 0, "", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("~S~ave", CMD_ORDER_SAVE, KB_F2, "F2", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    menu_bar.add_submenu(SubMenu::new("~F~ile", Menu::from_items(file_items)));
-
-    menu_bar
-}
-
-fn create_dynamic_status_line(height: u16, width: u16, manager: &OrderManager) -> StatusLine {
-    let mut items = vec![
-        StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-        StatusItem::new("~F2~ Save", KB_F2, CMD_ORDER_SAVE),
-    ];
-
-    if !manager.is_first() {
-        items.push(StatusItem::new("~PgUp~ Prev", 0x2149, CMD_ORDER_PREV));
-    }
-    if !manager.is_last() {
-        items.push(StatusItem::new("~PgDn~ Next", 0x2151, CMD_ORDER_NEXT));
-    }
-
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        items,
-    )
-}
-
-fn add_sample_data(manager: &mut OrderManager) {
-    manager.add(Order {
-        order_id: 1,
-        customer: "Acme Corp".to_string(),
-        product: "Widget".to_string(),
-        quantity: 100,
-        price: 9.99,
-        date: "2025-01-01".to_string(),
-    });
-
-    manager.add(Order {
-        order_id: 2,
-        customer: "TechCo".to_string(),
-        product: "Gadget".to_string(),
-        quantity: 50,
-        price: 19.99,
-        date: "2025-01-02".to_string(),
-    });
-
-    manager.add(Order {
-        order_id: 3,
-        customer: "MegaMart".to_string(),
-        product: "Gizmo".to_string(),
-        quantity: 200,
-        price: 4.99,
-        date: "2025-01-03".to_string(),
-    });
 }
 ```
+
+This pattern is useful for:
+- Maintaining alphabetically sorted item lists
+- Enabling fast lookups using binary search
+- Providing type-ahead functionality
+
+**Search and Filter**
+- Add search functionality to find records quickly
+- Filter views to show subsets of data
+- Implement incremental search patterns
+
+**Data Validation**
+- Add comprehensive validators for all fields
+- Implement cross-field validation (e.g., quantity × price = total)
+- Provide helpful error messages for validation failures
+
+**Undo/Redo**
+The editor implementation (`src/views/editor.rs`) demonstrates undo/redo patterns:
+
+```rust
+pub struct Editor {
+    undo_stack: Vec<EditorAction>,
+    redo_stack: Vec<EditorAction>,
+    // ... other fields
+}
+
+impl Editor {
+    pub fn undo(&mut self) {
+        if let Some(action) = self.undo_stack.pop() {
+            // Apply reverse of action
+            // Push to redo stack
+            self.redo_stack.push(action);
+        }
+    }
+}
+```
+
+You could adapt this pattern for undoing record edits.
 
 ---
 
 ## Summary
 
-In this chapter, you learned:
+In this chapter, you learned how to:
 
-### Data Management:
-- Pascal's `TCollection` vs. Rust's `Vec<T>`
-- Type-safe collection management
-- Navigating through records
-- Adding, updating, and deleting records
-- Persistent storage with serde
+- **Manage collections** using Rust's `Vec<T>` type instead of Pascal's `TCollection`
+- **Structure data** with Rust's struct types and derive traits
+- **Load and save data** using plain text I/O or optionally serde
+- **Navigate records** with proper command state management
+- **Add and cancel records** with clear state tracking
+- **Create custom views** by implementing the `View` trait
+- **Display dynamic information** using `Cell<T>` for interior mutability
 
-### Custom Views:
-- Implementing the `View` trait
-- Drawing with `DrawBuffer`
-- Handling events in custom views
-- Creating reusable UI components
+The Rust implementation differs from the original Pascal in several key ways:
 
-### Best Practices:
-1. **Use Vec<T>** - Type-safe, no casts needed
-2. **Encapsulate logic** - Create manager classes
-3. **Separate concerns** - Data, UI, and business logic
-4. **Handle errors** - Use Result for I/O operations
-5. **Test custom views** - Ensure proper bounds and drawing
+| Aspect | Pascal | Rust |
+|--------|--------|------|
+| Collections | `TCollection` with type-unsafe pointers | `Vec<T>` with compile-time type safety |
+| Persistence | Binary streams with registration | Plain text or serde (opt-in) |
+| Memory | Manual `Dispose()` calls | Automatic with ownership system |
+| Type Safety | Runtime type checking | Compile-time guarantees |
+| Mutability | Mutable by default | Explicit `mut`, `Cell`, `RefCell` |
 
----
-
-## See Also
-
-- **Chapter 3** - Adding Windows (window basics)
-- **Chapter 4** - Persistence and Configuration (serde patterns)
-- **src/views/view.rs** - View trait documentation
-- **src/views/static_text.rs** - Simple custom view example
-- **examples/dialogs_demo.rs** - Complex dialog examples
+These changes make the Rust version more robust and safer while maintaining the same conceptual patterns and user experience.
 
 ---
 
-In future chapters (if developed), you would learn about:
-- Validators for data entry fields
-- List boxes and selection controls
-- Complex dialog layouts
-- Database integration patterns
+**End of Chapter 6**

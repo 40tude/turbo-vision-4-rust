@@ -1,807 +1,455 @@
-# Chapter 3 — Adding Windows (Rust Edition)
-
-**Version:** 0.2.11
-**Updated:** 2025-11-04
+# Chapter 3 — Adding Windows
 
 So far you've customized your application's menu bar and status line and seen how to respond to their commands. In this chapter, you'll start adding windows to the desktop and managing them.
 
-In this chapter, you'll do the following:
+In this chapter, you'll do the following steps:
 
 - Add a simple window
-- Add file editor windows
-- Use a standard file open dialog box
-- Manage multiple windows
+- Understand window management and the desktop
+- Work with window properties and behavior
+- Learn about modal dialogs
 
 ---
 
-## Understanding the Desktop
+## Step 4 — Adding a Window
 
-One of the great benefits of Turbo Vision is that it makes it easy to create and manage multiple, overlapping, resizeable windows.
+**Progress:** Step 1: Basic App → Step 2: Menu/Status → Step 3: Commands → **Step 4: Windows** → Step 5: Clipboard → Step 6: Streams → Step 7: Resources → Step 8: Data entry → Step 9: Controls → Step 10: Validating → Step 11: Collections → Step 12: Custom view
 
-The key to managing windows is the **desktop**, which knows how to keep track of all the windows you give it. The desktop is one example of a **group** in Turbo Vision; that is, a visible object that holds and manages other visible items. You've already used groups—the application itself handles the menu bar, status line, and desktop. As you proceed, you'll find that windows and dialog boxes are also groups.
+One of the great benefits of Turbo Vision is that it makes it easy to create and manage multiple, overlapping, resizable windows.
 
-By default, the desktop covers all of the application screen that isn't covered by the menu bar and status line.
+The key to managing windows is the **desktop**, which knows how to keep track of all the windows you give it and which can handle such operations as cascading, tiling, and cycling through the available windows.
+
+The desktop is one example of a **group** in Turbo Vision; that is, a visible object that holds and manages other visible items. You've already used one group—the application itself, which handles the menu bar, the status line, and the desktop. As you proceed, you'll find that windows and dialog boxes are also groups.
 
 ---
 
-## Step 3 — Adding a Simple Window
+## Adding a Simple Window
+
+The desktop object is created automatically when you initialize the `Application` and is accessible via the `app.desktop` field. By default, the desktop covers all of the application screen that isn't covered by the menu bar and status line.
 
 Adding a window to the desktop in an application takes three steps:
 
-1. **Assign the boundaries for the window**
-2. **Construct the window object**
-3. **Insert the window into the desktop**
+1. Defining the boundaries for the window
+2. Constructing the window object
+3. Inserting the window into the desktop
 
-As a first step, you can add a plain window to the desktop in response to the **New** item on the File menu. That item generates a `CM_NEW` command, so you need to define a response to that command in the application's event loop.
+As a first step, you can add a plain window to the desktop in response to the New item on the File menu. That item generates a `CM_NEW` command, so you need to define a response to that command in your application's event loop.
 
 ### Listing 3.1 — Adding a Simple Window
 
 ```rust
-// tutorial_05.rs
+use turbo_vision::prelude::*;
 use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_ABOUT};
-use turbo_vision::core::event::{EventType, KB_F1, KB_ALT_X};
-use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::status_line::{StatusLine, StatusItem};
 use turbo_vision::views::window::Window;
-use turbo_vision::views::msgbox::message_box_ok;
+use turbo_vision::core::geometry::Rect;
+use turbo_vision::core::command::{CM_NEW, CM_QUIT};
+use turbo_vision::core::event::{Event, EventType};
 use std::time::Duration;
 
 fn main() -> std::io::Result<()> {
     let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
 
-    // Initialize menu bar
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
+    // Set up menu bar and status line (as in Chapter 2)
+    // ... menu bar setup code ...
+    // ... status line setup code ...
 
-    // Initialize status line
-    let status_line = create_status_line(height, width);
-    app.set_status_line(status_line);
+    loop {
+        app.draw();
+        app.terminal.flush()?;
 
-    // Custom event loop with three-phase processing
-    app.running = true;
-    while app.running {
-        // Draw the interface
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
-        }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
-        }
-        let _ = app.terminal.flush();
-
-        // Handle events
         if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // Phase 1: PreProcess - Status line first
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
+            app.handle_event(&mut event);
+
+            if !app.running {
+                break;
             }
 
-            // Special: Menu bar handles F10 and Alt keys
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-
-                // Check for cascading submenus
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Phase 2: Focused - Desktop handles events
-            app.desktop.handle_event(&mut event);
-
-            // Application-level command handling
+            // Handle custom commands
             if event.what == EventType::Command {
                 match event.command {
-                    CM_QUIT => {
-                        app.running = false;
-                    }
                     CM_NEW => {
                         new_window(&mut app);
-                    }
-                    CM_ABOUT => {
-                        show_about_box(&mut app);
+                        event.clear();
                     }
                     _ => {}
                 }
             }
         }
+
+        app.idle();
     }
 
     Ok(())
 }
 
 fn new_window(app: &mut Application) {
-    // Step 1: Assign boundaries for the window
-    let bounds = Rect::new(5, 3, 65, 18);
+    // Define boundaries for the window
+    let bounds = Rect::new(0, 0, 60, 20);
 
-    // Step 2: Construct the window object
+    // Construct the window
     let window = Window::new(bounds, "A Window");
 
-    // Step 3: Insert the window into the desktop
+    // Insert window into desktop
     app.desktop.add(Box::new(window));
 }
-
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
-
-    // File menu
-    let file_menu_items = vec![
-        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "", 0),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
-    menu_bar.add_submenu(file_menu);
-
-    // Help menu
-    let help_menu_items = vec![
-        MenuItem::with_shortcut("~A~bout", CM_ABOUT, KB_F1, "F1", 0),
-    ];
-    let help_menu = SubMenu::new("~H~elp", Menu::from_items(help_menu_items));
-    menu_bar.add_submenu(help_menu);
-
-    menu_bar
-}
-
-fn create_status_line(height: u16, width: u16) -> StatusLine {
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        vec![
-            StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-        ],
-    )
-}
-
-fn show_about_box(app: &mut Application) {
-    message_box_ok(
-        app,
-        "About",
-        "  Turbo Vision Tutorial App 3.0\n\n  Rust Edition"
-    );
-}
 ```
 
-### Understanding the Code
+### Understanding the Window Creation Process
 
-#### Assigning the Window Boundaries
+Let's break down what happens in the `new_window` function:
+
+#### 1. Assigning the Window Boundaries
 
 ```rust
-let bounds = Rect::new(5, 3, 65, 18);
+let bounds = Rect::new(0, 0, 60, 20);
 ```
 
-This creates a rectangle with:
-- Top-left corner at (5, 3)
-- Bottom-right corner at (65, 18)
-- Width of 60 characters
-- Height of 15 lines
+You've seen `Rect` variables before. However, for the menu bar and status line, you set their sizes based on the size of the application (using the terminal's size). In `new_window`, you assign the new window an absolute set of coordinates using `Rect::new`.
 
-Unlike the menu bar and status line (which used the application's full extent), here you assign the new window an absolute set of coordinates.
+The `Rect::new(x1, y1, x2, y2)` function creates a rectangle from coordinates `(x1, y1)` to `(x2, y2)`. This window will be 60 columns wide and 20 rows tall, positioned at the top-left of the desktop.
 
-#### Constructing the Window Object
+#### 2. Constructing the Window Object
 
 ```rust
 let window = Window::new(bounds, "A Window");
 ```
 
-This constructs a new window with the specified boundaries and title. The window comes with:
-- A frame (border) with the title
-- Close button (mouse click on top-left corner)
-- Zoom button (mouse click on top-right corner)
-- Resize handles
-- Interior group for adding child views
+The `Window::new` constructor takes two parameters: the boundaries of the window and a string containing the title for the window. In Rust, we create the window as a local variable on the stack.
 
-#### Inserting the Window
+Unlike the original Turbo Vision, the Rust implementation doesn't support window numbers (the `wnNoNumber` parameter from the Pascal version is not needed). Window selection is handled entirely through mouse clicks and keyboard navigation.
+
+#### 3. Inserting the Window
 
 ```rust
 app.desktop.add(Box::new(window));
 ```
 
-`add()` is a method common to all Turbo Vision groups. When you insert a window into the desktop, you're telling the desktop that it is supposed to manage that window. The desktop will:
-- Draw the window when needed
-- Handle window focus and activation
-- Manage Z-order (which window is on top)
-- Route events to the window
+`add` is a method common to all Turbo Vision groups, and it's the way a group gets control of the objects within it. When you add the window to the desktop, you're telling the desktop that it is supposed to manage that window.
 
-**Note:** In Rust, we use `Box::new(window)` to transfer ownership of the window to the desktop. This is Rust's ownership system at work—once added, the desktop owns the window.
+The window must be boxed (wrapped in `Box::new()`) because the desktop stores views as trait objects (`Box<dyn View>`), allowing it to manage different types of views polymorphically.
 
-### Running the Program
+If you run the program now and choose New from the File menu, an empty window with the title 'A Window' appears on the desktop. If you choose New again, another identical window appears in the same place, because `new_window` assigns exact coordinates for the window. Using your mouse, you can select different windows.
 
-If you run the program now and choose **New** from the File menu, an empty window with the title "A Window" appears on the desktop. If you choose **New** again, another identical window appears in the same place (because `new_window` assigns exact coordinates).
-
-Using your mouse, you can:
-- Select different windows by clicking on them
-- Move windows by dragging their title bar
-- Resize windows by dragging their borders
-- Close windows by clicking the close box (top-left corner)
-- Zoom windows by clicking the zoom box (top-right corner)
+The menu items under Window (like Tile, Cascade, Next) and the hot keys bound in the status line now operate on the windows. Note that the menu and status line items haven't changed. They don't know anything about your windows. They just issue commands which the windows and desktop already know how to respond to.
 
 ---
 
-## Step 4 — Adding an Editor Window
+## Window Properties and Behavior
 
-Now that you've seen how windows behave in general, you might want to include a more useful window, such as a file editor window. Turbo Vision's `Editor` view provides comprehensive text editing capabilities.
+Windows in Turbo Vision have several built-in capabilities that work automatically:
 
-Adding an editor window requires:
+### Dragging Windows
 
-1. **Creating a window**
-2. **Creating an editor view**
-3. **Adding the editor to the window**
+Windows can be dragged by clicking and holding the title bar. The window follows the mouse cursor until you release the button. The Rust implementation handles this through the `Frame` component, which detects title bar clicks and enters drag mode.
 
-### Listing 3.2 — Creating an Editor Window
+### Resizing Windows
+
+Windows can be resized by clicking and dragging the bottom-right corner. The implementation enforces a minimum window size (typically 16 columns wide by 6 rows tall) to ensure windows remain usable.
+
+### Z-Order Management
+
+Z-order is the layering of visible objects, determining which windows show up in front of others. When you click on a window that's partially covered by another window, Turbo Vision automatically brings it to the front.
+
+The desktop manages z-order by maintaining windows in a list, where later windows (those added more recently or brought to front) are drawn on top of earlier ones. You can see this in action in `src/views/desktop.rs:226-247`.
+
+### Shadows
+
+Windows display shadows by default, giving a three-dimensional appearance to the interface. Shadows are drawn one cell to the right and below the window boundary, using a darkened attribute (see `src/views/view.rs` for the `draw_shadow` function).
+
+---
+
+## Working with Modal Windows
+
+Modal windows are windows that capture all user input until they are closed. While a modal window is active, you cannot interact with other windows or menu items (except the status line, which remains available).
+
+### Creating Modal Dialogs
+
+The `Dialog` type (which wraps a `Window`) is typically used for modal interactions. Here's an example:
+
+### Listing 3.2 — Creating a Modal Dialog
 
 ```rust
-// tutorial_06.rs
-use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_ABOUT};
-use turbo_vision::core::event::{EventType, KB_F1, KB_F3, KB_ALT_X};
-use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::status_line::{StatusLine, StatusItem};
-use turbo_vision::views::window::Window;
-use turbo_vision::views::editor::Editor;
-use turbo_vision::views::msgbox::message_box_ok;
-use std::time::Duration;
+use turbo_vision::views::dialog::Dialog;
+use turbo_vision::views::button::Button;
+use turbo_vision::views::static_text::StaticText;
+use turbo_vision::core::command::{CM_OK, CM_CANCEL};
 
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
+fn show_dialog(app: &mut Application) {
+    // Create a dialog (40 wide x 10 tall, positioned at 20,8)
+    let mut dialog = Dialog::new(
+        Rect::new(20, 8, 60, 18),
+        "Sample Dialog"
+    );
 
-    // Initialize menu bar
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
+    // Add a message to the dialog
+    let text = StaticText::new(
+        Rect::new(2, 1, 36, 3),
+        "This is a modal dialog box.\nClick OK to continue."
+    );
+    dialog.add(Box::new(text));
 
-    // Initialize status line
-    let status_line = create_status_line(height, width);
-    app.set_status_line(status_line);
+    // Add OK button
+    let ok_button = Button::new(
+        Rect::new(10, 5, 20, 7),
+        "  ~O~K  ",
+        CM_OK,
+        true  // This is the default button
+    );
+    dialog.add(Box::new(ok_button));
 
-    // Custom event loop
-    app.running = true;
-    while app.running {
-        // Draw
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
+    // Add Cancel button
+    let cancel_button = Button::new(
+        Rect::new(22, 5, 32, 7),
+        "~C~ancel",
+        CM_CANCEL,
+        false
+    );
+    dialog.add(Box::new(cancel_button));
+
+    // Set initial focus
+    dialog.set_initial_focus();
+
+    // Execute the dialog (runs modal event loop)
+    let result = dialog.execute(app);
+
+    // Check result
+    match result {
+        CM_OK => {
+            // User clicked OK
         }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
+        CM_CANCEL => {
+            // User clicked Cancel or pressed ESC
         }
-        let _ = app.terminal.flush();
-
-        // Handle events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // Phase 1: PreProcess
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
-
-            // Menu bar
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Phase 2: Focused
-            app.desktop.handle_event(&mut event);
-
-            // Application commands
-            if event.what == EventType::Command {
-                match event.command {
-                    CM_QUIT => {
-                        app.running = false;
-                    }
-                    CM_NEW => {
-                        new_editor_window(&mut app);
-                    }
-                    CM_ABOUT => {
-                        show_about_box(&mut app);
-                    }
-                    _ => {}
-                }
-            }
-        }
+        _ => {}
     }
-
-    Ok(())
 }
+```
 
-fn new_editor_window(app: &mut Application) {
-    // Create window
-    let window_bounds = Rect::new(5, 3, 75, 20);
-    let mut window = Window::new(window_bounds, "Untitled");
+### Understanding Modal Execution
 
-    // Create editor with interior bounds (inset by 1 for the frame)
-    let editor_bounds = Rect::new(1, 1, 69, 16);
-    let editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
+The `execute` method is key to modal behavior. It:
 
-    // Add editor to window
-    window.add(Box::new(editor));
+1. Adds the dialog to the desktop
+2. Runs a modal event loop that only processes events for this dialog
+3. Blocks all interaction with other windows
+4. Returns when the dialog is closed (typically by clicking OK, Cancel, or the close button)
 
-    // Add window to desktop
+The return value is a `CommandId` indicating which command closed the dialog. This is usually `CM_OK`, `CM_CANCEL`, or another application-specific command.
+
+You can see the modal execution implementation in `src/views/group.rs:200-217` and how the application handles modal views in `src/app/application.rs:76-124`.
+
+---
+
+## Understanding Groups
+
+Windows and dialogs are both **groups** — views that can contain other views. The containment hierarchy looks like this:
+
+```
+Application
+├── MenuBar
+├── StatusLine
+└── Desktop (Group)
+    ├── Window 1 (Group)
+    │   ├── Button
+    │   ├── Editor
+    │   └── StaticText
+    └── Window 2 (Group)
+        └── TextViewer
+```
+
+Each group is responsible for:
+
+- **Layout management**: Positioning child views
+- **Event routing**: Passing events to children
+- **Focus management**: Tracking which child has input focus
+- **Drawing**: Rendering all children in the correct order
+
+When you add a view to a group using `group.add(Box::new(view))`, the group takes ownership of that view and includes it in its event handling and drawing cycles.
+
+---
+
+## Coordinate Systems
+
+Turbo Vision uses **absolute coordinates** for most operations:
+
+- All `Rect` boundaries are in absolute screen coordinates
+- When a view is added to a group, its coordinates are in absolute terms
+- Child views' positions are relative to the screen, not to their parent
+
+For example, if you create a button at `Rect::new(5, 5, 15, 7)` and add it to a window at `Rect::new(10, 10, 50, 30)`, the button will appear at screen position `(5, 5)`, **not** at position `(5, 5)` relative to the window's top-left corner.
+
+However, for **dialogs and windows**, there's a convenience: when you add child views to a `Dialog` or `Window`, you typically use **relative coordinates** (relative to the window's interior), and the window translates them to absolute coordinates. This is handled by the interior `Group` within the window.
+
+See the `Window` implementation in `src/views/window.rs:28-50` for details on how the interior group is positioned.
+
+---
+
+## Window Architecture Details
+
+The `Window` struct in the Rust implementation is composed of several parts:
+
+```rust
+pub struct Window {
+    bounds: Rect,           // Window's screen position
+    frame: Frame,           // Title bar, borders, close button
+    interior: Group,        // Contains child views
+    state: StateFlags,      // Window state (modal, dragging, etc.)
+    // ... additional fields for dragging/resizing
+}
+```
+
+The **frame** handles:
+- Drawing the window border and title
+- Detecting clicks on the title bar (for dragging) and close button
+- Drawing the close button
+
+The **interior** handles:
+- Managing child views (buttons, editors, etc.)
+- Routing events to children
+- Focus management within the window
+
+This separation of concerns makes the window implementation clean and maintainable.
+
+---
+
+## Advanced Window Creation Example
+
+Here's a more complete example that creates a window with multiple child views:
+
+### Listing 3.3 — Window with Multiple Views
+
+```rust
+use turbo_vision::views::window::Window;
+use turbo_vision::views::button::Button;
+use turbo_vision::views::static_text::StaticText;
+use turbo_vision::views::text_viewer::TextViewer;
+
+fn create_custom_window(app: &mut Application) {
+    let bounds = Rect::new(10, 5, 70, 20);
+    let mut window = Window::new(bounds, "Custom Window");
+
+    // Add a title label
+    let label = StaticText::new(
+        Rect::new(2, 1, 40, 2),
+        "Welcome to Turbo Vision!"
+    );
+    window.add(Box::new(label));
+
+    // Add a text viewer
+    let text_content = "This is a text viewer.\nYou can scroll through content here.";
+    let viewer = TextViewer::new(
+        Rect::new(2, 3, 56, 10),
+        text_content
+    );
+    window.add(Box::new(viewer));
+
+    // Add a button
+    let button = Button::new(
+        Rect::new(20, 12, 40, 14),
+        "  ~C~lose  ",
+        CM_CLOSE,
+        true
+    );
+    window.add(Box::new(button));
+
+    // Set initial focus to the first focusable view
+    window.set_initial_focus();
+
+    // Add to desktop
     app.desktop.add(Box::new(window));
 }
+```
 
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
+---
 
-    // File menu
-    let file_menu_items = vec![
-        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "", 0),
-        MenuItem::with_shortcut("~O~pen...", CM_OPEN, KB_F3, "F3", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
-    menu_bar.add_submenu(file_menu);
+## Event Flow in Windows
 
-    // Help menu
-    let help_menu_items = vec![
-        MenuItem::with_shortcut("~A~bout", CM_ABOUT, KB_F1, "F1", 0),
-    ];
-    let help_menu = SubMenu::new("~H~elp", Menu::from_items(help_menu_items));
-    menu_bar.add_submenu(help_menu);
+Understanding how events flow through windows is crucial:
 
-    menu_bar
-}
+1. **Application receives event** (keyboard, mouse, or command)
+2. **Menu bar gets first shot** at the event
+3. **Desktop handles the event**, which:
+   - Checks for window clicks (z-order changes)
+   - Routes event to the topmost window
+4. **Window processes the event**:
+   - Frame checks for title bar/close button clicks
+   - Interior group routes to focused child
+5. **Child view handles the event** (button click, text input, etc.)
+6. **Status line gets remaining events**
+7. **Application handles application-level commands** (like `CM_QUIT`)
 
-fn create_status_line(height: u16, width: u16) -> StatusLine {
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        vec![
-            StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-            StatusItem::new("~F3~ Open", KB_F3, CM_OPEN),
-        ],
-    )
-}
+If at any point a handler "consumes" the event by calling `event.clear()`, the event stops propagating. This is how Turbo Vision ensures that each event is handled by exactly one component.
 
-fn show_about_box(app: &mut Application) {
-    message_box_ok(
-        app,
-        "About",
-        "  Turbo Vision Tutorial App 3.0\n\n  Rust Edition"
+The event handling chain is implemented in `src/app/application.rs:219-258`.
+
+---
+
+## Practical Tips
+
+### Window Positioning
+
+Instead of hardcoding window positions, you can calculate positions dynamically:
+
+```rust
+let (width, height) = app.terminal.size();
+
+// Center a 60x20 window
+let x = (width as i16 - 60) / 2;
+let y = (height as i16 - 20) / 2;
+let bounds = Rect::new(x, y, x + 60, y + 20);
+
+let window = Window::new(bounds, "Centered Window");
+```
+
+### Cascading Windows
+
+To create a cascading effect (each window offset slightly from the previous), track how many windows have been created:
+
+```rust
+fn new_cascaded_window(app: &mut Application, window_count: usize) {
+    let offset = (window_count * 2) as i16;
+    let bounds = Rect::new(
+        5 + offset,
+        3 + offset,
+        65 + offset,
+        23 + offset
     );
-}
-```
 
-### Understanding Editor Windows
-
-#### Window Title
-
-The window is created with the title "Untitled", which indicates that whatever you type into the editor has not yet been assigned to a specific file. This is the standard convention for new, unsaved documents.
-
-#### Editor Bounds
-
-```rust
-let editor_bounds = Rect::new(1, 1, 69, 16);
-```
-
-The editor bounds are **relative to the window's interior**. We inset by 1 from each edge to account for the window's frame. The coordinates are in the window's coordinate system, not screen coordinates.
-
-#### Editor Features
-
-```rust
-let editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-```
-
-The `with_scrollbars_and_indicator()` method adds:
-- **Horizontal scrollbar** - For long lines
-- **Vertical scrollbar** - For many lines
-- **Indicator** - Shows current line/column position
-
-The editor supports:
-- **Navigation** - Arrow keys, Home, End, PgUp, PgDn
-- **Editing** - Insert, Delete, Backspace
-- **Selection** - Shift+Arrow keys, Ctrl+A
-- **Clipboard** - Ctrl+C (copy), Ctrl+X (cut), Ctrl+V (paste)
-- **Undo/Redo** - Ctrl+Z (undo), Ctrl+Y (redo)
-- **Auto-indent** - Preserves indentation on new lines
-
----
-
-## Step 5 — Using Standard Dialog Boxes
-
-Having a file editor that creates new files is useful, but you need to be able to edit existing files, too. To do that, you need to tell the file editor which file you want to edit. Turbo Vision's `FileDialog` provides a dialog box that lets users browse directories and select files.
-
-To edit existing files, you need to:
-
-1. **Construct a file dialog box**
-2. **Execute the dialog box to prompt for a file name**
-3. **Construct an editor window for that file**
-
-### Listing 3.3 — Opening Files with FileDialog
-
-```rust
-// tutorial_07.rs (additions to previous code)
-use turbo_vision::views::file_dialog::FileDialog;
-use std::fs;
-
-// Add to main event loop, in the Command handling:
-CM_OPEN => {
-    open_window(&mut app);
-}
-
-fn open_window(app: &mut Application) {
-    // Step 1: Construct a file dialog box
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 60;
-    let dialog_height = 20;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut file_dialog = FileDialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Open File",
-        "*.rs",      // Wildcard pattern: *.rs for Rust files, * for all files
-        None,        // Start in current directory
-    ).build();
-
-    // Step 2: Execute the dialog box to get the file name
-    if let Some(path) = file_dialog.execute(app) {
-        // User selected a file
-
-        // Step 3: Load the file and create an editor window
-        match fs::read_to_string(&path) {
-            Ok(content) => {
-                // Create window with filename as title
-                let window_bounds = Rect::new(5, 3, 75, 20);
-                let title = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("Untitled");
-                let mut window = Window::new(window_bounds, title);
-
-                // Create editor and load content
-                let editor_bounds = Rect::new(1, 1, 69, 16);
-                let mut editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-                editor.set_text(&content);
-
-                // Add editor to window
-                window.add(Box::new(editor));
-
-                // Add window to desktop
-                app.desktop.add(Box::new(window));
-            }
-            Err(_) => {
-                message_box_ok(app, "Error", "Failed to open file");
-            }
-        }
-    }
-    // If None was returned, the user canceled the dialog
-}
-```
-
-### Understanding FileDialog
-
-#### Constructor Parameters
-
-```rust
-FileDialog::new(bounds, title, wildcard, start_dir)
-```
-
-- **bounds**: The position and size of the dialog on the screen
-- **title**: The dialog box title (e.g., "Open File")
-- **wildcard**: File filter pattern
-  - `"*"` - Show all files
-  - `"*.rs"` - Show only Rust files
-  - `"*.toml"` - Show only TOML files
-  - `"*.txt"` - Show only text files
-- **start_dir**: Starting directory (None = current directory)
-
-#### Executing the Dialog
-
-```rust
-if let Some(path) = file_dialog.execute(app) {
-    // User selected a file
-} else {
-    // User canceled
-}
-```
-
-The `execute()` method:
-- Makes the dialog **modal** (blocks interaction with the rest of the app)
-- Returns `Option<PathBuf>`:
-  - `Some(path)` if the user selected a file
-  - `None` if the user canceled
-
-**Modal** means the dialog is the only active part of the application—you can't interact with windows behind it until you close the dialog.
-
-> **Note:** The status line is always available, no matter what dialog box is modal.
-
-#### FileDialog Features
-
-The dialog supports:
-- **Mouse clicks** - Select files and directories
-- **Double-click** - Open directories or select files
-- **Arrow keys** - Navigate the file list
-- **Enter** - Open directories or select files
-- **Backspace** - Go to parent directory
-- **Directory navigation** - Browse the file system
-- **Wildcard filtering** - Only show matching files
-
----
-
-## Managing Multiple Windows
-
-### Window Z-Order
-
-When you add multiple windows to the desktop, they are layered on top of each other. This layering is known as **Z-order**, and it determines:
-- Which window appears in front
-- Which window receives keyboard input
-- Which window is "active"
-
-```rust
-// First window (bottom)
-app.desktop.add(Box::new(window1));
-
-// Second window (on top of first)
-app.desktop.add(Box::new(window2));
-
-// Third window (on top)
-app.desktop.add(Box::new(window3));
-```
-
-### Selecting Windows
-
-Users can select (activate) windows in several ways:
-- **Mouse click** - Click anywhere on a window to bring it to the front
-- **Keyboard** - The focused window receives keyboard input
-- **Menu commands** - Standard window management commands
-
-### Closing Windows
-
-Windows can be closed by:
-- **Close button** - Click the close box in the top-left corner
-- **Alt+F3** - Standard close window shortcut
-- **Programmatically** - Calling `window.close()`
-
-The desktop automatically removes closed windows when you call:
-
-```rust
-app.desktop.remove_closed_windows();
-```
-
-Call this after handling events but before drawing to clean up closed windows.
-
----
-
-## Working with Window Contents
-
-### Adding Views to Windows
-
-Windows are groups, which means they can contain other views:
-
-```rust
-let mut window = Window::new(bounds, "Window Title");
-
-// Add an editor
-let editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-window.add(Box::new(editor));
-
-// Or add a static text label
-let text = StaticText::new(text_bounds, "Hello, World!");
-window.add(Box::new(text));
-
-// Or add a button
-let button = Button::new(button_bounds, "Click Me", 100, true);
-window.add(Box::new(button));
-```
-
-### Coordinate Systems
-
-When adding views to windows, remember that coordinates are **relative to the window's interior**:
-
-```rust
-// Window covers screen coordinates (10, 5) to (70, 20)
-let window_bounds = Rect::new(10, 5, 70, 20);
-let mut window = Window::new(window_bounds, "My Window");
-
-// Editor uses window-relative coordinates
-// (1, 1) is one character in from the window's top-left interior corner
-let editor_bounds = Rect::new(1, 1, 59, 14);
-let editor = Editor::new(editor_bounds);
-
-window.add(Box::new(editor));
-```
-
-The window's frame takes up one character on each edge, so:
-- Window bounds: `(10, 5)` to `(70, 20)` = 60×15
-- Interior bounds: `(0, 0)` to `(58, 13)` = 58×13 (inset by 1 on each side)
-
----
-
-## Complete Example
-
-Here's a complete example that ties everything together:
-
-```rust
-// tutorial_08_complete.rs
-use turbo_vision::app::Application;
-use turbo_vision::core::geometry::Rect;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_ABOUT};
-use turbo_vision::core::event::{EventType, KB_F1, KB_F3, KB_ALT_X};
-use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
-use turbo_vision::views::status_line::{StatusLine, StatusItem};
-use turbo_vision::views::window::Window;
-use turbo_vision::views::editor::Editor;
-use turbo_vision::views::file_dialog::FileDialog;
-use turbo_vision::views::msgbox::message_box_ok;
-use std::time::Duration;
-use std::fs;
-
-fn main() -> std::io::Result<()> {
-    let mut app = Application::new()?;
-    let (width, height) = app.terminal.size();
-
-    // Initialize menu bar and status line
-    let menu_bar = create_menu_bar(width);
-    app.set_menu_bar(menu_bar);
-
-    let status_line = create_status_line(height, width);
-    app.set_status_line(status_line);
-
-    // Main event loop
-    app.running = true;
-    while app.running {
-        // Draw
-        app.desktop.draw(&mut app.terminal);
-        if let Some(ref mut menu_bar) = app.menu_bar {
-            menu_bar.draw(&mut app.terminal);
-        }
-        if let Some(ref mut status_line) = app.status_line {
-            status_line.draw(&mut app.terminal);
-        }
-        let _ = app.terminal.flush();
-
-        // Handle events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(Duration::from_millis(50)) {
-            // Phase 1: PreProcess
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
-
-            // Menu bar
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = turbo_vision::core::event::Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Phase 2: Focused
-            app.desktop.handle_event(&mut event);
-
-            // Clean up closed windows
-            app.desktop.remove_closed_windows();
-
-            // Application commands
-            if event.what == EventType::Command {
-                match event.command {
-                    CM_QUIT => {
-                        app.running = false;
-                    }
-                    CM_NEW => {
-                        new_editor_window(&mut app);
-                    }
-                    CM_OPEN => {
-                        open_window(&mut app);
-                    }
-                    CM_ABOUT => {
-                        show_about_box(&mut app);
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn new_editor_window(app: &mut Application) {
-    let window_bounds = Rect::new(5, 3, 75, 20);
-    let mut window = Window::new(window_bounds, "Untitled");
-
-    let editor_bounds = Rect::new(1, 1, 69, 16);
-    let editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-
-    window.add(Box::new(editor));
+    let window = Window::new(bounds, &format!("Window {}", window_count + 1));
     app.desktop.add(Box::new(window));
 }
+```
 
-fn open_window(app: &mut Application) {
-    // Create file dialog
-    let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 60;
-    let dialog_height = 20;
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
+### Checking for Window Closure
 
-    let mut file_dialog = FileDialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
-        "Open File",
-        "*",
-        None,
-    ).build();
+When handling `CM_CLOSE` commands, you might want to validate whether the window can be closed (for example, prompting to save unsaved changes):
 
-    // Execute dialog
-    if let Some(path) = file_dialog.execute(app) {
-        match fs::read_to_string(&path) {
-            Ok(content) => {
-                let window_bounds = Rect::new(5, 3, 75, 20);
-                let title = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("Untitled");
-                let mut window = Window::new(window_bounds, title);
+```rust
+if event.what == EventType::Command && event.command == CM_CLOSE {
+    // Check if there are unsaved changes
+    if has_unsaved_changes() {
+        let result = message_box(
+            app,
+            "Save changes before closing?",
+            MF_WARNING | MF_YES_BUTTON | MF_NO_BUTTON | MF_CANCEL_BUTTON
+        );
 
-                let editor_bounds = Rect::new(1, 1, 69, 16);
-                let mut editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-                editor.set_text(&content);
-
-                window.add(Box::new(editor));
-                app.desktop.add(Box::new(window));
+        match result {
+            CM_YES => {
+                save_changes();
+                // Allow close
             }
-            Err(_) => {
-                message_box_ok(app, "Error", "Failed to open file");
+            CM_NO => {
+                // Allow close without saving
             }
+            CM_CANCEL => {
+                // Cancel the close
+                event.clear();
+                return;
+            }
+            _ => {}
         }
     }
-}
-
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
-
-    let file_menu_items = vec![
-        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "", 0),
-        MenuItem::with_shortcut("~O~pen...", CM_OPEN, KB_F3, "F3", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("E~x~it", CM_QUIT, KB_ALT_X, "Alt+X", 0),
-    ];
-    let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
-    menu_bar.add_submenu(file_menu);
-
-    let help_menu_items = vec![
-        MenuItem::with_shortcut("~A~bout", CM_ABOUT, KB_F1, "F1", 0),
-    ];
-    let help_menu = SubMenu::new("~H~elp", Menu::from_items(help_menu_items));
-    menu_bar.add_submenu(help_menu);
-
-    menu_bar
-}
-
-fn create_status_line(height: u16, width: u16) -> StatusLine {
-    StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        vec![
-            StatusItem::new("~Alt+X~ Exit", KB_ALT_X, CM_QUIT),
-            StatusItem::new("~F3~ Open", KB_F3, CM_OPEN),
-        ],
-    )
-}
-
-fn show_about_box(app: &mut Application) {
-    message_box_ok(
-        app,
-        "About",
-        "  Turbo Vision Tutorial App 3.0\n\n  Rust Edition"
-    );
 }
 ```
 
@@ -812,47 +460,87 @@ fn show_about_box(app: &mut Application) {
 In this chapter, you learned:
 
 - How to create and add windows to the desktop
-- How windows are managed by the desktop (Z-order, focus, activation)
-- How to create editor windows with full text editing capabilities
-- How to use FileDialog to let users select files
-- How to load files into editor windows
-- How to add child views to windows
-- How coordinate systems work (screen vs. window-relative)
+- The structure of windows (frame and interior group)
+- How windows handle dragging, resizing, and z-order
+- The difference between modeless and modal windows
+- How events flow through the window hierarchy
+- Coordinate systems in Turbo Vision
+- Practical techniques for window positioning and management
 
-### Key Differences from Pascal
+### Key Types and Functions
 
-| Pascal | Rust (v0.2.11) |
-|--------|----------------|
-| `TWindow` | `Window` struct |
-| `New(PWindow, Init(R, title, number))` | `Window::new(bounds, title)` |
-| `Desktop^.Insert(window)` | `app.desktop.add(Box::new(window))` |
-| `PEditWindow` | `Window` + `Editor` |
-| `TFileDialog` | `FileDialog` |
-| `ExecuteDialog(dialog, @data)` | `dialog.execute(app)` returns `Option<PathBuf>` |
-| Raw pointers | Rust ownership with `Box<dyn View>` |
-| Window numbers (Alt+1, Alt+2) | Not yet implemented in Rust version |
-| Tile/Cascade | Not yet implemented in Rust version |
+| Type/Function | Purpose | Module |
+|--------------|---------|---------|
+| `Window` | Resizable, draggable window with frame | `views::window` |
+| `Dialog` | Modal dialog window | `views::dialog` |
+| `Desktop` | Container for windows | `views::desktop` |
+| `Group` | Container for child views | `views::group` |
+| `Frame` | Window border and title bar | `views::frame` |
+| `window.add()` | Add a child view to a window | `views::window` |
+| `dialog.execute()` | Run a modal dialog | `views::dialog` |
+| `desktop.add()` | Add a window to the desktop | `views::desktop` |
+| `set_initial_focus()` | Set focus to first focusable child | `views::window` |
 
-### Best Practices
+### Next Steps
 
-1. **Clean up closed windows** - Call `app.desktop.remove_closed_windows()` after handling events
-2. **Use relative coordinates** - Child view coordinates are relative to their parent window
-3. **Check file operations** - Always handle `Result` from file I/O operations
-4. **Use descriptive titles** - Window titles should indicate content ("Untitled" vs. filename)
-5. **Center dialogs** - Position modal dialogs in the center of the screen
-6. **Add scrollbars to editors** - Use `with_scrollbars_and_indicator()` for full editor functionality
+In the next chapter, you'll learn about **persistence and configuration**, including how to save and load the desktop state, work with streams, and use resources to bundle application data.
+
+---
+
+## Architecture Notes: From Pascal to Rust
+
+The Rust implementation maintains the same conceptual model as Borland's Turbo Vision, but adapts it to Rust's ownership system:
+
+### Window Construction
+
+**Original Pascal:**
+```pascal
+TheWindow := New(PWindow, Init(R, 'A window', wnNoNumber));
+Desktop^.Insert(TheWindow);
+```
+
+**Rust Implementation:**
+```rust
+let window = Window::new(bounds, "A window");
+app.desktop.add(Box::new(window));
+```
+
+**Key differences:**
+- Rust uses stack allocation followed by boxing, not heap pointers
+- No separate `Init` method — constructor does all initialization
+- No window numbers (simplified interaction model)
+- Rust ownership prevents memory leaks automatically
+
+### Group Management
+
+**Original Pascal:** Groups used doubly-linked lists of pointers with manual memory management
+
+**Rust Implementation:** Groups use `Vec<Box<dyn View>>` with automatic memory management
+- Type-safe (trait objects replace void pointers)
+- Automatic cleanup when group is dropped
+- Same Z-order semantics (last in vector = topmost)
+
+### Modal Execution
+
+**Original Pascal:** Used `execView` with a local event loop and `endModal` to set end state
+
+**Rust Implementation:** Same pattern, adapted to Rust
+- `execute` method runs modal event loop (`src/views/group.rs:200-217`)
+- `end_modal` sets the end state
+- Automatic cleanup when dialog closes
+- Same conceptual model, safer implementation
 
 ---
 
 ## See Also
 
-- **Chapter 1** - Stepping into Turbo Vision (basics, event loop)
-- **Chapter 2** - Responding to Commands (menus, status lines, commands)
-- **docs/TURBOVISION-DESIGN.md** - Complete architecture documentation
-- **examples/editor_demo.rs** - Comprehensive editor examples
-- **examples/file_dialog.rs** - FileDialog usage examples
-- **examples/window_resize_demo.rs** - Window manipulation examples
-
----
-
-In the next chapter, you'll learn about **data entry** and **controls**, creating forms with input fields, checkboxes, radio buttons, and more interactive UI elements.
+- **Chapter 2**: Responding to Commands (event handling basics)
+- **Chapter 8**: Views and Groups (detailed group architecture)
+- **Chapter 9**: Event-Driven Programming (advanced event handling)
+- **Chapter 11**: Window and Dialog Box Objects (advanced window features)
+- **Example Code**: `examples/window_resize_demo.rs` — Window dragging and resizing
+- **Example Code**: `examples/dialog_example.rs` — Modal dialog with buttons
+- **Example Code**: `examples/window_modal_overlap_test.rs` — Modal window behavior
+- **Source Code**: `src/views/window.rs` — Window implementation
+- **Source Code**: `src/views/desktop.rs` — Desktop management
+- **Source Code**: `src/views/frame.rs` — Window frame implementation
