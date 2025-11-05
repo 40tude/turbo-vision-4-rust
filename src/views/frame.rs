@@ -146,10 +146,8 @@ impl View for Frame {
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        // Only handle events if frame is active (matches Borland tframe.cc:165)
-        if (self.state & SF_ACTIVE) == 0 {
-            return;
-        }
+        // Note: Removed SF_ACTIVE check - all frames are created active and never deactivated
+        // The check was preventing event handling in some edge cases
 
         if event.what == EventType::MouseDown && (event.mouse.buttons & MB_LEFT_BUTTON) != 0 {
             let mouse_pos = event.mouse.pos;
@@ -181,6 +179,21 @@ impl View for Frame {
                 event.clear(); // Mark event as handled
             }
         } else if event.what == EventType::MouseUp {
+            // Handle mouse up on close button FIRST (before drag/resize cleanup)
+            // This ensures close button works even if there was accidental mouse movement
+            let mouse_pos = event.mouse.pos;
+
+            if mouse_pos.y == self.bounds.a.y
+                && mouse_pos.x >= self.bounds.a.x + 2
+                && mouse_pos.x <= self.bounds.a.x + 4
+            {
+                // Generate close command
+                *event = Event::command(CM_CLOSE);
+                // Also clear drag/resize state if set
+                self.state &= !(SF_DRAGGING | SF_RESIZING);
+                return;
+            }
+
             // End dragging or resizing
             if (self.state & SF_DRAGGING) != 0 {
                 self.state &= !SF_DRAGGING;
@@ -188,18 +201,6 @@ impl View for Frame {
             } else if (self.state & SF_RESIZING) != 0 {
                 self.state &= !SF_RESIZING;
                 event.clear();
-            }
-        }
-
-        // Handle mouse up on close button (after mouse down was already on it)
-        if event.what == EventType::MouseUp {
-            let mouse_pos = event.mouse.pos;
-            if mouse_pos.y == self.bounds.a.y
-                && mouse_pos.x >= self.bounds.a.x + 2
-                && mouse_pos.x <= self.bounds.a.x + 4
-            {
-                // Generate close command
-                *event = Event::command(CM_CLOSE);
             }
         }
     }
