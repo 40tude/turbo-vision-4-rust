@@ -111,6 +111,13 @@ impl Dialog {
                 // Handle the event - this calls Dialog::handle_event()
                 // which will call end_modal if needed
                 self.handle_event(&mut event);
+
+                // If the event was converted to a command (e.g., KB_ENTER -> CM_OK),
+                // we need to process it again so the command handler runs
+                // Matches Borland: putEvent() re-queues the converted event
+                if event.what == EventType::Command {
+                    self.handle_event(&mut event);
+                }
             }
 
             // Check if dialog should close

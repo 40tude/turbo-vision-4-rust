@@ -6,6 +6,7 @@ use crate::core::geometry::Rect;
 use crate::core::palette::colors;
 use crate::core::state::{StateFlags, SF_DISABLED, SHADOW_BOTTOM, SHADOW_SOLID, SHADOW_TOP};
 use crate::terminal::Terminal;
+use std::any::Any;
 
 pub struct Button {
     bounds: Rect,
@@ -224,6 +225,10 @@ impl View for Button {
 
     fn button_command(&self) -> Option<u16> {
         Some(self.command)
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
