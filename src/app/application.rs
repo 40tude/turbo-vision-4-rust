@@ -8,6 +8,7 @@ use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_F10, KB_ALT_X, KB_ESC_X};
 use crate::core::command::{CommandId, CM_QUIT, CM_COMMAND_SET_CHANGED, CM_CANCEL};
 use crate::core::command_set;
+use crate::core::error::Result;
 use crate::terminal::Terminal;
 use crate::views::{View, menu_bar::MenuBar, status_line::StatusLine, desktop::Desktop};
 use std::time::Duration;
@@ -24,7 +25,36 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new() -> std::io::Result<Self> {
+    /// Creates a new application instance and initializes the terminal.
+    ///
+    /// This function sets up the complete application structure including:
+    /// - Terminal initialization in raw mode
+    /// - Desktop creation with background
+    /// - Global command set initialization
+    ///
+    /// The menu bar and status line must be set separately using
+    /// [`set_menu_bar()`](Self::set_menu_bar) and
+    /// [`set_status_line()`](Self::set_status_line).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if terminal initialization fails. See
+    /// [`Terminal::init()`](crate::Terminal::init) for details on possible
+    /// error conditions.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use turbo_vision::app::Application;
+    /// use turbo_vision::core::error::Result;
+    ///
+    /// fn main() -> Result<()> {
+    ///     let mut app = Application::new()?;
+    ///     // Set up menu bar, status line, add windows...
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn new() -> Result<Self> {
         let terminal = Terminal::init()?;
         let (width, height) = terminal.size();
 

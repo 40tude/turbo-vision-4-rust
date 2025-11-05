@@ -80,7 +80,7 @@ impl DrawBuffer {
         let mut chars = s.chars();
         let start_pos = pos;
 
-        #[allow(clippy::while_let_on_iterator)]
+        // Parse string character by character, handling ~X~ shortcut highlighting
         while let Some(ch) = chars.next() {
             if pos >= self.data.len() {
                 break;
@@ -88,7 +88,6 @@ impl DrawBuffer {
 
             if ch == '~' {
                 // Read characters until closing ~ and render with shortcut color
-                #[allow(clippy::while_let_on_iterator)]
                 while let Some(shortcut_ch) = chars.next() {
                     if shortcut_ch == '~' {
                         break;  // Found closing tilde

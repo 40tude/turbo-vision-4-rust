@@ -18,7 +18,7 @@ const KB_CTRL_A: u16 = 0x0001;  // Ctrl+A - Select All
 const KB_CTRL_C: u16 = 0x0003;  // Ctrl+C - Copy
 const KB_CTRL_V: u16 = 0x0016;  // Ctrl+V - Paste
 const KB_CTRL_X: u16 = 0x0018;  // Ctrl+X - Cut
-#[allow(dead_code)]
+#[expect(dead_code, reason = "Reserved for future undo functionality in Memo widget")]
 const KB_CTRL_Z: u16 = 0x001A;  // Ctrl+Z - Undo
 
 /// Memo - Multi-line text editor control

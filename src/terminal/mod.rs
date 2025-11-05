@@ -1,12 +1,40 @@
 // (C) 2025 - Enzo Lombardi
 
-//! Terminal abstraction layer - crossterm-based rendering with double buffering.
+//! Terminal abstraction layer providing crossterm-based rendering.
+//!
+//! This module provides the [`Terminal`] type which handles all interaction
+//! with the physical terminal including:
+//! - Raw mode management and alternate screen
+//! - Double-buffered rendering for flicker-free updates
+//! - Event polling (keyboard, mouse, resize)
+//! - Mouse capture and tracking
+//! - Clipping region management
+//! - ANSI dump support for debugging
+//!
+//! # Examples
+//!
+//! Basic terminal usage:
+//!
+//! ```rust,no_run
+//! use turbo_vision::Terminal;
+//! use turbo_vision::core::error::Result;
+//!
+//! fn main() -> Result<()> {
+//!     let mut terminal = Terminal::init()?;
+//!
+//!     // Use terminal for rendering...
+//!
+//!     terminal.shutdown()?;
+//!     Ok(())
+//! }
+//! ```
 
 use crate::core::draw::Cell;
 use crate::core::event::{Event, EventType, EscSequenceTracker, MB_LEFT_BUTTON, MB_MIDDLE_BUTTON, MB_RIGHT_BUTTON, KB_F12, KB_SHIFT_F12};
 use crate::core::geometry::Point;
 use crate::core::palette::Attr;
 use crate::core::ansi_dump;
+use crate::core::error::Result;
 use crossterm::{
     cursor, execute, queue, style,
     terminal::{self},
@@ -32,8 +60,46 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    /// Initialize the terminal
-    pub fn init() -> io::Result<Self> {
+    /// Initializes a new terminal instance in raw mode.
+    ///
+    /// This function sets up the terminal for full-screen TUI operation by:
+    /// - Enabling raw mode (no line buffering, no echo)
+    /// - Entering alternate screen buffer
+    /// - Hiding the cursor
+    /// - Enabling mouse capture
+    /// - Creating double buffers for flicker-free rendering
+    ///
+    /// The terminal is automatically restored to normal mode when dropped,
+    /// but it's recommended to call [`shutdown()`](Self::shutdown) explicitly
+    /// for better error handling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Terminal capabilities cannot be queried
+    /// - Raw mode cannot be enabled
+    /// - Alternate screen cannot be entered
+    /// - Mouse capture cannot be enabled
+    ///
+    /// Common causes include:
+    /// - Running in a non-terminal environment (e.g., redirected output)
+    /// - Terminal doesn't support required capabilities
+    /// - Permission denied for terminal operations
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use turbo_vision::Terminal;
+    /// use turbo_vision::core::error::Result;
+    ///
+    /// fn main() -> Result<()> {
+    ///     let mut terminal = Terminal::init()?;
+    ///     // Terminal is now in raw mode with alternate screen
+    ///     terminal.shutdown()?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn init() -> Result<Self> {
         terminal::enable_raw_mode()?;
         let mut stdout = stdout();
         execute!(
@@ -65,8 +131,32 @@ impl Terminal {
         })
     }
 
-    /// Shutdown the terminal
-    pub fn shutdown(&mut self) -> io::Result<()> {
+    /// Shuts down the terminal and restores normal mode.
+    ///
+    /// This function restores the terminal to its original state by:
+    /// - Disabling mouse capture
+    /// - Showing the cursor
+    /// - Leaving alternate screen buffer
+    /// - Disabling raw mode
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if terminal restoration fails. In most cases, the
+    /// terminal will still be usable even if an error occurs.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use turbo_vision::Terminal;
+    /// # use turbo_vision::core::error::Result;
+    /// # fn main() -> Result<()> {
+    /// let mut terminal = Terminal::init()?;
+    /// // Use terminal...
+    /// terminal.shutdown()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn shutdown(&mut self) -> Result<()> {
         let mut stdout = stdout();
         execute!(
             stdout,

@@ -2,6 +2,8 @@
 
 //! Geometric primitives - Point and Rect types for positioning and sizing views.
 
+use std::fmt;
+
 /// A point in 2D space
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Point {
@@ -16,6 +18,12 @@ impl Point {
 
     pub const fn zero() -> Self {
         Self { x: 0, y: 0 }
+    }
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
@@ -118,6 +126,12 @@ impl Default for Rect {
     }
 }
 
+impl fmt::Display for Rect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}, {}, {}]", self.a.x, self.a.y, self.b.x, self.b.y)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +206,23 @@ mod tests {
         // Overlapping on one corner
         let r6 = Rect::new(8, 8, 15, 15);
         assert!(r1.intersects(&r6));
+    }
+
+    #[test]
+    fn test_point_display() {
+        let p = Point::new(10, 20);
+        assert_eq!(format!("{}", p), "(10, 20)");
+
+        let p2 = Point::new(-5, 0);
+        assert_eq!(format!("{}", p2), "(-5, 0)");
+    }
+
+    #[test]
+    fn test_rect_display() {
+        let r = Rect::new(1, 2, 11, 12);
+        assert_eq!(format!("{}", r), "[1, 2, 11, 12]");
+
+        let r2 = Rect::new(0, 0, 80, 25);
+        assert_eq!(format!("{}", r2), "[0, 0, 80, 25]");
     }
 }

@@ -88,11 +88,9 @@ impl StatusLine {
 
                 // Parse ~X~ for highlighting - everything between tildes is highlighted
                 let mut chars = item.text.chars();
-                #[allow(clippy::while_let_on_iterator)]
                 while let Some(ch) = chars.next() {
                     if ch == '~' {
                         // Read all characters until closing ~ in highlight color
-                        #[allow(clippy::while_let_on_iterator)]
                         while let Some(shortcut_ch) = chars.next() {
                             if shortcut_ch == '~' {
                                 break;  // Found closing tilde

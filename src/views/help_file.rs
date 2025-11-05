@@ -84,9 +84,10 @@ pub struct HelpFile {
 
 impl HelpFile {
     /// Create a new help file from a markdown file
-    pub fn new(path: &str) -> std::io::Result<Self> {
+    pub fn new(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
+        let path_ref = path.as_ref();
         let mut help_file = Self {
-            path: path.to_string(),
+            path: path_ref.to_string_lossy().to_string(),
             topics: HashMap::new(),
             default_topic: None,
         };

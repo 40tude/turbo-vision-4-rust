@@ -26,6 +26,43 @@ pub const MAX_COMMANDS: usize = 32 * 2048;
 
 // Global command set - matches Borland's TView::curCommandSet (tview.cc:67)
 // Uses thread_local to avoid Sync requirement while maintaining global accessibility
+//
+// ## Thread-Local Global Command Set
+//
+// For compatibility with Borland TV, commands are managed through a thread-local
+// global command set. This design has the following implications:
+//
+// - **Per-thread state**: Each thread has its own independent command set
+// - **Test isolation**: Multiple Application instances in different threads don't interfere
+// - **No synchronization overhead**: No need for Mutex/Arc since state is thread-local
+// - **Single-threaded TUI**: Appropriate for terminal applications (always single-threaded)
+//
+// **Usage:**
+// ```rust
+// use turbo_vision::core::command_set::{enable_command, disable_command, command_enabled};
+// use turbo_vision::core::command::CM_SAVE;
+//
+// // Enable a command
+// enable_command(CM_SAVE);
+//
+// // Check if command is enabled
+// if command_enabled(CM_SAVE) {
+//     // Save operation is available
+// }
+//
+// // Disable a command
+// disable_command(CM_SAVE);
+// ```
+//
+// **Alternative Design (Future):**
+// For applications requiring explicit command set management, consider
+// passing CommandSet through Application:
+// ```rust,ignore
+// pub struct Application {
+//     command_set: CommandSet,
+//     // ...
+// }
+// ```
 thread_local! {
     static GLOBAL_COMMAND_SET: RefCell<CommandSet> = RefCell::new(CommandSet::with_all_enabled());
     static COMMAND_SET_CHANGED: RefCell<bool> = RefCell::new(false);

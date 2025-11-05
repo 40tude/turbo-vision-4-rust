@@ -2,9 +2,10 @@
 // Debug key codes to see what's actually being received
 use turbo_vision::terminal::Terminal;
 use turbo_vision::core::event::{KB_F11, KB_F12};
+use turbo_vision::core::error::Result;
 use std::time::Duration;
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<()> {
     let mut terminal = Terminal::init()?;
 
     println!("Key Debug Test - Press keys to see their codes");

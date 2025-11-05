@@ -18,9 +18,9 @@ use std::cmp::min;
 // Control key codes
 const KB_CTRL_A: u16 = 0x0001;  // Ctrl+A - Select All
 const KB_CTRL_C: u16 = 0x0003;  // Ctrl+C - Copy
-#[allow(dead_code)]
+#[expect(dead_code, reason = "Reserved for future find/replace functionality")]
 const KB_CTRL_F: u16 = 0x0006;  // Ctrl+F - Find
-#[allow(dead_code)]
+#[expect(dead_code, reason = "Reserved for future find/replace functionality")]
 const KB_CTRL_H: u16 = 0x0008;  // Ctrl+H - Replace
 const KB_CTRL_V: u16 = 0x0016;  // Ctrl+V - Paste
 const KB_CTRL_X: u16 = 0x0018;  // Ctrl+X - Cut
@@ -240,10 +240,11 @@ impl Editor {
 
     /// Load file contents into the editor
     /// Matches Borland's TFileEditor::load()
-    pub fn load_file(&mut self, path: &str) -> std::io::Result<()> {
-        let content = std::fs::read_to_string(path)?;
+    pub fn load_file(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        let path_ref = path.as_ref();
+        let content = std::fs::read_to_string(path_ref)?;
         self.set_text(&content);
-        self.filename = Some(path.to_string());
+        self.filename = Some(path_ref.to_string_lossy().to_string());
         self.modified = false;
         self.undo_stack.clear();
         self.redo_stack.clear();
@@ -266,10 +267,11 @@ impl Editor {
 
     /// Save editor contents to a specific filename
     /// Matches Borland's TFileEditor::saveAs()
-    pub fn save_as(&mut self, path: &str) -> std::io::Result<()> {
+    pub fn save_as(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        let path_ref = path.as_ref();
         let content = self.get_text();
-        std::fs::write(path, content)?;
-        self.filename = Some(path.to_string());
+        std::fs::write(path_ref, content)?;
+        self.filename = Some(path_ref.to_string_lossy().to_string());
         self.modified = false;
         self.update_indicator();
         Ok(())

@@ -104,9 +104,59 @@ impl Default for HistoryList {
     }
 }
 
-/// Global history manager
+/// Global history manager singleton.
 ///
-/// Manages all history lists by ID. Uses OnceLock for lazy initialization.
+/// Manages all history lists by ID. Uses `OnceLock` for lazy initialization
+/// and `Mutex` for thread-safe access.
+///
+/// ## Design Rationale
+///
+/// - **Global state**: Matches Borland TV's global history system
+/// - **Lazy initialization**: `OnceLock` ensures single initialization across threads
+/// - **Thread-safe**: `Mutex` protects the HashMap from concurrent access
+/// - **Process-wide**: All application instances share the same history
+///
+/// ## Thread Safety
+///
+/// The history manager is fully thread-safe:
+/// - `OnceLock` ensures singleton is initialized exactly once
+/// - `Mutex<HashMap>` protects against concurrent modifications
+/// - Appropriate for single-threaded TUI apps and multi-threaded tests
+///
+/// ## Usage Pattern
+///
+/// ```rust
+/// use turbo_vision::core::history::HistoryManager;
+///
+/// // Define history IDs as constants
+/// const HISTORY_SEARCH: u16 = 1;
+/// const HISTORY_REPLACE: u16 = 2;
+///
+/// // Add items to history
+/// HistoryManager::add(HISTORY_SEARCH, "search term".to_string());
+/// HistoryManager::add(HISTORY_SEARCH, "another search".to_string());
+///
+/// // Retrieve history for displaying in UI
+/// let items = HistoryManager::get_list(HISTORY_SEARCH);
+/// // items = ["another search", "search term"]  // most recent first
+/// ```
+///
+/// ## Alternative Design (Future)
+///
+/// For applications requiring isolated history (e.g., testing multiple instances):
+/// ```rust,ignore
+/// pub struct Application {
+///     history: HistoryManager,  // Instance-specific
+///     // ...
+/// }
+///
+/// // Pass history reference through view hierarchy
+/// impl View for InputLine {
+///     fn handle_event(&mut self, event: &Event, history: &mut HistoryManager) {
+///         // Use instance-specific history
+///     }
+/// }
+/// ```
 fn history_manager() -> &'static Mutex<HashMap<u16, HistoryList>> {
     static HISTORY_MANAGER: OnceLock<Mutex<HashMap<u16, HistoryList>>> = OnceLock::new();
     HISTORY_MANAGER.get_or_init(|| Mutex::new(HashMap::new()))

@@ -4,8 +4,62 @@
 
 use std::sync::Mutex;
 
-/// Global clipboard for copy/cut/paste operations
-/// Supports both in-memory clipboard and OS clipboard integration
+/// Global clipboard for copy/cut/paste operations.
+///
+/// Uses a global static for simplicity and consistency with Borland TV's global clipboard model.
+///
+/// ## Design Rationale
+///
+/// - **Global state**: Simpler API for single-application scenarios
+/// - **Thread-safe**: Uses `Mutex<String>` for safe concurrent access
+/// - **OS integration**: Syncs with system clipboard when available
+/// - **Fallback**: In-memory clipboard when OS clipboard is unavailable
+///
+/// ## Thread Safety
+///
+/// The clipboard is protected by a `Mutex`, making it safe to use from multiple threads.
+/// However, TUI applications are typically single-threaded, so contention is minimal.
+///
+/// ## Usage
+///
+/// ```rust
+/// use turbo_vision::core::clipboard::{set_clipboard, get_clipboard, has_clipboard_content};
+///
+/// // Copy text to clipboard
+/// set_clipboard("Hello, World!");
+///
+/// // Check if clipboard has content
+/// if has_clipboard_content() {
+///     // Paste from clipboard
+///     let text = get_clipboard();
+///     println!("Clipboard contains: {}", text);
+/// }
+/// ```
+///
+/// ## Testing Considerations
+///
+/// For applications needing isolated clipboard state (e.g., unit tests), consider:
+/// - Using a feature-gated test clipboard implementation
+/// - Injecting clipboard through Application context as a trait
+///
+/// Example alternative design:
+/// ```rust,ignore
+/// pub trait Clipboard {
+///     fn set(&mut self, text: String);
+///     fn get(&self) -> String;
+///     fn clear(&mut self);
+/// }
+///
+/// pub struct GlobalClipboard;
+/// impl Clipboard for GlobalClipboard { /* use global static */ }
+///
+/// #[cfg(feature = "test-util")]
+/// pub struct TestClipboard {
+///     content: String,
+/// }
+/// #[cfg(feature = "test-util")]
+/// impl Clipboard for TestClipboard { /* isolated state */ }
+/// ```
 static CLIPBOARD: Mutex<String> = Mutex::new(String::new());
 
 /// Set the clipboard content (both in-memory and OS clipboard)

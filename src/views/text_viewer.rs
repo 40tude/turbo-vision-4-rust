@@ -94,8 +94,8 @@ impl TextViewer {
     }
 
     /// Load text from a file
-    pub fn load_file(&mut self, path: &str) -> std::io::Result<()> {
-        let content = std::fs::read_to_string(path)?;
+    pub fn load_file(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        let content = std::fs::read_to_string(path.as_ref())?;
         self.set_text(&content);
         Ok(())
     }

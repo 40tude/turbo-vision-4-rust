@@ -37,7 +37,7 @@ impl EditWindow {
     }
 
     /// Load a file into the editor
-    pub fn load_file(&mut self, path: &str) -> std::io::Result<()> {
+    pub fn load_file(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         self.editor.load_file(path)
     }
 
@@ -47,7 +47,7 @@ impl EditWindow {
     }
 
     /// Save as a different file
-    pub fn save_as(&mut self, path: &str) -> std::io::Result<()> {
+    pub fn save_as(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         self.editor.save_as(path)
     }
 

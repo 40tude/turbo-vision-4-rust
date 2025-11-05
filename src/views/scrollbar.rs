@@ -9,16 +9,11 @@ use crate::core::palette::colors;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 
-/// Scroll bar part codes
-#[allow(dead_code)]
+/// Scroll bar part codes (used by getPartCode() method)
 const SB_INDICATOR: i16 = 0;
-#[allow(dead_code)]
 const SB_UP_ARROW: i16 = 1;
-#[allow(dead_code)]
 const SB_DOWN_ARROW: i16 = 2;
-#[allow(dead_code)]
 const SB_PAGE_UP: i16 = 3;
-#[allow(dead_code)]
 const SB_PAGE_DOWN: i16 = 4;
 
 /// Scroll bar characters for vertical scrollbar
@@ -122,7 +117,7 @@ impl ScrollBar {
     }
 
     /// Get the part of the scrollbar at a given position
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Borland TV API - reserved for advanced scrollbar interaction")]
     fn get_part_at(&self, p: Point) -> i16 {
         let rel_x = p.x - self.bounds.a.x;
         let rel_y = p.y - self.bounds.a.y;
@@ -159,7 +154,7 @@ impl ScrollBar {
     }
 
     /// Scroll by a given part
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Borland TV API - reserved for advanced scrollbar interaction")]
     fn scroll_step(&mut self, part: i16) -> i32 {
         match part {
             SB_UP_ARROW => -self.ar_step,

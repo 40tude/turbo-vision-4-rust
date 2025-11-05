@@ -5,6 +5,7 @@
 use super::command::CommandId;
 use super::geometry::Point;
 use crossterm::event::{KeyCode as CKC, KeyEvent, KeyModifiers};
+use std::fmt;
 use std::time::{Duration, Instant};
 
 /// Keyboard code (scan code + character)
@@ -189,6 +190,47 @@ impl Event {
 impl Default for Event {
     fn default() -> Self {
         Self::nothing()
+    }
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.what {
+            EventType::Nothing => write!(f, "Event::Nothing"),
+            EventType::Keyboard => {
+                write!(f, "Event::Keyboard(key_code={:#06x}", self.key_code)?;
+                if !self.key_modifiers.is_empty() {
+                    write!(f, ", modifiers={:?}", self.key_modifiers)?;
+                }
+                write!(f, ")")
+            }
+            EventType::MouseDown => write!(
+                f,
+                "Event::MouseDown({}, buttons={:#04x}{})",
+                self.mouse.pos,
+                self.mouse.buttons,
+                if self.mouse.double_click { ", double_click" } else { "" }
+            ),
+            EventType::MouseUp => write!(
+                f,
+                "Event::MouseUp({}, buttons={:#04x})",
+                self.mouse.pos, self.mouse.buttons
+            ),
+            EventType::MouseMove => write!(
+                f,
+                "Event::MouseMove({}, buttons={:#04x})",
+                self.mouse.pos, self.mouse.buttons
+            ),
+            EventType::MouseAuto => write!(
+                f,
+                "Event::MouseAuto({}, buttons={:#04x})",
+                self.mouse.pos, self.mouse.buttons
+            ),
+            EventType::MouseWheelUp => write!(f, "Event::MouseWheelUp({})", self.mouse.pos),
+            EventType::MouseWheelDown => write!(f, "Event::MouseWheelDown({})", self.mouse.pos),
+            EventType::Command => write!(f, "Event::Command({:#06x})", self.command),
+            EventType::Broadcast => write!(f, "Event::Broadcast({:#06x})", self.command),
+        }
     }
 }
 
