@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Event system - keyboard and mouse event handling with Borland-compatible key codes.
+
 use super::command::CommandId;
 use super::geometry::Point;
 use crossterm::event::{KeyCode as CKC, KeyEvent, KeyModifiers};

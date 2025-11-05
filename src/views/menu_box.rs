@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! MenuBox view - popup menu container for dropdown menus.
 // MenuBox - Popup menu container
 //
 // Matches Borland: TMenuBox (menubox.h, tmenubox.cc)

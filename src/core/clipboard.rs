@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Clipboard support - global clipboard management with OS integration.
+
 use std::sync::Mutex;
 
 /// Global clipboard for copy/cut/paste operations

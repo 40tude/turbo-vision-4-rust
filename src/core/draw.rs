@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Drawing primitives - Cell and DrawBuffer types for efficient line-based rendering.
+
 use super::palette::Attr;
 
 /// A single character cell with attributes

@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Help context system - maps context IDs to help topics for F1 key support.
 // help_context - Context-sensitive help support
 //
 // Maps help context IDs to help topics.

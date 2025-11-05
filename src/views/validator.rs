@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Validator - input validation system for InputLine controls.
 /// Validator module - Input validation for InputLine
 /// Matches Borland's TValidator architecture from validate.h and tvalidat.cc
 ///

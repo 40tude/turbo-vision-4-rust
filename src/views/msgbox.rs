@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! MsgBox - message box utilities for displaying alerts and confirmations.
+
 use crate::core::command::{CommandId, CM_OK, CM_CANCEL, CM_YES, CM_NO};
 use crate::core::geometry::Rect;
 use crate::app::Application;

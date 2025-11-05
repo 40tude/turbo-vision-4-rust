@@ -1,4 +1,8 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Color palette - 16-color palette definitions and attribute management.
+// Color Palette
+// Color definitions, attributes, and palette management matching Borland Turbo Vision
 use crossterm::style::Color;
 
 /// 16-color palette matching Turbo Vision

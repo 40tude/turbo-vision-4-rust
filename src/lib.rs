@@ -1,5 +1,9 @@
 // (C) 2025 - Enzo Lombardi
-// Turbo Vision - Rust TUI Library
+
+//! Turbo Vision - A modern Rust implementation of the classic Turbo Vision TUI framework.
+//! Provides a complete toolkit for building text-based user interfaces with windows, dialogs,
+//! menus, and controls matching the original Borland Turbo Vision architecture.
+
 // Core modules
 pub mod core;
 pub mod terminal;

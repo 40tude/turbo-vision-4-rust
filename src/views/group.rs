@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Group view - container for managing multiple child views with focus handling.
+
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_TAB, KB_SHIFT_TAB};
 use crate::core::draw::DrawBuffer;

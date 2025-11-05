@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! View state flags - constants for tracking view visibility, focus, and behavior.
+
 /// View state flags
 pub type StateFlags = u16;
 

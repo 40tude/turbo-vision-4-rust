@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Desktop view - main workspace for managing application windows.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::palette::colors;

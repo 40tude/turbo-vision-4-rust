@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Background view - solid color background fill for containers.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;

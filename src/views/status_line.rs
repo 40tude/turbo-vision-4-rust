@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! StatusLine view - bottom status bar with keyboard shortcuts and context help.
+
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KeyCode, MB_LEFT_BUTTON};
 use crate::core::draw::DrawBuffer;

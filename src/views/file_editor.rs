@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! FileEditor view - text editor with file loading, saving, and modified state tracking.
 // FileEditor - Editor with file management and save prompts
 //
 // Matches Borland: TFileEditor (tfileedi.h, tfileedi.cc)

@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! DirListBox view - directory tree navigation and selection.
 // DirListBox - Directory tree viewer
 //
 // Matches Borland: TDirListBox (views/tdirlist.cc)

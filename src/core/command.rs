@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Command identifiers - constants for all UI commands and messages.
+
 /// Command identifiers
 pub type CommandId = u16;
 

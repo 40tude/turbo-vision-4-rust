@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Views module - all UI components and widgets.
+
 pub mod view;
 pub mod group;
 pub mod window;

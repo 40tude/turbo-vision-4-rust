@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Syntax highlighting system - extensible token-based syntax coloring for editors.
 // Syntax Highlighting System
 //
 // Provides extensible syntax highlighting for the Editor component.

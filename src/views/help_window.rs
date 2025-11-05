@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! HelpWindow view - window container for displaying context-sensitive help.
 // HelpWindow - Help display window
 //
 // Matches Borland: THelpWindow (help.h)

@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Editor view - advanced multi-line text editor with syntax highlighting support.
+
 use crate::core::geometry::{Point, Rect};
 use crate::core::event::{Event, EventType, KB_UP, KB_DOWN, KB_LEFT, KB_RIGHT, KB_PGUP, KB_PGDN, KB_HOME, KB_END, KB_ENTER, KB_BACKSPACE, KB_DEL, KB_TAB};
 use crate::core::draw::DrawBuffer;

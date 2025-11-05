@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! View trait - base interface for all UI components with event handling and drawing.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;

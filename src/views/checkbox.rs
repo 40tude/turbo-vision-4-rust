@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! CheckBox view - boolean selection control with checkable items.
 // CheckBox - Boolean selection control
 //
 // Matches Borland: TCheckBoxes (extends TCluster)

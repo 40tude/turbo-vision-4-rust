@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! ListBox view - scrollable list with single selection support.
+
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_ENTER, MB_LEFT_BUTTON};
 use crate::core::palette::colors;

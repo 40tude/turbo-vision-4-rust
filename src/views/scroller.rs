@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Scroller view - scrollable viewport base for text viewers and editors.
+
 use crate::core::geometry::{Point, Rect};
 use crate::core::event::Event;
 use crate::terminal::Terminal;

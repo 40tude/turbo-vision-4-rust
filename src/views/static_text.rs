@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! StaticText view - multi-line static text display with word wrapping.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;

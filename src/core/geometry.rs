@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Geometric primitives - Point and Rect types for positioning and sizing views.
+
 /// A point in 2D space
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Point {

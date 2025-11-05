@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Button view - clickable button with keyboard shortcuts and command dispatch.
+
 use super::view::{write_line_to_terminal, View};
 use crate::core::command::CommandId;
 use crate::core::draw::DrawBuffer;

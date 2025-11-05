@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! SortedListBox view - automatically sorted list with binary search support.
 // SortedListBox - A sorted list with binary search capability
 //
 // Matches Borland: TSortedListBox (extends TListBox)

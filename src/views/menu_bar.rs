@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! MenuBar view - horizontal top menu bar with dropdown submenus.
 // MenuBar - Horizontal menu bar
 //
 // Matches Borland: TMenuBar (menubar.h, tmenubar.cc)

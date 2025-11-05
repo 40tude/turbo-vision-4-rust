@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! HistoryWindow view - popup window for selecting from input history.
 // HistoryWindow - Popup window displaying history items
 //
 // Matches Borland: THistoryWindow (modal window with THistoryViewer)

@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Menu data structures - declarative menu building with Borland-compatible API.
 // Borland-compatible menu data structures
 // Matches the original Turbo Vision TMenuItem, TSubMenu, TMenu architecture
 //

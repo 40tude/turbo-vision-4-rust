@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Dialog view - modal window for user interaction with OK/Cancel buttons.
+
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_ESC_ESC, KB_ENTER};
 use crate::core::command::{CommandId, CM_CANCEL};

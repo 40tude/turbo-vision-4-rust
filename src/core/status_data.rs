@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Status line data structures - declarative status bar building with command-based visibility.
 // Borland-compatible status line data structures
 // Matches the original Turbo Vision TStatusItem, TStatusDef architecture
 //

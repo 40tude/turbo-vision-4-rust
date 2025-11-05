@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! MenuViewer - base trait and state management for menu view implementations.
 // Menu Viewer - Base trait and state for menu views
 //
 // Matches Borland: TMenuView (menuview.h, tmenuvie.cc)

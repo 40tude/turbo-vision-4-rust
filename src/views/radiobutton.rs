@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! RadioButton view - mutually exclusive selection control (one choice from many).
 // RadioButton - Mutually exclusive selection control
 //
 // Matches Borland: TRadioButtons (extends TCluster)

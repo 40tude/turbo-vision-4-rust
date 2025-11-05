@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! LookupValidator - validates input against a list of allowed values.
 // LookupValidator - Validates input against a list of valid values
 //
 // Matches Borland: TLookupValidator (validate.h)

@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! EditWindow view - window container for editor with title bar showing filename.
 // EditWindow - Window wrapper for Editor
 //
 // Matches Borland: TEditWindow (teditor.h)

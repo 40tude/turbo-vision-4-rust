@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! ParamText view - parametrized text display with dynamic string substitution.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::palette::colors;

@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Indicator view - visual indicator for displaying scroll position or progress.
+
 use crate::core::geometry::{Point, Rect};
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;

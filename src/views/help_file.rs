@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! HelpFile - markdown-based help content loader and parser.
 // HelpFile - Markdown-based help file manager
 //
 // Modern alternative to Borland's THelpFile (binary format)

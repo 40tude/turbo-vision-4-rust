@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! FileList view - specialized list viewer for displaying and selecting files.
 // FileList - Specialized list viewer for files
 //
 // Matches Borland: TFileList (views/tfillist.cc)

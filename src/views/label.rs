@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Label view - static text display with optional linked control focus.
+
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;

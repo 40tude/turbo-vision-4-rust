@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! ListViewer - base trait and state for scrollable list view implementations.
 // List Viewer - Base trait and state for scrollable list views
 //
 // Matches Borland: TListViewer (lstviewr.h, tlistvie.cc)

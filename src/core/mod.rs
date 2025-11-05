@@ -1,4 +1,7 @@
 // (C) 2025 - Enzo Lombardi
+
+//! Core module - fundamental types and systems used throughout the framework.
+
 pub mod geometry;
 pub mod draw;
 pub mod event;

@@ -1,4 +1,6 @@
 // (C) 2025 - Enzo Lombardi
+
+//! HelpViewer view - scrollable help content viewer with cross-reference navigation.
 // HelpViewer - Help content viewer based on TextView
 //
 // Matches Borland: THelpViewer (help.h)
