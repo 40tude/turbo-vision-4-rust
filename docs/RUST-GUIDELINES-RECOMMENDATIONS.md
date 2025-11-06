@@ -2,7 +2,7 @@
 
 **Generated:** 2025-11-05
 **Last Updated:** 2025-11-06
-**Version:** 1.8
+**Version:** 1.9
 **Source Guidelines:** ~/rust-guidelines.txt (Pragmatic Rust Guidelines)
 **Analyzed Directory:** src/
 
@@ -17,6 +17,12 @@ This document provides a comprehensive analysis of the turbo-vision library agai
 - ✅ Comprehensive examples in doc comments
 - ✅ 5 unit tests for ButtonBuilder (all passing)
 - ✅ All 185 library tests passing
+- ✅ **Static to DI Analysis**: Comprehensive 300+ line analysis document
+  - Analyzed 3 global/static patterns (CommandSet, HistoryManager, Clipboard)
+  - Documented trade-offs of current approach vs dependency injection
+  - **Decision**: Keep current static approach (appropriate for TUI framework)
+  - Provided complete DI migration roadmap for future reference
+  - See [STATIC-TO-DI-ANALYSIS.md](STATIC-TO-DI-ANALYSIS.md)
 
 **2025-11-06 (Phase 4.12 - Testing Infrastructure) ✅ COMPLETED:**
 - ✅ Added `test-util` feature to Cargo.toml
@@ -1256,7 +1262,10 @@ Consider adding GitHub Actions workflow for:
     - [x] Add builder patterns for complex types:
       - [x] ButtonBuilder (completed 2025-11-06)
       - [x] WindowBuilder (completed 2025-11-06)
-    - [ ] Consider refactoring statics to dependency injection (deferred - low priority)
+    - [x] Consider refactoring statics to dependency injection (analyzed 2025-11-06)
+      - See [STATIC-TO-DI-ANALYSIS.md](STATIC-TO-DI-ANALYSIS.md) for comprehensive analysis
+      - **Decision**: Keep current static approach (appropriate for TUI framework)
+      - Analysis includes complete DI migration plan for future reference
 
 ---
 
@@ -1493,7 +1502,7 @@ The library has achieved production-ready standards with all critical, high, and
 - 📊 **Impact:** Library now uses 100% safe Rust, production-ready error handling, clear documentation
 - 🎯 **Benefit:** Eliminates undefined behavior, better error messages, easier to learn
 
-### 2025-11-06 - Phase 4.13 Completed (API Enhancements)
+### 2025-11-06 - Phase 4.13 Completed (API Enhancements) - ALL ITEMS
 - ✅ **ButtonBuilder**
   - Fluent API with methods: bounds(), title(), command(), default()
   - Uses #[must_use] on builder methods for correct usage
@@ -1505,8 +1514,23 @@ The library has achieved production-ready standards with all critical, high, and
   - Uses #[must_use] on builder methods
   - Panics with clear messages if required fields missing
   - Doctest example showing window creation with button
-- 📊 **Impact:** More ergonomic and discoverable API for creating UI components
-- 🎯 **Benefit:** Easier to construct complex views, better discoverability through examples
+- ✅ **Static to Dependency Injection Analysis (FINAL ITEM)**
+  - Created comprehensive 300+ line analysis document: STATIC-TO-DI-ANALYSIS.md
+  - Analyzed 3 global/static patterns:
+    - CommandSet (thread-local with RefCell)
+    - HistoryManager (OnceLock + Mutex singleton)
+    - Clipboard (static Mutex)
+  - **Decision**: Keep current static approach (pragmatic for TUI framework)
+  - Documented trade-offs: simplicity vs testability, ergonomics vs explicitness
+  - Provided complete DI refactoring plan with:
+    - AppContext struct design
+    - Clipboard/History traits
+    - Phase-by-phase migration strategy
+    - Example implementations
+    - Testing implications
+  - Recommendation: Revisit if requirements change (multi-instance, plugins, library use)
+- 📊 **Impact:** Complete API enhancement phase with builder patterns + architectural analysis
+- 🎯 **Benefit:** Ergonomic API + informed decision on architecture with migration path documented
 
 ### 2025-11-06 - Phase 3.8 and 4.12 Completed
 - ✅ **Phase 3.8 - Documentation Polish**
@@ -1528,8 +1552,8 @@ The library has achieved production-ready standards with all critical, high, and
 
 ---
 
-**Document Version:** 1.8
+**Document Version:** 1.9
 **Generated:** 2025-11-05
-**Last Updated:** 2025-11-06 (Phase 4.13 completed - Builder patterns added)
+**Last Updated:** 2025-11-06 (Phase 4.13 fully completed - Static/DI analysis done)
 **Analyzed Codebase:** turbo-vision @ main branch
 **Guidelines Source:** Pragmatic Rust Guidelines (~/rust-guidelines.txt)
