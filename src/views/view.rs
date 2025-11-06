@@ -191,6 +191,41 @@ pub trait View {
     fn set_end_state(&mut self, _command: CommandId) {
         // Default: do nothing (only modal views need this)
     }
+
+    /// Convert local coordinates to global (screen) coordinates
+    /// Matches Borland: TView::makeGlobal(TPoint source, TPoint& dest)
+    ///
+    /// In Borland, makeGlobal traverses the owner chain and accumulates offsets.
+    /// In this Rust implementation, views store absolute bounds (converted in Group::add()),
+    /// so we simply add the view's origin to the local coordinates.
+    ///
+    /// # Arguments
+    /// * `local_x` - X coordinate relative to view's interior (0,0 = top-left of view)
+    /// * `local_y` - Y coordinate relative to view's interior
+    ///
+    /// # Returns
+    /// Global (screen) coordinates as (x, y) tuple
+    fn make_global(&self, local_x: i16, local_y: i16) -> (i16, i16) {
+        let bounds = self.bounds();
+        (bounds.a.x + local_x, bounds.a.y + local_y)
+    }
+
+    /// Convert global (screen) coordinates to local view coordinates
+    /// Matches Borland: TView::makeLocal(TPoint source, TPoint& dest)
+    ///
+    /// In Borland, makeLocal is the inverse of makeGlobal, converting screen
+    /// coordinates back to view-relative coordinates.
+    ///
+    /// # Arguments
+    /// * `global_x` - X coordinate in screen space
+    /// * `global_y` - Y coordinate in screen space
+    ///
+    /// # Returns
+    /// Local coordinates as (x, y) tuple, where (0,0) is the view's top-left
+    fn make_local(&self, global_x: i16, global_y: i16) -> (i16, i16) {
+        let bounds = self.bounds();
+        (global_x - bounds.a.x, global_y - bounds.a.y)
+    }
 }
 
 /// Helper to draw a line to the terminal
