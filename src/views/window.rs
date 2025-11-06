@@ -69,8 +69,8 @@ impl Window {
         }
     }
 
-    pub fn add(&mut self, view: Box<dyn View>) {
-        self.interior.add(view);
+    pub fn add(&mut self, view: Box<dyn View>) -> usize {
+        self.interior.add(view)
     }
 
     pub fn set_initial_focus(&mut self) {
