@@ -34,7 +34,7 @@ impl Desktop {
         }
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> usize {
         use crate::core::state::{OF_CENTERED, OF_CENTER_X, OF_CENTER_Y};
 
         // Apply automatic centering if OF_CENTERED flags are set
@@ -44,7 +44,7 @@ impl Desktop {
             self.center_view(&mut *view, options);
         }
 
-        self.children.add(view);
+        let index = self.children.add(view);
         // Focus on the newly added window (last child)
         let num_children = self.children.len();
         if num_children > 0 {
@@ -56,6 +56,7 @@ impl Desktop {
                 self.children.set_focus_to(last_idx);
             }
         }
+        index
     }
 
     /// Center a view within the desktop bounds based on its option flags

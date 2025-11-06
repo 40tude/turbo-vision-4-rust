@@ -40,7 +40,7 @@ impl Group {
         }
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> usize {
         // Convert child's bounds from relative to absolute coordinates
         // Child bounds are specified relative to this Group's interior
         let child_bounds = view.bounds();
@@ -52,6 +52,7 @@ impl Group {
         );
         view.set_bounds(absolute_bounds);
         self.children.push(view);
+        self.children.len() - 1  // Return index of newly added child
     }
 
     pub fn set_initial_focus(&mut self) {
