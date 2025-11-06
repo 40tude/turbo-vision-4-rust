@@ -168,6 +168,47 @@ impl Terminal {
         Ok(())
     }
 
+    /// Suspend the terminal (for Ctrl+Z handling)
+    /// Matches Borland: TScreen::suspend() - restores terminal to normal mode
+    /// Leaves raw mode and restores cursor, but keeps the Terminal struct alive
+    /// Call resume() to return to TUI mode
+    pub fn suspend(&mut self) -> Result<()> {
+        let mut stdout = stdout();
+        execute!(
+            stdout,
+            event::DisableMouseCapture,
+            cursor::Show,
+            terminal::LeaveAlternateScreen
+        )?;
+        terminal::disable_raw_mode()?;
+        Ok(())
+    }
+
+    /// Resume the terminal after suspension (for Ctrl+Z handling)
+    /// Matches Borland: TScreen::resume() - re-enters raw mode and redraws
+    /// Re-initializes terminal state and forces full screen redraw
+    pub fn resume(&mut self) -> Result<()> {
+        terminal::enable_raw_mode()?;
+        let mut stdout = stdout();
+        execute!(
+            stdout,
+            terminal::EnterAlternateScreen,
+            cursor::Hide,
+            event::EnableMouseCapture
+        )?;
+
+        // Force full screen redraw by clearing prev_buffer
+        // This ensures everything is redrawn after resume
+        let empty_cell = Cell::new(' ', Attr::from_u8(0x07));
+        for row in &mut self.prev_buffer {
+            for cell in row {
+                *cell = empty_cell;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get terminal size
     pub fn size(&self) -> (u16, u16) {
         (self.width, self.height)
