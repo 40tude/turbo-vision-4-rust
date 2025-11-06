@@ -183,7 +183,7 @@ impl View for InputLine {
                 for (i, ch) in visible_text.chars().enumerate() {
                     let pos = visible_start + i;
                     let char_attr = if pos >= sel_start && pos < sel_end {
-                        colors::SELECTED
+                        colors::INPUT_SELECTED
                     } else {
                         attr
                     };
