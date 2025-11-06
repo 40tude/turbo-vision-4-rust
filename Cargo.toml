@@ -41,3 +41,57 @@ arboard = "3.3"
 
 [dev-dependencies]
 tempfile = "3.8"
+
+# Lint configuration for improved code quality
+[lints.rust]
+# Catch common mistakes and improve clarity
+ambiguous_negative_literals = "warn"
+missing_debug_implementations = "allow"  # Many types don't need Debug for UI framework
+redundant_imports = "warn"
+redundant_lifetimes = "warn"
+trivial_numeric_casts = "allow"  # Allow explicit casts for clarity in coordinate math
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+
+[lints.clippy]
+# Enable main lint groups (priority = -1 means they come before restriction lints)
+cargo = { level = "warn", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+correctness = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+
+# Allow some pedantic lints that are too strict for our use case
+similar_names = "allow"  # Many similar names are fine in UI code (x/y, w/h, etc.)
+collapsible_if = "allow"  # Sometimes separate ifs are more readable
+redundant_else = "allow"  # Explicit else can improve readability
+unreadable_literal = "allow"  # Hex/binary literals are fine without separators
+module_name_repetitions = "allow"  # e.g., button::Button is standard Rust
+missing_errors_doc = "allow"  # We have # Errors sections where needed
+must_use_candidate = "allow"  # Too many false positives
+missing_panics_doc = "allow"  # We document panics where they occur
+
+# Restriction lints (opt-in lints for specific patterns)
+allow_attributes_without_reason = "warn"
+as_underscore = "warn"
+assertions_on_result_states = "warn"
+clone_on_ref_ptr = "warn"
+deref_by_slicing = "warn"
+disallowed_script_idents = "warn"
+empty_drop = "warn"
+empty_enum_variants_with_brackets = "warn"
+empty_structs_with_brackets = "warn"
+fn_to_numeric_cast_any = "warn"
+if_then_some_else_none = "warn"
+map_err_ignore = "warn"
+redundant_type_annotations = "warn"
+renamed_function_params = "warn"
+semicolon_outside_block = "warn"
+string_to_string = "warn"
+undocumented_unsafe_blocks = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+unneeded_field_pattern = "warn"
+unused_result_ok = "warn"

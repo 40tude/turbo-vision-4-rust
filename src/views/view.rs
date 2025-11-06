@@ -181,7 +181,6 @@ pub fn write_line_to_terminal(terminal: &mut Terminal, x: i16, y: i16, buf: &Dra
 /// Draws a shadow offset by (1, 1) from the view bounds
 /// Shadow is the same size as the view, but only the right and bottom edges are visible
 pub fn draw_shadow(terminal: &mut Terminal, bounds: Rect, shadow_attr: u8) {
-    use crate::core::state::SHADOW_SIZE;
     use crate::core::palette::Attr;
 
     let attr = Attr::from_u8(shadow_attr);

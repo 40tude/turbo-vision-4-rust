@@ -209,7 +209,7 @@ impl View for Window {
                 // Update bounds (maintaining size)
                 let width = self.bounds.width();
                 let height = self.bounds.height();
-                self.bounds = Rect::new(new_x, new_y, new_x + width as i16, new_y + height as i16);
+                self.bounds = Rect::new(new_x, new_y, new_x + width, new_y + height);
 
                 // Update frame and interior bounds
                 self.frame.set_bounds(self.bounds);
