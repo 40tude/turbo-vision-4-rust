@@ -153,6 +153,59 @@ impl Desktop {
 }
 
 impl Desktop {
+    /// Cycle to the next window (Borland: selectNext)
+    /// Moves the current top window to the back, bringing the next window forward
+    /// Matches Borland: cmNext command calls selectNext(False)
+    pub fn select_next(&mut self) {
+        use crate::core::state::OF_TOP_SELECT;
+
+        // Need at least 2 windows (plus background) to cycle
+        if self.children.len() <= 2 {
+            return;
+        }
+
+        // Get the current top window (last in children list, excluding background)
+        let top_window_idx = self.children.len() - 1;
+
+        // Check if top window has OF_TOP_SELECT flag
+        let has_top_select = {
+            let options = self.children.child_at(top_window_idx).options();
+            (options & OF_TOP_SELECT) != 0
+        };
+
+        if has_top_select {
+            // Move top window behind all others (after background)
+            // This is equivalent to Borland's: current->putInFrontOf(background)
+            self.children.send_to_back(top_window_idx);
+        }
+    }
+
+    /// Cycle to the previous window (Borland: selectPrev)
+    /// Brings the bottom window to the top
+    /// Matches Borland: cmPrev command calls current->putInFrontOf(background)
+    pub fn select_prev(&mut self) {
+        use crate::core::state::OF_TOP_SELECT;
+
+        // Need at least 2 windows (plus background) to cycle
+        if self.children.len() <= 2 {
+            return;
+        }
+
+        // Get the bottom window (right after background)
+        let bottom_window_idx = 1;
+
+        // Check if it has OF_TOP_SELECT flag
+        let has_top_select = {
+            let options = self.children.child_at(bottom_window_idx).options();
+            (options & OF_TOP_SELECT) != 0
+        };
+
+        if has_top_select {
+            // Bring bottom window to front
+            self.children.bring_to_front(bottom_window_idx);
+        }
+    }
+
     /// Get a mutable reference to a window by index (for movement tracking)
     /// Returns None if index is out of bounds
     /// Index 0 refers to first window (background is at internal index 0)
@@ -222,9 +275,10 @@ impl View for Desktop {
         };
 
         // Handle z-order changes on mouse down (only when no modal window is present)
-        // When a window is clicked, bring it to the front (unless it's already on top)
-        // Matches Borland: TGroup::selectView() called on mouse events
+        // When a window is clicked, bring it to the front if it has OF_TOP_SELECT flag
+        // Matches Borland: TView::handleEvent() calls focus() -> select() -> makeFirst() if ofTopSelect set
         if !has_modal && event.what == EventType::MouseDown {
+            use crate::core::state::OF_TOP_SELECT;
             let mouse_pos = event.mouse.pos;
 
             // Find which window was clicked (search in reverse z-order, skip background at 0)
@@ -238,12 +292,16 @@ impl View for Desktop {
             }
 
             // If a window was clicked and it's not already on top, bring it to front
+            // Only if the window has OF_TOP_SELECT flag set (matches Borland: ofTopSelect)
             if let Some(window_idx) = clicked_window {
                 let last_idx = self.children.len() - 1;
                 if window_idx != last_idx {
-                    // Bring window to front
-                    self.children.bring_to_front(window_idx);
-                    // Note: We don't return here - let the event propagate to the window
+                    let window_options = self.children.child_at(window_idx).options();
+                    if (window_options & OF_TOP_SELECT) != 0 {
+                        // Bring window to front (Borland: makeFirst())
+                        self.children.bring_to_front(window_idx);
+                        // Note: We don't return here - let the event propagate to the window
+                    }
                 }
             }
         }

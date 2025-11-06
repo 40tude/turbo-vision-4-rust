@@ -8,6 +8,9 @@ pub type CommandId = u16;
 // Standard commands
 pub const CM_QUIT: CommandId = 24;
 pub const CM_CLOSE: CommandId = 25;
+pub const CM_ZOOM: CommandId = 26;
+pub const CM_NEXT: CommandId = 27;  // Cycle to next window (Borland: cmNext)
+pub const CM_PREV: CommandId = 28;  // Cycle to previous window (Borland: cmPrev)
 pub const CM_OK: CommandId = 10;
 pub const CM_CANCEL: CommandId = 11;
 pub const CM_YES: CommandId = 12;

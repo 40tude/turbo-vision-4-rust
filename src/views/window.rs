@@ -44,6 +44,8 @@ impl Window {
     }
 
     fn new_with_palette(bounds: Rect, title: &str, frame_palette: super::frame::FramePaletteType, interior_color: crate::core::palette::Attr) -> Self {
+        use crate::core::state::{OF_SELECTABLE, OF_TOP_SELECT};
+
         let frame = Frame::with_palette(bounds, title, frame_palette);
 
         // Interior bounds are ABSOLUTE (inset by 1 from window bounds for frame)
@@ -56,7 +58,7 @@ impl Window {
             frame,
             interior,
             state: SF_SHADOW, // Windows have shadows by default
-            options: 0,
+            options: OF_SELECTABLE | OF_TOP_SELECT, // Matches Borland: TWindow constructor sets these
             drag_offset: None,
             resize_start_size: None,
             min_size: Point::new(16, 6), // Minimum size: 16 wide, 6 tall (matches Borland's minWinSize)
@@ -295,11 +297,12 @@ impl View for Window {
             }
         }
 
-        // Handle CM_CLOSE command (Borland: twindow.cc lines 124-138)
+        // Handle CM_CLOSE command (Borland: twindow.cc lines 104-118)
         // Frame generates CM_CLOSE when close button is clicked
-        // In Borland: TWindow::handleEvent calls close(), which calls valid(cmClose)
-        // to allow subclasses to validate (e.g., prompt to save)
+        // Matches Borland: TWindow::handleEvent calls close(), which calls destroy(this)
         if event.what == EventType::Command && event.command == CM_CLOSE {
+            use crate::core::state::SF_CLOSED;
+
             // Check if this window is modal
             if (self.state & SF_MODAL) != 0 {
                 // Modal window: convert CM_CLOSE to CM_CANCEL
@@ -307,12 +310,11 @@ impl View for Window {
                 *event = Event::command(CM_CANCEL);
                 // Don't clear event - let it propagate to dialog's execute loop
             } else {
-                // Non-modal window: DON'T close immediately
-                // In Borland, close() calls valid(cmClose) first
-                // Since we don't have subclassing/valid(), let CM_CLOSE propagate
-                // to the application level where it can be validated
-                // The application will set SF_CLOSED if the close is allowed
-                // DON'T clear event - let it bubble to application
+                // Non-modal window: close itself (Borland: TWindow::close() calls destroy(this))
+                // In Rust, we mark with SF_CLOSED flag and let app.desktop.remove_closed_windows() handle it
+                // TODO: Add valid(cmClose) support for validation (e.g., "Save before closing?")
+                self.state |= SF_CLOSED;
+                event.clear();
             }
             return;
         }
