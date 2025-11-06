@@ -125,6 +125,32 @@ impl Group {
         new_index
     }
 
+    /// Send a child view to the back (bottom of z-order, but after index 0)
+    /// Matches Borland: current->putInFrontOf(background) for window cycling
+    /// Returns the new index of the moved child (always 1 for desktop windows)
+    pub fn send_to_back(&mut self, index: usize) -> usize {
+        if index >= self.children.len() || index == 1 {
+            // Already at back (position 1) or invalid index
+            return index;
+        }
+
+        // Remove the view from its current position
+        let view = self.children.remove(index);
+
+        // Insert it at position 1 (right after element 0, which is typically background)
+        self.children.insert(1, view);
+
+        // Update focused index if necessary
+        if self.focused == index {
+            self.focused = 1;
+        } else if self.focused >= 1 && self.focused < index {
+            // Views between positions 1 and index shifted up by one
+            self.focused += 1;
+        }
+
+        1 // Always returns 1 (the back position after index 0)
+    }
+
     /// Remove a child at the specified index
     /// Matches Borland: TGroup::remove(TView *p) or TGroup::shutDown()
     pub fn remove(&mut self, index: usize) {
