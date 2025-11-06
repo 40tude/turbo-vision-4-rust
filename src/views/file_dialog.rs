@@ -56,7 +56,7 @@
 
 use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType};
-use crate::core::command::{CM_OK, CM_CANCEL, CM_FILE_FOCUSED};
+use crate::core::command::{CM_OK, CM_CANCEL, CM_FILE_FOCUSED, CommandId};
 use crate::terminal::Terminal;
 use super::dialog::Dialog;
 use super::input_line::InputLine;
@@ -474,6 +474,17 @@ impl FileDialog {
         } else {
             None
         }
+    }
+
+    /// Get the current directory being browsed
+    /// Useful for ChDirDialog to get the selected directory
+    pub fn get_current_directory(&self) -> PathBuf {
+        self.current_path.clone()
+    }
+
+    /// Get the end state (command that closed the dialog)
+    pub fn get_end_state(&self) -> CommandId {
+        self.dialog.get_end_state()
     }
 }
 
