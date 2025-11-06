@@ -344,6 +344,40 @@ impl Application {
             command_set::clear_command_set_changed();
         }
     }
+
+    /// Suspend the application (for Ctrl+Z handling)
+    /// Matches Borland: TProgram::suspend() - temporarily exits TUI mode
+    /// Restores terminal to normal mode, allowing user to return to shell
+    /// Call resume() to return to TUI mode
+    pub fn suspend(&mut self) -> crate::core::error::Result<()> {
+        self.terminal.suspend()
+    }
+
+    /// Resume the application after suspension (for Ctrl+Z handling)
+    /// Matches Borland: TProgram::resume() - returns to TUI mode and redraws
+    /// Re-enters raw mode and forces a complete screen redraw
+    pub fn resume(&mut self) -> crate::core::error::Result<()> {
+        self.terminal.resume()?;
+
+        // Force complete redraw of the entire UI
+        use crate::views::View;
+
+        // Draw desktop (which includes all windows)
+        self.desktop.draw(&mut self.terminal);
+
+        // Draw menu bar if present
+        if let Some(ref mut menu_bar) = self.menu_bar {
+            menu_bar.draw(&mut self.terminal);
+        }
+
+        // Draw status line if present
+        if let Some(ref mut status_line) = self.status_line {
+            status_line.draw(&mut self.terminal);
+        }
+
+        self.terminal.flush()?;
+        Ok(())
+    }
 }
 
 impl Drop for Application {
