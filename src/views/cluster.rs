@@ -18,7 +18,7 @@
 //   View trait + Cluster trait → CheckBox, RadioButton (embed ClusterState)
 
 use crate::core::event::{Event, EventType};
-use crate::core::palette::{Attr, TvColor};
+use crate::core::palette::Attr;
 use super::view::View;
 
 /// State management for cluster (button group) components
@@ -137,6 +137,8 @@ pub trait Cluster: View {
     ///
     /// Returns (normal_color, hotkey_color)
     fn get_colors(&self) -> (Attr, Attr) {
+        use crate::core::palette::{Attr, TvColor};
+
         if self.is_focused() {
             (
                 Attr::new(TvColor::Yellow, TvColor::Blue),
