@@ -45,7 +45,8 @@ impl Frame {
 
     /// Get colors for frame elements based on palette type and state
     /// Matches Borland's getColor() with palette mapping (tframe.cc:43-64)
-    fn get_frame_colors(&self) -> (Attr, Attr) {
+    /// Returns (frame_attr, close_icon_attr, title_attr)
+    fn get_frame_colors(&self) -> (Attr, Attr, Attr) {
         // Borland determines cFrame based on state:
         // - Inactive: cFrame = 0x0101 (both bytes use palette[1])
         // - Dragging: cFrame = 0x0505 (both bytes use palette[5])
@@ -57,30 +58,46 @@ impl Frame {
         match self.palette_type {
             FramePaletteType::Dialog => {
                 if !is_active {
-                    // Inactive: cFrame = 0x0101
+                    // Inactive: cFrame = 0x0101, cTitle = 0x0002
                     // cpDialog[1] = 0x21 (Blue on Green) -> mapped to DarkGray on LightGray
                     let inactive_attr = Attr::new(TvColor::DarkGray, TvColor::LightGray);
-                    (inactive_attr, inactive_attr)
+                    (inactive_attr, inactive_attr, inactive_attr)
                 } else if is_dragging {
-                    // Dragging: cFrame = 0x0505
+                    // Dragging: cFrame = 0x0505, cTitle = 0x0005
                     // cpDialog[5] = 0x25 (Magenta on Green) -> mapped to LightGreen on LightGray
                     let dragging_attr = Attr::new(TvColor::LightGreen, TvColor::LightGray);
-                    (dragging_attr, dragging_attr)
+                    (dragging_attr, dragging_attr, dragging_attr)
                 } else {
-                    // Active: cFrame = 0x0503
+                    // Active: cFrame = 0x0503, cTitle = 0x0004
                     // cpDialog[3] = 0x23 (Cyan on Green) -> White on LightGray (frame)
                     // cpDialog[5] = 0x25 (Magenta on Green) -> LightGreen on LightGray (highlight)
+                    // cpDialog[4] = 0x24 (Red on Green) -> White on LightGray (title)
                     let frame_attr = colors::DIALOG_FRAME_ACTIVE;  // White on LightGray
                     let close_icon_attr = Attr::new(TvColor::LightGreen, TvColor::LightGray);
-                    (frame_attr, close_icon_attr)
+                    let title_attr = colors::DIALOG_TITLE;  // White on LightGray
+                    (frame_attr, close_icon_attr, title_attr)
                 }
             }
             FramePaletteType::Editor => {
-                // cpBlueWindow/cpCyanWindow palette mapping
-                // TODO: Implement proper state-based colors when editor windows are supported
-                let frame_attr = Attr::new(TvColor::Yellow, TvColor::Blue);
-                let close_icon_attr = Attr::new(TvColor::White, TvColor::Blue);
-                (frame_attr, close_icon_attr)
+                // cpBlueWindow palette mapping (Borland TWindow with wpBlueWindow)
+                // See TWindow.cc line 38: palette(wpBlueWindow)
+                // TWindow frame is White on Blue background
+
+                if !is_active {
+                    // Inactive: LightGreen on Blue (all elements)
+                    let inactive_attr = Attr::new(TvColor::LightGreen, TvColor::Blue);
+                    (inactive_attr, inactive_attr, inactive_attr)
+                } else if is_dragging {
+                    // Dragging: White on Blue (maintains blue background while dragging)
+                    let dragging_attr = Attr::new(TvColor::White, TvColor::Blue);
+                    (dragging_attr, dragging_attr, dragging_attr)
+                } else {
+                    // Active: White on Blue for frame and close icon, Yellow on Blue for title
+                    let frame_attr = Attr::new(TvColor::White, TvColor::Blue);  // Border
+                    let close_icon_attr = Attr::new(TvColor::White, TvColor::Blue);  // Close icon
+                    let title_attr = Attr::new(TvColor::Yellow, TvColor::Blue);  // Title
+                    (frame_attr, close_icon_attr, title_attr)
+                }
             }
         }
     }
@@ -100,7 +117,7 @@ impl View for Frame {
         let height = self.bounds.height() as usize;
 
         // Get frame colors from palette mapping (matches Borland's getColor())
-        let (frame_attr, close_icon_attr) = self.get_frame_colors();
+        let (frame_attr, close_icon_attr, title_attr) = self.get_frame_colors();
 
         // Top border with title - using double-line box drawing
         let mut buf = DrawBuffer::new(width);
@@ -124,7 +141,7 @@ impl View for Frame {
 
         // Add title after close button
         if !self.title.is_empty() && width > self.title.len() + 8 {
-            buf.move_str(6, &format!(" {} ", self.title), colors::DIALOG_TITLE);
+            buf.move_str(6, &format!(" {} ", self.title), title_attr);
         }
         write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
 

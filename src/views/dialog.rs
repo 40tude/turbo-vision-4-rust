@@ -18,7 +18,7 @@ pub struct Dialog {
 impl Dialog {
     pub fn new(bounds: Rect, title: &str) -> Self {
         Self {
-            window: Window::new(bounds, title),
+            window: Window::new_for_dialog(bounds, title),
             result: CM_CANCEL,
         }
     }
