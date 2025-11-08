@@ -477,6 +477,13 @@ impl View for Group {
 
                 // Second pass: handle the event
                 self.children[i].handle_event(event);
+
+                // IMPORTANT: If the child converted the event to Broadcast (e.g., calculator buttons),
+                // we need to handle that broadcast now (matches Borland's putEvent behavior)
+                if event.what == EventType::Broadcast {
+                    // Recursively call handle_event to process the broadcast
+                    self.handle_event(event);
+                }
                 return;
             }
         }
@@ -514,6 +521,14 @@ impl View for Group {
                     if (child.options() & OF_POST_PROCESS) != 0 {
                         child.handle_event(event);
                     }
+                }
+
+                // IMPORTANT: If a PostProcess view converted the event to Broadcast,
+                // we need to handle that broadcast now (matches Borland's putEvent behavior)
+                // For example, calculator buttons convert MouseDown to Broadcast
+                if event.what == EventType::Broadcast {
+                    // Recursively call handle_event to process the broadcast
+                    self.handle_event(event);
                 }
             }
         } else {
