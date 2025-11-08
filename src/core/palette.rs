@@ -28,6 +28,7 @@ pub enum TvColor {
 }
 
 impl TvColor {
+    /// Converts TvColor to crossterm Color with RGB values
     pub fn to_crossterm(self) -> Color {
         match self {
             TvColor::Black => Color::Rgb { r: 0, g: 0, b: 0 },
@@ -47,6 +48,55 @@ impl TvColor {
             TvColor::Yellow => Color::Rgb { r: 255, g: 255, b: 85 },
             TvColor::White => Color::Rgb { r: 255, g: 255, b: 255 },
         }
+    }
+
+    /// Gets the RGB components of this color
+    pub fn to_rgb(self) -> (u8, u8, u8) {
+        match self {
+            TvColor::Black => (0, 0, 0),
+            TvColor::Blue => (0, 0, 170),
+            TvColor::Green => (0, 170, 0),
+            TvColor::Cyan => (0, 170, 170),
+            TvColor::Red => (170, 0, 0),
+            TvColor::Magenta => (170, 0, 170),
+            TvColor::Brown => (170, 85, 0),
+            TvColor::LightGray => (170, 170, 170),
+            TvColor::DarkGray => (85, 85, 85),
+            TvColor::LightBlue => (85, 85, 255),
+            TvColor::LightGreen => (85, 255, 85),
+            TvColor::LightCyan => (85, 255, 255),
+            TvColor::LightRed => (255, 85, 85),
+            TvColor::LightMagenta => (255, 85, 255),
+            TvColor::Yellow => (255, 255, 85),
+            TvColor::White => (255, 255, 255),
+        }
+    }
+
+    /// Creates a TvColor from RGB values by finding the closest match
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        // Find closest color in the palette
+        let all_colors = [
+            TvColor::Black, TvColor::Blue, TvColor::Green, TvColor::Cyan,
+            TvColor::Red, TvColor::Magenta, TvColor::Brown, TvColor::LightGray,
+            TvColor::DarkGray, TvColor::LightBlue, TvColor::LightGreen, TvColor::LightCyan,
+            TvColor::LightRed, TvColor::LightMagenta, TvColor::Yellow, TvColor::White,
+        ];
+
+        let mut best_color = TvColor::Black;
+        let mut best_distance = u32::MAX;
+
+        for &color in &all_colors {
+            let (cr, cg, cb) = color.to_rgb();
+            let distance = (r as i32 - cr as i32).pow(2) as u32 +
+                          (g as i32 - cg as i32).pow(2) as u32 +
+                          (b as i32 - cb as i32).pow(2) as u32;
+            if distance < best_distance {
+                best_distance = distance;
+                best_color = color;
+            }
+        }
+
+        best_color
     }
 
     pub fn from_u8(n: u8) -> Self {
@@ -114,6 +164,24 @@ impl Attr {
 
     pub fn to_u8(self) -> u8 {
         (self.fg as u8) | ((self.bg as u8) << 4)
+    }
+
+    /// Creates a darkened version of this attribute (for semi-transparent shadows)
+    /// Reduces RGB values by the given factor (0.0 = black, 1.0 = unchanged)
+    /// Default shadow factor is 0.5 (50% darker)
+    pub fn darken(&self, factor: f32) -> Self {
+        let darken_color = |color: TvColor| -> TvColor {
+            let (r, g, b) = color.to_rgb();
+            let new_r = ((r as f32) * factor).min(255.0) as u8;
+            let new_g = ((g as f32) * factor).min(255.0) as u8;
+            let new_b = ((b as f32) * factor).min(255.0) as u8;
+            TvColor::from_rgb(new_r, new_g, new_b)
+        };
+
+        Self {
+            fg: darken_color(self.fg),
+            bg: darken_color(self.bg),
+        }
     }
 }
 

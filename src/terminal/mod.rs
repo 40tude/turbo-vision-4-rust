@@ -296,6 +296,15 @@ impl Terminal {
         }
     }
 
+    /// Read a cell from the buffer at the given position
+    /// Returns None if coordinates are out of bounds
+    pub fn read_cell(&self, x: i16, y: i16) -> Option<Cell> {
+        if x < 0 || y < 0 || x >= self.width as i16 || y >= self.height as i16 {
+            return None;
+        }
+        Some(self.buffer[y as usize][x as usize])
+    }
+
     /// Clear the entire screen
     pub fn clear(&mut self) {
         let empty_cell = Cell::new(' ', Attr::from_u8(0x07));

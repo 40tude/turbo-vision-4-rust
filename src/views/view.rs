@@ -5,7 +5,7 @@
 use crate::core::geometry::Rect;
 use crate::core::event::Event;
 use crate::core::draw::DrawBuffer;
-use crate::core::state::{StateFlags, SF_SHADOW, SF_FOCUSED, SHADOW_SIZE};
+use crate::core::state::{StateFlags, SF_SHADOW, SF_FOCUSED, SHADOW_SIZE, SHADOW_ATTR};
 use crate::core::command::CommandId;
 use crate::terminal::Terminal;
 use std::io;
@@ -258,26 +258,54 @@ pub fn write_line_to_terminal(terminal: &mut Terminal, x: i16, y: i16, buf: &Dra
 
 /// Draw shadow for a view
 /// Draws a shadow offset by (1, 1) from the view bounds
-/// Shadow is the same size as the view, but only the right and bottom edges are visible
-pub fn draw_shadow(terminal: &mut Terminal, bounds: Rect, shadow_attr: u8) {
+/// Shadow is semi-transparent - darkens the underlying content by 50%
+/// This matches the Borland Turbo Vision behavior more closely
+pub fn draw_shadow(terminal: &mut Terminal, bounds: Rect, _shadow_attr: u8) {
     use crate::core::palette::Attr;
 
-    let attr = Attr::from_u8(shadow_attr);
+    const SHADOW_FACTOR: f32 = 0.5; // Darken to 50% of original brightness
+
     let mut buf = DrawBuffer::new(SHADOW_SIZE.0 as usize);
 
     // Draw right edge shadow (2 columns wide, offset by 1 vertically)
-    // Starts at y+1 and extends to y+height+1
+    // Read existing cells and darken them for semi-transparency
     for y in (bounds.a.y + 1)..(bounds.b.y + 1) {
-        buf.move_char(0, ' ', attr, SHADOW_SIZE.0 as usize);
+        for i in 0..SHADOW_SIZE.0 {
+            let x = bounds.b.x + i;
+
+            // Read the existing cell at this position
+            if let Some(existing_cell) = terminal.read_cell(x, y) {
+                // Darken the existing cell's attribute
+                let darkened_attr = existing_cell.attr.darken(SHADOW_FACTOR);
+                buf.put_char(i as usize, existing_cell.ch, darkened_attr);
+            } else {
+                // Out of bounds - use default shadow
+                let default_attr = Attr::from_u8(SHADOW_ATTR);
+                buf.put_char(i as usize, ' ', default_attr);
+            }
+        }
         write_line_to_terminal(terminal, bounds.b.x, y, &buf);
     }
 
     // Draw bottom edge shadow (offset by 1 horizontally, includes right shadow area)
-    // Starts at x+1 and extends to match the right shadow end point
-    // Width = view_width + (SHADOW_SIZE.0 - 1) because we offset by 1
     let bottom_width = (bounds.b.x - bounds.a.x + SHADOW_SIZE.0 - 1) as usize;
     let mut bottom_buf = DrawBuffer::new(bottom_width);
-    bottom_buf.move_char(0, ' ', attr, bottom_width);
+
+    let shadow_y = bounds.b.y;
+    for i in 0..bottom_width {
+        let x = bounds.a.x + 1 + i as i16;
+
+        // Read the existing cell at this position
+        if let Some(existing_cell) = terminal.read_cell(x, shadow_y) {
+            // Darken the existing cell's attribute
+            let darkened_attr = existing_cell.attr.darken(SHADOW_FACTOR);
+            bottom_buf.put_char(i, existing_cell.ch, darkened_attr);
+        } else {
+            // Out of bounds - use default shadow
+            let default_attr = Attr::from_u8(SHADOW_ATTR);
+            bottom_buf.put_char(i, ' ', default_attr);
+        }
+    }
     write_line_to_terminal(terminal, bounds.a.x + 1, bounds.b.y, &bottom_buf);
 }
 
