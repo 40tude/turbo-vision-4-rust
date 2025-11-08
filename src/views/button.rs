@@ -16,6 +16,7 @@ pub struct Button {
     title: String,
     command: CommandId,
     is_default: bool,
+    is_broadcast: bool,
     state: StateFlags,
     options: u16,
 }
@@ -37,6 +38,7 @@ impl Button {
             title: title.to_string(),
             command,
             is_default,
+            is_broadcast: false,
             state,
             options: OF_POST_PROCESS,  // Buttons process in post-process phase
         }
@@ -48,6 +50,23 @@ impl Button {
 
     pub fn is_disabled(&self) -> bool {
         self.get_state_flag(SF_DISABLED)
+    }
+
+    /// Set whether this button broadcasts its command instead of sending it as a command event
+    /// Matches Borland: bfBroadcast flag
+    pub fn set_broadcast(&mut self, broadcast: bool) {
+        self.is_broadcast = broadcast;
+    }
+
+    /// Set whether this button is selectable (can receive focus)
+    /// Matches Borland: ofSelectable flag
+    pub fn set_selectable(&mut self, selectable: bool) {
+        use crate::core::state::OF_SELECTABLE;
+        if selectable {
+            self.options |= OF_SELECTABLE;
+        } else {
+            self.options &= !OF_SELECTABLE;
+        }
     }
 }
 
@@ -179,7 +198,11 @@ impl View for Button {
                     return;
                 }
                 if event.key_code == KB_ENTER || event.key_code == ' ' as u16 {
-                    *event = Event::command(self.command);
+                    if self.is_broadcast {
+                        *event = Event::broadcast(self.command);
+                    } else {
+                        *event = Event::command(self.command);
+                    }
                 }
             }
             EventType::MouseDown => {
@@ -191,8 +214,12 @@ impl View for Button {
                     && mouse_pos.y >= self.bounds.a.y
                     && mouse_pos.y < self.bounds.b.y - 1  // Exclude shadow line
                 {
-                    // Button clicked - generate command
-                    *event = Event::command(self.command);
+                    // Button clicked - generate command or broadcast
+                    if self.is_broadcast {
+                        *event = Event::broadcast(self.command);
+                    } else {
+                        *event = Event::command(self.command);
+                    }
                 }
             }
             _ => {}
