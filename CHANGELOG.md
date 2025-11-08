@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2025-11-08
+
+### Added
+- **Semi-Transparent Shadows**
+  - Shadows now darken underlying content instead of drawing opaque backgrounds
+  - Matches Borland Turbo Vision's original VGA-based shadow behavior
+  - Added `TvColor::to_rgb()` for RGB component extraction
+  - Added `TvColor::from_rgb()` for closest color matching via Euclidean distance
+  - Added `Attr::darken(factor)` method for color darkening (default 50%)
+  - Added `Terminal::read_cell()` to read existing buffer content
+  - Completely rewrote `draw_shadow()` to use read-modify-write pattern
+  - Preserves underlying characters while darkening colors
+  - Cross-platform implementation using RGB blending instead of VGA bit manipulation
+
+### Changed
+- Shadow rendering now reads terminal buffer before drawing
+- Shadow cells show darkened version of underlying content (semi-transparent effect)
+- Updated Rust-vs-Borland comparison document with new shadow implementation details
+
+### Technical Details
+- Darkening uses 50% factor (configurable constant)
+- Color matching finds nearest color in 16-color palette using RGB distance
+- Falls back to default shadow color for out-of-bounds positions
+- No performance impact - shadow rendering is still O(n) where n = shadow size
+
 ## [0.3.0] - 2025-11-06
 
 ### Added
