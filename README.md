@@ -8,7 +8,8 @@ A Rust implementation of the classic Borland Turbo Vision text user interface fr
 
 Based on
 kloczek Borland Turbo Vision C++ port [here](https://github.com/kloczek/tvision)
-Other implementations:
+
+Other C++ implementations:
 - [Magiblot Turbo Vision for C++](https://github.com/magiblot/tvision)
 - [Borland Original Turbo Vision 2.0.3 code](http://www.sigala.it/sergio/tvision/source/tv2orig.zip)
 
@@ -34,7 +35,7 @@ kloczek port of Borland Turbo Vision C++. All features from the original framewo
 - **Cross-Platform**: Built on crossterm for wide terminal compatibility
 - **Modal Dialogs**: Built-in support for modal dialog execution
 - **Focus Management**: Tab navigation and keyboard shortcuts
-- **ANSI Dump**: Debug UI by dumping screen/views to ANSI text files (F12 for full screen, F11 for active view, with flash effect)
+- **ANSI Dump**: Debug UI by dumping screen/views to ANSI text files (F12 for full screen, Shift+F12 for active view, with flash effect)
 
 ## Quick Start
 
@@ -130,9 +131,6 @@ This implementation closely follows Borland Turbo Vision's architecture, adapted
   - Three-phase processing (PreProcess → Focused → PostProcess) matching Borland's `TGroup::handleEvent()`
   - Event re-queuing via `Terminal::put_event()` matching Borland's `TProgram::putEvent()`
   - Owner-aware broadcasts via `Group::broadcast()` matching Borland's `message(owner, ...)` pattern
-- **Reference Implementation**: Studied original Borland C++ source code in `local-only/borland-tvision/`
-
-See `local-only/ARCHITECTURAL-FINDINGS.md` for detailed analysis of how Borland's C++ architecture maps to Rust.
 
 ## Project Statistics
 
@@ -153,3 +151,4 @@ Generated with [tokei](https://github.com/XAMPPRocky/tokei) - includes inline do
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
