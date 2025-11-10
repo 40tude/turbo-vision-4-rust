@@ -366,6 +366,10 @@ impl View for SharedEditor {
     fn update_cursor(&self, terminal: &mut turbo_vision::terminal::Terminal) {
         self.0.borrow().update_cursor(terminal);
     }
+
+    fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
+        self.0.borrow().get_palette()
+    }
 }
 
 fn prompt_save_if_dirty(app: &mut Application, state: &mut EditorState, has_window: bool) -> bool {

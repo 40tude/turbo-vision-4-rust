@@ -171,6 +171,10 @@ impl View for FileEditor {
     fn set_state(&mut self, state: StateFlags) {
         self.editor.set_state(state);
     }
+
+    fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+        self.editor.get_palette()
+    }
 }
 
 /// Builder for creating file editors with a fluent API.

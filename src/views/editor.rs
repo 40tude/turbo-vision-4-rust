@@ -1391,7 +1391,8 @@ impl View for Editor {
     }
 
     fn get_palette(&self) -> Option<crate::core::palette::Palette> {
-        None  // Editor uses hardcoded blue window colors
+        use crate::core::palette::{palettes, Palette};
+        Some(Palette::from_slice(palettes::CP_EDITOR))
     }
 }
 
