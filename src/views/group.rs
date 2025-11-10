@@ -612,6 +612,10 @@ impl View for Group {
     fn get_owner(&self) -> Option<*const dyn View> {
         self.owner
     }
+
+    fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+        None  // TGroup has no palette (empty/transparent)
+    }
 }
 
 /// Builder for creating groups with a fluent API.
@@ -690,6 +694,10 @@ mod tests {
         }
 
         fn handle_event(&mut self, _event: &mut Event) {}
+
+        fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+            None
+        }
     }
 
     #[test]

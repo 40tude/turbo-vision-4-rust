@@ -228,6 +228,10 @@ impl View for HelpWindow {
         self.window.set_state(state);
         self.viewer.set_state(state);
     }
+
+    fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+        self.window.get_palette()
+    }
 }
 
 #[cfg(test)]

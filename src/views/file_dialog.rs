@@ -504,6 +504,10 @@ impl View for FileDialog {
     fn handle_event(&mut self, event: &mut Event) {
         self.dialog.handle_event(event);
     }
+
+    fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+        self.dialog.get_palette()
+    }
 }
 
 /// Builder for creating file dialogs with a fluent API.

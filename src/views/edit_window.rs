@@ -110,6 +110,10 @@ impl View for EditWindow {
         self.window.set_state(state);
         self.editor.set_state(state);
     }
+
+    fn get_palette(&self) -> Option<crate::core::palette::Palette> {
+        self.window.get_palette()
+    }
 }
 
 #[cfg(test)]
