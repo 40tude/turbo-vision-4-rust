@@ -1,5 +1,9 @@
 # Chapter 10: Application Objects
 
+**Previous:** [Chapter 9 — Event-Driven Programming](Chapter-9-Event-Driven-Programming.md)
+
+---
+
 The `Application` struct is the foundation of every Turbo Vision program. It manages the terminal interface, coordinates the user interface components (menu bar, status line, and desktop), and controls the application's main event loop. Understanding the application object is essential for building complete Turbo Vision applications.
 
 This chapter covers:
@@ -511,3 +515,7 @@ The `Application` struct is the backbone of Turbo Vision applications:
 Understanding the application object's lifecycle and methods enables you to build sophisticated, responsive Turbo Vision applications that handle events efficiently and provide a polished user experience.
 
 In the next chapters, we'll explore windows, dialogs, and the various control types that make up complete user interfaces.
+
+---
+
+**Next:** [Chapter 11 — Window and Dialog Box Objects](Chapter-11-Window-and-Dialog-Box-Objects.md)

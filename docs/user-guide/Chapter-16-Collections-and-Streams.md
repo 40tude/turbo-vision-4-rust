@@ -1,5 +1,9 @@
 # Chapter 16: Collections and Streams
 
+**Previous:** [Chapter 15 — Editor and Text Views](Chapter-15-Editor-and-Text-Views.md)
+
+---
+
 In the original Turbo Vision, collections provided a polymorphic way to hold different but related objects, and streams allowed these collections to be persisted to disk for later retrieval. This chapter examines how the Rust implementation handles these concepts using idiomatic Rust patterns.
 
 ## Rust Approach: Collections and Serialization
@@ -751,3 +755,7 @@ This approach provides:
 - **Flexibility** - add serialization only where needed
 
 When you need persistence, Rust's ecosystem provides excellent options like serde that integrate seamlessly with the standard library's file I/O capabilities.
+
+---
+
+**Next:** [Chapter 17 — Streams and Persistence](Chapter-17-Streams-and-Persistence.md)

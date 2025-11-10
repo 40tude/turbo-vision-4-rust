@@ -1,5 +1,9 @@
 # Chapter 8: Views and Groups
 
+**Previous:** [Chapter 7 — Architecture Overview](Chapter-7-Architecture-Overview.md)
+
+---
+
 ## Introduction
 
 One of the keys to Turbo Vision is the system used to present information on the screen, using views. Views are objects that represent rectangular regions on the screen, and they are the only way Turbo Vision applications display information to users.
@@ -848,3 +852,7 @@ In this chapter, you've learned about the fundamental building blocks of Turbo V
 - **Modal execution** allows views like dialogs to take control of the event loop
 
 The next chapters will build on these concepts, showing you how to work with specific view types like windows, dialogs, and controls.
+
+---
+
+**Next:** [Chapter 9 — Event-Driven Programming](Chapter-9-Event-Driven-Programming.md)

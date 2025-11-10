@@ -1,5 +1,9 @@
 # Chapter 17: Streams and Persistence
 
+**Previous:** [Chapter 16 — Collections and Streams](Chapter-16-Collections-and-Streams.md)
+
+---
+
 This chapter covers how applications handle data persistence—saving and loading program state. The original Turbo Vision used a sophisticated stream-based serialization system that could save entire object hierarchies to disk and restore them later. The current Rust implementation takes a different approach that's more aligned with modern Rust idioms.
 
 The topics in this chapter include:
@@ -699,3 +703,7 @@ The current Rust Turbo Vision implementation gives you the foundation (file I/O,
 - [JSON in Rust](https://docs.serde.rs/serde_json/) - JSON serialization
 - [TOML in Rust](https://docs.rs/toml/) - Configuration file format
 - [Bincode](https://docs.rs/bincode/) - Binary serialization
+
+---
+
+**Next:** [Chapter 18 — Resources](Chapter-18-Resources.md)

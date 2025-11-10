@@ -1,5 +1,9 @@
 # Chapter 4: Persistence and Configuration
 
+**Previous:** [Chapter 3 — Adding Windows](Chapter-3-Adding-Windows.md)
+
+---
+
 Now that you've made your tutorial application do actual work, the next logical step would be to save that work and configure your application's interface efficiently. This chapter explores how Turbo Vision applications handle persistence and resource management, and explains the architectural differences between the original Pascal implementation and the current Rust implementation.
 
 The topics in this chapter include:
@@ -557,3 +561,7 @@ The current Rust implementation prioritizes compile-time safety and simplicity o
 - `src/views/status_line.rs` - Status line view implementation
 - `demo/rust_editor.rs` - Complete example showing menus, status lines, and dialogs
 - `examples/menu_status_data.rs` - Focused examples of menu and status line construction
+
+---
+
+**Next:** [Chapter 5 — Creating Data Entry Forms](Chapter-5-Creating-Data-Entry-Forms.md)

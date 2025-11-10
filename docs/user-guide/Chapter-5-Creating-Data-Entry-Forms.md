@@ -1,5 +1,9 @@
 # Chapter 5: Creating Data-Entry Forms
 
+**Previous:** [Chapter 4 — Persistence and Configuration](Chapter-4-Persistence-and-Configuration.md)
+
+---
+
 Up to this point, all the objects you've used have been standard Turbo Vision objects, with the exception of the application object, which you've extended considerably. That gives you an idea of the power of Turbo Vision, but at some point you'll definitely want to create some custom functionality. In this chapter, you'll:
 
 - Create a data-entry dialog
@@ -912,3 +916,7 @@ The Rust implementation emphasizes:
 - **Explicit state management** rather than implicit streaming
 
 These patterns provide the same functionality as the Pascal original while leveraging Rust's modern language features for safety and performance.
+
+---
+
+**Next:** [Chapter 6 — Managing Data Collections](Chapter-6-Managing-Data-Collections.md)

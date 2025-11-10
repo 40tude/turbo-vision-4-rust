@@ -1,5 +1,9 @@
 # Chapter 6: Managing Data Collections
 
+**Previous:** [Chapter 5 — Creating Data Entry Forms](Chapter-5-Creating-Data-Entry-Forms.md)
+
+---
+
 Now that you have a working data-entry window, it makes sense to connect it with a database. Keep in mind that this example is intended to teach you about Turbo Vision, not about database management or inventory control. Some aspects of the program are necessarily simplified to allow you to focus on Turbo Vision without too much attention to the underlying database.
 
 To connect your data-entry window with the database, you'll do the following:
@@ -998,3 +1002,7 @@ These changes make the Rust version more robust and safer while maintaining the 
 ---
 
 **End of Chapter 6**
+
+---
+
+**Next:** [Chapter 7 — Architecture Overview](Chapter-7-Architecture-Overview.md)

@@ -1,5 +1,9 @@
 # Chapter 3 — Adding Windows
 
+**Previous:** [Chapter 2 — Responding to Commands](Chapter-2-Responding-to-Commands.md)
+
+---
+
 So far you've customized your application's menu bar and status line and seen how to respond to their commands. In this chapter, you'll start adding windows to the desktop and managing them.
 
 In this chapter, you'll do the following steps:
@@ -572,3 +576,7 @@ app.desktop.add(window);
 - **Source Code**: `src/views/window.rs` — Window implementation
 - **Source Code**: `src/views/desktop.rs` — Desktop management
 - **Source Code**: `src/views/frame.rs` — Window frame implementation
+
+---
+
+**Next:** [Chapter 4 — Persistence and Configuration](Chapter-4-Persistence-and-Configuration.md)

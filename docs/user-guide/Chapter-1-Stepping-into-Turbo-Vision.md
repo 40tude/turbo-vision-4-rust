@@ -163,3 +163,7 @@ Keeping constants in a separate module provides a single, central location for a
 
 At this point, your minimal Turbo Vision application runs, displays its framework, and exits cleanly.
 In the next step, you'll **customize menus and status lines** to make the interface more useful.
+
+---
+
+**Next:** [Chapter 2 — Responding to Commands](Chapter-2-Responding-to-Commands.md)
