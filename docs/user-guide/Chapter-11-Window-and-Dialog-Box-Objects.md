@@ -1,5 +1,9 @@
 # Chapter 11: Window and Dialog Box Objects
 
+**Previous:** [Chapter 10 — Application Objects](Chapter-10-Application-Objects.md)
+
+---
+
 This chapter describes window and dialog box objects in Turbo Vision, covering their construction, management, and usage patterns.
 
 ## Window Objects
@@ -498,3 +502,7 @@ Example files:
 - `examples/window_resize_demo.rs`: Multiple windows with dragging/resizing
 - `examples/window_modal_overlap_test.rs`: Overlapping window management
 - `examples/file_dialog.rs`: File selection dialog
+
+---
+
+**Next:** [Chapter 12 — Control Objects](Chapter-12-Control-Objects.md)

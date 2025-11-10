@@ -1,5 +1,9 @@
 # Chapter 18: Resources
 
+**Previous:** [Chapter 17 — Streams and Persistence](Chapter-17-Streams-and-Persistence.md)
+
+---
+
 A resource file, in the original Turbo Vision, was a special object that saved other objects to disk and retrieved them by name. Applications could load objects (menus, status lines, dialog boxes) from resources rather than initializing them in code. This allowed for customization without recompiling, easier internationalization, and separation of UI definitions from program logic.
 
 This chapter explores the resource concept and how the modern Rust implementation addresses the same goals through different mechanisms.

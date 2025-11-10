@@ -1,5 +1,9 @@
 # Chapter 7: Architecture Overview
 
+**Previous:** [Chapter 6 — Managing Data Collections](Chapter-6-Managing-Data-Collections.md)
+
+---
+
 ## Introduction
 
 This chapter assumes that you have a good working knowledge of Rust, especially traits, trait objects, and composition patterns. It also assumes that you have read Part 1 of this book to get an overview of Turbo Vision's philosophy, capabilities, and terminology.
@@ -613,3 +617,7 @@ if matches!(event.what, EventType::MouseDown | EventType::MouseUp | EventType::M
 ---
 
 ## End of Chapter 7
+
+---
+
+**Next:** [Chapter 8 — Views and Groups](Chapter-8-Views-and-Groups.md)

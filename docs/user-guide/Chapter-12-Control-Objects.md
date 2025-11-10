@@ -1,5 +1,9 @@
 # Chapter 12: Control Objects
 
+**Previous:** [Chapter 11 — Window and Dialog Box Objects](Chapter-11-Window-and-Dialog-Box-Objects.md)
+
+---
+
 ## Scroll Bar Objects
 
 Scroll bar objects provide several methods you can call to directly manipulate the settings of a scroll bar: `set_range`, `set_value`, and `set_params`.
@@ -470,3 +474,7 @@ For more advanced controls and validation, see:
 - Chapter 13: Data Validation
 - Chapter 14: Palettes and Color Selection
 - Chapter 15: Editor and Text Views
+
+---
+
+**Next:** [Chapter 13 — Data Validation](Chapter-13-Data-Validation.md)

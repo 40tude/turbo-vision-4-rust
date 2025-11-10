@@ -1,5 +1,9 @@
 # Chapter 15: Editor and Text Views
 
+**Previous:** [Chapter 14 — Palettes and Color Selection](Chapter-14-Palettes-and-Color-Selection.md)
+
+---
+
 ## Overview
 
 This chapter covers Turbo Vision's text editing components, from simple terminal views to full-featured editors with syntax highlighting, search/replace, and file operations.
@@ -534,3 +538,7 @@ All components:
 - Follow Rust ownership and borrowing rules
 
 For file editing, use `FileEditor`. For text input in dialogs, use `Memo`. For custom text display, work directly with `Terminal` and the drawing system.
+
+---
+
+**Next:** [Chapter 16 — Collections and Streams](Chapter-16-Collections-and-Streams.md)

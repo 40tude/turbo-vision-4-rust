@@ -1,5 +1,9 @@
 # Chapter 14: Palettes and Color Selection
 
+**Previous:** [Chapter 13 — Data Validation](Chapter-13-Data-Validation.md)
+
+---
+
 No one ever seems to agree on what colors are "best" for any computer screen. Rather than dictating the colors of screen items, Turbo Vision enables both programmers and users to vary the colors of views. This chapter covers the features of Turbo Vision you need to understand to work with colors: color palettes and color attributes.
 
 ## Using Color Palettes
@@ -589,3 +593,7 @@ Key principles:
 - Test colors in different terminal environments
 
 The color system is defined in `src/core/palette.rs` and used throughout the view implementations for consistent, attractive, and accessible user interfaces.
+
+---
+
+**Next:** [Chapter 15 — Editor and Text Views](Chapter-15-Editor-and-Text-Views.md)

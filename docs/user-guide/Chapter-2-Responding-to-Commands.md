@@ -1,5 +1,9 @@
 # Chapter 2 — Responding to Commands
 
+**Previous:** [Chapter 1 — Stepping into Turbo Vision](Chapter-1-Stepping-into-Turbo-Vision.md)
+
+---
+
 In Chapter 1, you built a minimal Turbo Vision application. In this chapter, you'll learn how to make it **respond to user commands**, such as keystrokes or menu selections. You'll extend the tutorial application by adding an **About box** and handling custom commands, and learn how to enable or disable menu items dynamically.
 
 ---
@@ -492,3 +496,7 @@ In the next chapter, you'll learn how to **add windows** to your Turbo Vision ap
 - **Chapter 9**: Event-Driven Programming (advanced event handling)
 - **Example Code**: `examples/menu_status_data.rs` — Demonstrates menu and status line construction
 - **Example Code**: `examples/command_set_demo.rs` — Shows command enable/disable in action
+
+---
+
+**Next:** [Chapter 3 — Adding Windows](Chapter-3-Adding-Windows.md)

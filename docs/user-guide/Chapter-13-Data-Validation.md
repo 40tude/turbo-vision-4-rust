@@ -1,5 +1,9 @@
 # Chapter 13: Data Validation
 
+**Previous:** [Chapter 12 — Control Objects](Chapter-12-Control-Objects.md)
+
+---
+
 Data validation in Turbo Vision ensures that user input meets specific criteria before being accepted by your application. The validation system is flexible and extensible, supporting multiple validation strategies.
 
 It's important to remember that the validation is handled by validator objects, not by the input line objects themselves. If you've already created a customized input line for a specialized purpose, you've probably already duplicated capability that's built into input lines and their validators.
@@ -569,3 +573,7 @@ The Rust implementations can be found in:
 - `src/views/validator.rs` - Base trait and FilterValidator, RangeValidator
 - `src/views/picture_validator.rs` - PictureValidator
 - `src/views/lookup_validator.rs` - LookupValidator
+
+---
+
+**Next:** [Chapter 14 — Palettes and Color Selection](Chapter-14-Palettes-and-Color-Selection.md)

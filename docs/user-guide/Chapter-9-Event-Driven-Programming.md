@@ -1,5 +1,9 @@
 # Event-driven programming
 
+**Previous:** [Chapter 8 — Views and Groups](Chapter-8-Views-and-Groups.md)
+
+---
+
 The purpose of Turbo Vision is to provide you with a working framework for your applications so you can focus on creating the "meat" of your applications. The two major Turbo Vision tools are built-in windowing support and handling of events. Chapter 8 explained views, and this chapter discusses how to build your programs around events.
 
 ## Bringing Turbo Vision to life
@@ -336,3 +340,7 @@ Event-driven programming in Turbo Vision is built around a few key concepts:
 6. **Clearing events** marks them as handled and prevents duplicate processing
 
 By understanding these mechanisms, you can build sophisticated applications where views coordinate seamlessly without tight coupling between components.
+
+---
+
+**Next:** [Chapter 10 — Application Objects](Chapter-10-Application-Objects.md)
