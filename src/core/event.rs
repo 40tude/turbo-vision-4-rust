@@ -65,6 +65,33 @@ pub const KB_ESC_E: KeyCode = 0x1201; // ESC+E (Edit menu)
 pub const KB_ESC_S: KeyCode = 0x1F01; // ESC+S (Search menu)
 pub const KB_ESC_V: KeyCode = 0x2F01; // ESC+V (View menu)
 
+pub const KB_CTRL_A: KeyCode = 0x0001; // CTRL+A
+pub const KB_CTRL_B: KeyCode = 0x0002; // CTRL+B
+pub const KB_CTRL_C: KeyCode = 0x0003; // CTRL+C
+pub const KB_CTRL_D: KeyCode = 0x0004; // CTRL+D
+pub const KB_CTRL_E: KeyCode = 0x0005; // CTRL+E
+pub const KB_CTRL_F: KeyCode = 0x0006; // CTRL+F
+pub const KB_CTRL_G: KeyCode = 0x0007; // CTRL+G
+pub const KB_CTRL_H: KeyCode = 0x0008; // CTRL+H
+pub const KB_CTRL_I: KeyCode = 0x0009; // CTRL+I
+pub const KB_CTRL_J: KeyCode = 0x000a; // CTRL+J
+pub const KB_CTRL_K: KeyCode = 0x000b; // CTRL+K
+pub const KB_CTRL_L: KeyCode = 0x000c; // CTRL+L
+pub const KB_CTRL_M: KeyCode = 0x000d; // CTRL+M
+pub const KB_CTRL_N: KeyCode = 0x000e; // CTRL+N
+pub const KB_CTRL_O: KeyCode = 0x000f; // CTRL+O
+pub const KB_CTRL_P: KeyCode = 0x0010; // CTRL+P
+pub const KB_CTRL_Q: KeyCode = 0x0011; // CTRL+Q
+pub const KB_CTRL_R: KeyCode = 0x0012; // CTRL+R
+pub const KB_CTRL_S: KeyCode = 0x0013; // CTRL+S
+pub const KB_CTRL_T: KeyCode = 0x0014; // CTRL+T
+pub const KB_CTRL_U: KeyCode = 0x0015; // CTRL+U
+pub const KB_CTRL_V: KeyCode = 0x0016; // CTRL+V
+pub const KB_CTRL_W: KeyCode = 0x0017; // CTRL+W
+pub const KB_CTRL_X: KeyCode = 0x0018; // CTRL+X
+pub const KB_CTRL_Y: KeyCode = 0x0019; // CTRL+Y
+pub const KB_CTRL_Z: KeyCode = 0x001a; // CTRL+Z
+
 // Double ESC for closing dialogs
 pub const KB_ESC_ESC: KeyCode = 0x011C; // Double ESC
 
