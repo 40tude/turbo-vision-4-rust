@@ -265,7 +265,7 @@ pub trait View {
         let bounds = self.bounds();
         let mut buf = DrawBuffer::new(SHADOW_SIZE.0 as usize);
 
-        // Draw right edge shadow (2 columns wide, offset by 1 vertically)
+        // Draw right edge shadow (1 column wide, offset by 1 vertically)
         // Read existing cells and darken them for semi-transparency
         for y in (bounds.a.y + 1)..(bounds.b.y + 1) {
             for i in 0..SHADOW_SIZE.0 {
@@ -491,7 +491,7 @@ pub fn draw_shadow_bounds(terminal: &mut Terminal, bounds: Rect) {
 
     let mut buf = DrawBuffer::new(SHADOW_SIZE.0 as usize);
 
-    // Draw right edge shadow (2 columns wide, offset by 1 vertically)
+    // Draw right edge shadow (1 column wide, offset by 1 vertically)
     // Read existing cells and darken them for semi-transparency
     for y in (bounds.a.y + 1)..(bounds.b.y + 1) {
         for i in 0..SHADOW_SIZE.0 {

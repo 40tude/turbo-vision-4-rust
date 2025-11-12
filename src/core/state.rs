@@ -36,7 +36,8 @@ pub const OF_CENTERED: u16 = 0x300;
 pub const OF_VALIDATE: u16 = 0x400;  // View should be validated on focus release (Borland: ofValidate)
 
 /// Shadow size (width, height)
-pub const SHADOW_SIZE: (i16, i16) = (2, 1);
+/// Matches Borland: shadows are 1 column wide on right, 1 row tall on bottom
+pub const SHADOW_SIZE: (i16, i16) = (1, 1);
 
 /// Shadow attribute (darkened color)
 pub const SHADOW_ATTR: u8 = 0x08;
