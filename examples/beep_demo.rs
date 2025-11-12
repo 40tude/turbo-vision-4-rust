@@ -9,7 +9,7 @@ use turbo_vision::views::dialog::DialogBuilder;
 use turbo_vision::views::static_text::StaticTextBuilder;
 
 // Custom command IDs for this example
-const CM_BEEP: u16 = 100;
+const CMD_BEEP: u16 = 100;
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
@@ -23,13 +23,13 @@ fn main() -> turbo_vision::core::error::Result<()> {
             .build(),
     ));
 
-    dialog.add(Box::new(ButtonBuilder::new().bounds(Rect::new(8, 6, 18, 8)).title("Beep!").command(CM_BEEP).default(false).build()));
+    dialog.add(Box::new(ButtonBuilder::new().bounds(Rect::new(8, 6, 18, 8)).title("Beep!").command(CMD_BEEP).default(false).build()));
     dialog.add(Box::new(ButtonBuilder::new().bounds(Rect::new(21, 6, 31, 8)).title("Close").command(CM_OK).default(true).build()));
 
     loop {
         let result = dialog.execute(&mut app);
 
-        if result == CM_BEEP {
+        if result == CMD_BEEP {
             // Make a beep sound!
             app.beep();
             // Continue the dialog
