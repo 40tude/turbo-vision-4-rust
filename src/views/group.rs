@@ -368,17 +368,21 @@ impl View for Group {
         let dx = bounds.a.x - self.bounds.a.x;
         let dy = bounds.a.y - self.bounds.a.y;
 
+        // Calculate the size change (how much the group was resized)
+        let dw = bounds.width() - self.bounds.width();
+        let dh = bounds.height() - self.bounds.height();
+
         // Update our bounds
         self.bounds = bounds;
 
-        // Update all children's bounds by the same offset
+        // Update all children's bounds by the offset and size change
         for child in &mut self.children {
             let child_bounds = child.bounds();
             let new_bounds = Rect::new(
                 child_bounds.a.x + dx,
                 child_bounds.a.y + dy,
-                child_bounds.b.x + dx,
-                child_bounds.b.y + dy,
+                child_bounds.b.x + dx + dw,
+                child_bounds.b.y + dy + dh,
             );
             child.set_bounds(new_bounds);
         }
