@@ -16,7 +16,8 @@
 use crate::app::Application;
 use crate::core::command::{CommandId, CM_OK};
 use crate::core::event::{Event, EventType};
-use crate::core::geometry::Rect;
+use crate::core::geometry::{Point, Rect};
+use crate::core::history::HistoryManager;
 use crate::terminal::Terminal;
 use super::dialog::Dialog;
 use super::input_line::InputLine;
@@ -24,6 +25,7 @@ use super::label::Label;
 use super::button::Button;
 use super::dir_listbox::DirListBox;
 use super::scrollbar::ScrollBar;
+use super::history::History;
 use super::msgbox::message_box_error;
 use super::View;
 use std::path::PathBuf;
@@ -33,6 +35,10 @@ use std::rc::Rc;
 // Custom commands for ChDirDialog
 const CM_CHANGE_DIR: CommandId = 200;
 const CM_REVERT: CommandId = 201;
+
+// History ID for directory paths
+// Matches Borland: histId parameter in TChDirDialog constructor
+const DEFAULT_HISTORY_ID: u16 = 10;
 
 /// Wrapper that allows ScrollBar to be a child view
 struct SharedScrollBar(Rc<RefCell<ScrollBar>>);
@@ -122,6 +128,7 @@ pub struct ChDirDialog {
     dialog: Dialog,
     dir_input_data: Rc<RefCell<String>>,
     dir_listbox: Rc<RefCell<DirListBox>>,
+    history_id: u16,
     #[allow(dead_code)] // Will be used for navigation implementation
     dir_list_idx: usize,
     #[allow(dead_code)] // Will be used for input updates
@@ -135,6 +142,9 @@ pub struct ChDirDialog {
 
 impl ChDirDialog {
     /// Create a new change directory dialog
+    ///
+    /// # Arguments
+    /// * `history_id` - Optional history ID for storing directory history (defaults to 10)
     ///
     /// Matches Borland constructor:
     /// `TChDirDialog::TChDirDialog( ushort opts, ushort histId )`
@@ -151,7 +161,8 @@ impl ChDirDialog {
     /// - OK button: TRect( 35, 6, 45, 8 )
     /// - Chdir button: TRect( 35, 9, 45, 11 )
     /// - Revert button: TRect( 35, 12, 45, 14 )
-    pub fn new() -> Self {
+    pub fn new(history_id: Option<u16>) -> Self {
+        let history_id = history_id.unwrap_or(DEFAULT_HISTORY_ID);
         // Borland dialog bounds: TRect( 16, 2, 64, 21 )
         // This is absolute screen coordinates, will be centered by ofCentered flag
         let dialog_bounds = Rect::new(16, 2, 64, 21);
@@ -174,8 +185,10 @@ impl ChDirDialog {
         let dir_label = Label::new(label_bounds, "Directory ~n~ame");
         dialog.add(Box::new(dir_label));
 
-        // TODO: History button - Borland: TRect( 30, 3, 33, 4 )
-        // Skipping history button for now as it requires History implementation
+        // History button - Borland: TRect( 30, 3, 33, 4 )
+        // Shows a dropdown button (▼) that displays previous directories
+        let history_button = History::new(Point::new(30, 3), history_id);
+        dialog.add(Box::new(history_button));
 
         // Vertical scrollbar - Borland: TRect( 32, 6, 33, 16 )
         let v_scrollbar_bounds = Rect::new(32, 6, 33, 16);
@@ -216,13 +229,15 @@ impl ChDirDialog {
         let revert_button = Button::new(revert_bounds, "~R~evert", CM_REVERT, false);
         dialog.add(Box::new(revert_button));
 
-        // TODO: Optional Help button - Borland: TRect( 35, 15, 45, 17 )
-        // Skipping help button for now
+        // Help button is intentionally NOT implemented
+        // Borland: TRect( 35, 15, 45, 17 ) - optional, requires help system
+        // Will be added when application-wide help system is implemented
 
         Self {
             dialog,
             dir_input_data,
             dir_listbox,
+            history_id,
             dir_list_idx,
             dir_input_idx,
             ok_button_idx,
@@ -237,6 +252,7 @@ impl ChDirDialog {
     ///
     /// Matches Borland: user interacts with dialog, OK/Cancel to exit
     /// The valid() method validates the directory before closing
+    /// History is automatically updated on success
     pub fn execute(&mut self, app: &mut Application) -> Option<PathBuf> {
         loop {
             let end_state = self.dialog.execute(app);
@@ -257,7 +273,10 @@ impl ChDirDialog {
                     continue;
                 }
 
-                // Valid directory - return success
+                // Valid directory - add to history and return success
+                // Matches Borland: historyAdd is called in handleEvent on cmReleasedFocus
+                HistoryManager::add(self.history_id, dir_path.clone());
+
                 self.selected_directory = Some(path.clone());
                 return Some(path);
             } else {
@@ -344,17 +363,26 @@ impl View for ChDirDialog {
 }
 
 /// Builder for creating change directory dialogs with a fluent API.
-pub struct ChDirDialogBuilder {}
+pub struct ChDirDialogBuilder {
+    history_id: Option<u16>,
+}
 
 impl ChDirDialogBuilder {
     /// Creates a new ChDirDialogBuilder
     pub fn new() -> Self {
-        Self {}
+        Self { history_id: None }
+    }
+
+    /// Sets a custom history ID for directory history
+    #[must_use]
+    pub fn history_id(mut self, history_id: u16) -> Self {
+        self.history_id = Some(history_id);
+        self
     }
 
     /// Builds the ChDirDialog with Borland standard layout
     pub fn build(self) -> ChDirDialog {
-        ChDirDialog::new()
+        ChDirDialog::new(self.history_id)
     }
 
     /// Builds the ChDirDialog as a Box
