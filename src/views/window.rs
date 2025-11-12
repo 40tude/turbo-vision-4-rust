@@ -8,7 +8,7 @@ use super::view::View;
 use crate::core::command::{CM_CANCEL, CM_CLOSE};
 use crate::core::event::{Event, EventType};
 use crate::core::geometry::{Point, Rect};
-use crate::core::state::{StateFlags, SF_DRAGGING, SF_MODAL, SF_RESIZING, SF_SHADOW};
+use crate::core::state::{SF_DRAGGING, SF_MODAL, SF_RESIZING, SF_SHADOW, StateFlags};
 use crate::terminal::Terminal;
 
 pub struct Window {
@@ -323,10 +323,7 @@ impl Window {
     /// Execute a modal event loop
     /// Delegates to the interior Group's execute() method
     /// Matches Borland: Window and Dialog both inherit TGroup's execute()
-    pub fn execute(
-        &mut self,
-        app: &mut crate::app::Application,
-    ) -> crate::core::command::CommandId {
+    pub fn execute(&mut self, app: &mut crate::app::Application) -> crate::core::command::CommandId {
         self.interior.execute(app)
     }
 
@@ -408,10 +405,7 @@ impl View for Window {
             // Frame just started dragging - record offset
             if event.what == EventType::MouseDown || event.what == EventType::MouseMove {
                 let mouse_pos = event.mouse.pos;
-                self.drag_offset = Some(Point::new(
-                    mouse_pos.x - self.bounds.a.x,
-                    mouse_pos.y - self.bounds.a.y,
-                ));
+                self.drag_offset = Some(Point::new(mouse_pos.x - self.bounds.a.x, mouse_pos.y - self.bounds.a.y));
                 self.state |= SF_DRAGGING;
                 event.clear(); // Mark event as handled
                 return;
@@ -424,10 +418,7 @@ impl View for Window {
                 let mouse_pos = event.mouse.pos;
                 // Calculate offset from bottom-right corner
                 // Borland: p = size - event.mouse.where (tview.cc:235)
-                self.resize_start_size = Some(Point::new(
-                    self.bounds.b.x - mouse_pos.x,
-                    self.bounds.b.y - mouse_pos.y,
-                ));
+                self.resize_start_size = Some(Point::new(self.bounds.b.x - mouse_pos.x, self.bounds.b.y - mouse_pos.y));
                 self.state |= SF_RESIZING;
                 event.clear(); // Mark event as handled
                 return;
@@ -674,7 +665,7 @@ impl View for Window {
     }
 
     fn get_palette(&self) -> Option<crate::core::palette::Palette> {
-        use crate::core::palette::{palettes, Palette};
+        use crate::core::palette::{Palette, palettes};
         match self.palette_type {
             WindowPaletteType::Blue => Some(Palette::from_slice(palettes::CP_BLUE_WINDOW)),
             WindowPaletteType::Cyan => Some(Palette::from_slice(palettes::CP_CYAN_WINDOW)),

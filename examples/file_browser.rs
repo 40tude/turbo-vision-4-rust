@@ -18,37 +18,28 @@ use turbo_vision::views::view::View;
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
-    let terminal_size = app.terminal.size();
+    let (w, h) = app.terminal.size();
+    let (w, h) = (w as i16, h as i16);
     let current_dir = env::current_dir()?;
 
     // Split screen: DirListBox on left, FileList on right
-    let split_x = terminal_size.0 / 2;
+    let split_x = w / 2;
 
     // Directory tree on left
-    let dir_bounds = Rect::new(0, 0, split_x as i16, terminal_size.1 as i16 - 1);
+    let dir_bounds = Rect::new(0, 0, split_x, h - 1);
     let mut dir_list = DirListBox::new(dir_bounds, &current_dir);
     dir_list.set_focus(true);
 
     // File list on right
-    let file_bounds = Rect::new(
-        split_x as i16,
-        0,
-        terminal_size.0 as i16,
-        terminal_size.1 as i16 - 1,
-    );
+    let file_bounds = Rect::new(split_x, 0, w, h - 1);
     let mut file_list = FileList::new(file_bounds, &current_dir);
     file_list.refresh();
 
-    // Status line at bottom
-    let status_bounds = Rect::new(
-        0,
-        terminal_size.1 as i16 - 1,
-        terminal_size.0 as i16,
-        terminal_size.1 as i16,
-    );
+    // Kind of status line at bottom
+    let status_bounds = Rect::new(0, h - 1, w, h);
     let mut status = StaticTextBuilder::new()
         .bounds(status_bounds)
-        .text(" File Browser | TAB: Switch panels | Enter: Navigate | ESC ESC: Exit")
+        .text(" File Browser Demo | TAB: Switch panels | Enter: Navigate | ESC ESC: Exit")
         .build();
 
     // Event loop
