@@ -9,7 +9,7 @@
 // Provides a ready-to-use editor window for text editing.
 
 use crate::core::geometry::{Point, Rect};
-use crate::core::event::Event;
+use crate::core::event::{Event, EventType};
 use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use super::window::Window;
@@ -352,13 +352,77 @@ impl View for EditWindow {
         // During rapid resizing, this ensures scrollbars are always at correct positions
         self.sync_frame_children_positions();
 
-        // Window draws itself and all children (including editor)
-        self.window.draw(terminal);
+        // Draw frame and interior first
+        self.window.frame_mut().draw(terminal);
+        self.window.interior_mut().draw(terminal);
+
+        // Check if scrollbars are needed based on content size
+        let editor = self.editor.borrow();
+        let needs_h_scrollbar = editor.needs_horizontal_scrollbar();
+        let needs_v_scrollbar = editor.needs_vertical_scrollbar();
+        drop(editor); // Release borrow before drawing
+
+        // Conditionally draw scrollbars only if needed
+        if needs_h_scrollbar {
+            if let Some(child) = self.window.get_frame_child_mut(self.h_scrollbar_idx) {
+                child.draw(terminal);
+            }
+        }
+        if needs_v_scrollbar {
+            if let Some(child) = self.window.get_frame_child_mut(self.v_scrollbar_idx) {
+                child.draw(terminal);
+            }
+        }
+        // Always draw indicator
+        if let Some(child) = self.window.get_frame_child_mut(self.indicator_idx) {
+            child.draw(terminal);
+        }
+
+        // Draw shadow if enabled
+        if self.window.has_shadow() {
+            self.window.draw_shadow(terminal);
+        }
     }
 
     fn handle_event(&mut self, event: &mut Event) {
         // Save old bounds before Window processes the event
         let old_bounds = self.window.bounds();
+
+        // Pass events to scrollbars first (if they're visible and the event hasn't been handled)
+        if event.what != EventType::Nothing {
+            let editor = self.editor.borrow();
+            let needs_h_scrollbar = editor.needs_horizontal_scrollbar();
+            let needs_v_scrollbar = editor.needs_vertical_scrollbar();
+            drop(editor);
+
+            let mut scrollbar_handled = false;
+
+            // Let horizontal scrollbar handle event if visible
+            if needs_h_scrollbar {
+                if let Some(child) = self.window.get_frame_child_mut(self.h_scrollbar_idx) {
+                    child.handle_event(event);
+                    if event.what == EventType::Nothing {
+                        scrollbar_handled = true;
+                    }
+                }
+            }
+
+            // Let vertical scrollbar handle event if visible (and not already handled)
+            if !scrollbar_handled && needs_v_scrollbar {
+                if let Some(child) = self.window.get_frame_child_mut(self.v_scrollbar_idx) {
+                    child.handle_event(event);
+                    if event.what == EventType::Nothing {
+                        scrollbar_handled = true;
+                    }
+                }
+            }
+
+            // If scrollbar handled the event, sync editor delta from scrollbar values
+            if scrollbar_handled {
+                self.editor.borrow_mut().sync_from_scrollbars();
+                return;
+            }
+        }
 
         // Let Window handle the event (drag, resize, etc.)
         self.window.handle_event(event);

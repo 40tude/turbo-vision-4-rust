@@ -230,6 +230,23 @@ impl Editor {
         self.lines.len()
     }
 
+    /// Get the maximum line width (length of the longest line)
+    pub fn max_line_width(&self) -> usize {
+        self.lines.iter().map(|line| line.len()).max().unwrap_or(0)
+    }
+
+    /// Check if vertical scrollbar is needed
+    pub fn needs_vertical_scrollbar(&self) -> bool {
+        let visible_height = self.bounds.height() as usize;
+        self.line_count() > visible_height
+    }
+
+    /// Check if horizontal scrollbar is needed
+    pub fn needs_horizontal_scrollbar(&self) -> bool {
+        let visible_width = self.bounds.width() as usize;
+        self.max_line_width() > visible_width
+    }
+
     /// Load file contents into the editor
     /// Matches Borland's TFileEditor::load()
     pub fn load_file(&mut self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
@@ -506,6 +523,18 @@ impl Editor {
                 content_area.height() as i32,
                 1,
             );
+        }
+    }
+
+    /// Sync editor's delta (scroll position) from scrollbar values
+    /// Called after scrollbar events to update editor view
+    pub fn sync_from_scrollbars(&mut self) {
+        if let Some(ref h_bar) = self.h_scrollbar {
+            self.delta.x = h_bar.borrow().get_value() as i16;
+        }
+
+        if let Some(ref v_bar) = self.v_scrollbar {
+            self.delta.y = v_bar.borrow().get_value() as i16;
         }
     }
 

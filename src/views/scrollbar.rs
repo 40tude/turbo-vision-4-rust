@@ -6,6 +6,7 @@ use super::view::{write_line_to_terminal, View};
 use crate::core::draw::DrawBuffer;
 use crate::core::event::{
     Event, EventType, KB_DOWN, KB_END, KB_HOME, KB_LEFT, KB_PGDN, KB_PGUP, KB_RIGHT, KB_UP,
+    MB_LEFT_BUTTON,
 };
 use crate::core::geometry::{Point, Rect};
 use crate::core::palette::{SCROLLBAR_INDICATOR, SCROLLBAR_PAGE};
@@ -309,8 +310,89 @@ impl View for ScrollBar {
                     _ => {}
                 }
             }
+        } else if event.what == EventType::MouseDown && (event.mouse.buttons & MB_LEFT_BUTTON) != 0 {
+            let mouse_pos = event.mouse.pos;
+
+            if self.is_vertical {
+                // Check if mouse is within scrollbar bounds
+                if mouse_pos.x >= self.bounds.a.x && mouse_pos.x < self.bounds.b.x
+                    && mouse_pos.y >= self.bounds.a.y && mouse_pos.y < self.bounds.b.y {
+
+                    let rel_y = mouse_pos.y - self.bounds.a.y;
+                    let height = self.bounds.height();
+
+                    if rel_y == 0 {
+                        // Up arrow clicked
+                        self.value = (self.value - self.ar_step).max(self.min_val);
+                        event.clear();
+                    } else if rel_y == height - 1 {
+                        // Down arrow clicked
+                        self.value = (self.value + self.ar_step).min(self.max_val);
+                        event.clear();
+                    } else {
+                        // Page area clicked - calculate position
+                        let range = self.max_val - self.min_val;
+                        if range > 0 {
+                            let thumb_size = 1;
+                            let track_size = (height - 2 - thumb_size).max(1) as i32;
+                            let thumb_pos = if range > 0 {
+                                ((self.value - self.min_val) * track_size / range) as i16
+                            } else {
+                                0
+                            };
+
+                            if rel_y < thumb_pos + 1 {
+                                // Clicked above thumb - page up
+                                self.value = (self.value - self.pg_step).max(self.min_val);
+                            } else if rel_y > thumb_pos + 1 {
+                                // Clicked below thumb - page down
+                                self.value = (self.value + self.pg_step).min(self.max_val);
+                            }
+                            event.clear();
+                        }
+                    }
+                }
+            } else {
+                // Horizontal scrollbar
+                if mouse_pos.y >= self.bounds.a.y && mouse_pos.y < self.bounds.b.y
+                    && mouse_pos.x >= self.bounds.a.x && mouse_pos.x < self.bounds.b.x {
+
+                    let rel_x = mouse_pos.x - self.bounds.a.x;
+                    let width = self.bounds.width();
+
+                    if rel_x == 0 {
+                        // Left arrow clicked
+                        self.value = (self.value - self.ar_step).max(self.min_val);
+                        event.clear();
+                    } else if rel_x == width - 1 {
+                        // Right arrow clicked
+                        self.value = (self.value + self.ar_step).min(self.max_val);
+                        event.clear();
+                    } else {
+                        // Page area clicked
+                        let range = self.max_val - self.min_val;
+                        if range > 0 {
+                            let thumb_size = 1;
+                            let track_size = (width - 2 - thumb_size).max(1) as i32;
+                            let thumb_pos = if range > 0 {
+                                ((self.value - self.min_val) * track_size / range) as i16
+                            } else {
+                                0
+                            };
+
+                            if rel_x < thumb_pos + 1 {
+                                // Clicked left of thumb - page left
+                                self.value = (self.value - self.pg_step).max(self.min_val);
+                            } else if rel_x > thumb_pos + 1 {
+                                // Clicked right of thumb - page right
+                                self.value = (self.value + self.pg_step).min(self.max_val);
+                            }
+                            event.clear();
+                        }
+                    }
+                }
+            }
         }
-        // TODO: Add mouse support when mouse events are implemented
     }
 
     fn set_owner(&mut self, owner: *const dyn View) {
