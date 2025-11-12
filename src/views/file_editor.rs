@@ -34,9 +34,10 @@ impl FileEditor {
     /// Create a new file editor
     ///
     /// Matches Borland: TFileEditor(bounds, hScrollBar, vScrollBar, indicator, fileName)
+    /// Note: In the Rust version, scrollbars should be managed by the parent Window
     pub fn new(bounds: Rect) -> Self {
         Self {
-            editor: Editor::new(bounds).with_scrollbars_and_indicator(),
+            editor: Editor::new(bounds),
             filename: None,
         }
     }

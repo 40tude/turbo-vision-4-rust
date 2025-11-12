@@ -138,8 +138,11 @@ impl View for Frame {
         let mut side_buf = DrawBuffer::new(width);
         side_buf.put_char(0, '║', frame_attr);  // Double vertical line
         side_buf.put_char(width - 1, '║', frame_attr);  // Double vertical line
+        // Fill interior with background color from palette chain (matches Borland)
+        // Maps through Frame's palette -> Window's palette -> App palette
+        let interior_color = self.map_color(crate::core::palette::WINDOW_BACKGROUND);
         for i in 1..width - 1 {
-            side_buf.put_char(i, ' ', frame_attr);
+            side_buf.put_char(i, ' ', interior_color);
         }
         for y in 1..height - 1 {
             write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y + y as i16, &side_buf);

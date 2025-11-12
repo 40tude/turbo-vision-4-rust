@@ -15,6 +15,9 @@ pub struct Window {
     bounds: Rect,
     frame: Frame,
     interior: Group,
+    /// Direct children of window (positioned relative to window frame, not interior)
+    /// Used for scrollbars and other frame-relative elements
+    frame_children: Vec<Box<dyn View>>,
     state: StateFlags,
     options: u16,
     /// Drag start position (relative to mouse when drag started)
@@ -50,20 +53,10 @@ impl Window {
     /// Matches Borland: TWindow constructor sets palette(wpBlueWindow)
     /// For TDialog (gray palette), use new_for_dialog() instead
     pub fn new(bounds: Rect, title: &str) -> Self {
-        use crate::core::palette::{palettes, Palette, Attr, WINDOW_BACKGROUND};
-
-        // Map interior color through blue window palette
-        // This matches the frame color (blue background)
-        let app_palette_data = palettes::get_app_palette();
-        let palette = Palette::from_slice(palettes::CP_BLUE_WINDOW);
-        let app_index = palette.get(WINDOW_BACKGROUND as usize);
-        let interior_color = Attr::from_u8(app_palette_data[app_index as usize - 1]);
-
         Self::new_with_palette(
             bounds,
             title,
             super::frame::FramePaletteType::Editor,
-            interior_color,
             WindowPaletteType::Blue,
             true, // resizable
         )
@@ -72,19 +65,10 @@ impl Window {
     /// Create a window for TDialog with gray palette
     /// Matches Borland: TDialog overrides TWindow palette to use cpGrayDialog
     pub(crate) fn new_for_dialog(bounds: Rect, title: &str) -> Self {
-        use crate::core::palette::{palettes, Palette, Attr, WINDOW_BACKGROUND};
-
-        // Map interior color through dialog palette
-        let app_palette_data = palettes::get_app_palette();
-        let palette = Palette::from_slice(palettes::CP_GRAY_DIALOG);
-        let app_index = palette.get(WINDOW_BACKGROUND as usize);
-        let interior_color = Attr::from_u8(app_palette_data[app_index as usize - 1]);
-
         Self::new_with_palette(
             bounds,
             title,
             super::frame::FramePaletteType::Dialog,
-            interior_color,
             WindowPaletteType::Dialog,
             false, // not resizable (TDialog doesn't have wfGrow)
         )
@@ -94,7 +78,6 @@ impl Window {
         bounds: Rect,
         title: &str,
         frame_palette: super::frame::FramePaletteType,
-        interior_color: crate::core::palette::Attr,
         window_palette: WindowPaletteType,
         resizable: bool,
     ) -> Self {
@@ -105,12 +88,14 @@ impl Window {
         // Interior bounds are ABSOLUTE (inset by 1 from window bounds for frame)
         let mut interior_bounds = bounds;
         interior_bounds.grow(-1, -1);
-        let interior = Group::with_background(interior_bounds, interior_color);
+        // Don't use background - the Frame fills the interior space (matching Borland)
+        let interior = Group::new(interior_bounds);
 
         let mut window = Self {
             bounds,
             frame,
             interior,
+            frame_children: Vec::new(),
             state: SF_SHADOW, // Windows have shadows by default
             options: OF_SELECTABLE | OF_TOP_SELECT | OF_TILEABLE, // Matches Borland: TWindow/TEditWindow flags
             drag_offset: None,
@@ -139,6 +124,41 @@ impl Window {
 
         // Add to interior group (which will set owner pointer for palette chain)
         self.interior.add(view)
+    }
+
+    /// Add a child positioned relative to the window frame (not interior)
+    /// Used for scrollbars and other frame-edge elements
+    /// Matches Borland: TWindow is a TGroup, all children use window-relative coords
+    pub fn add_frame_child(&mut self, mut view: Box<dyn View>) -> usize {
+        // Set the owner type
+        let owner_type = match self.palette_type {
+            WindowPaletteType::Dialog => super::view::OwnerType::Dialog,
+            _ => super::view::OwnerType::Window,
+        };
+        view.set_owner_type(owner_type);
+
+        // Set owner pointer for palette chain
+        view.set_owner(self as *const _ as *const dyn View);
+
+        // Convert from relative to absolute coordinates (relative to window frame)
+        let child_bounds = view.bounds();
+        let absolute_bounds = Rect::new(
+            self.bounds.a.x + child_bounds.a.x,
+            self.bounds.a.y + child_bounds.a.y,
+            self.bounds.a.x + child_bounds.b.x,
+            self.bounds.a.y + child_bounds.b.y,
+        );
+        view.set_bounds(absolute_bounds);
+
+        self.frame_children.push(view);
+        self.frame_children.len() - 1
+    }
+
+    /// Update a frame child's bounds (for use by subclasses during resize)
+    pub fn update_frame_child(&mut self, index: usize, bounds: Rect) {
+        if let Some(child) = self.frame_children.get_mut(index) {
+            child.set_bounds(bounds);
+        }
     }
 
     pub fn set_initial_focus(&mut self) {
@@ -335,11 +355,20 @@ impl View for Window {
         let mut interior_bounds = bounds;
         interior_bounds.grow(-1, -1);
         self.interior.set_bounds(interior_bounds);
+
+        // NOTE: We do NOT automatically update frame_children here
+        // Subclasses like EditWindow handle frame_children positioning manually
+        // because scrollbars need to be repositioned based on new window SIZE, not just offset
     }
 
     fn draw(&mut self, terminal: &mut Terminal) {
         self.frame.draw(terminal);
         self.interior.draw(terminal);
+
+        // Draw frame children (scrollbars, etc.) after interior so they appear on top
+        for child in &mut self.frame_children {
+            child.draw(terminal);
+        }
 
         // Draw shadow if enabled
         if self.has_shadow() {
@@ -733,23 +762,13 @@ impl WindowBuilder {
     ///
     /// Panics if required fields (bounds, title) are not set.
     pub fn build(self) -> Window {
-        use crate::core::palette::{palettes, Palette, Attr, WINDOW_BACKGROUND};
-
         let bounds = self.bounds.expect("Window bounds must be set");
         let title = self.title.expect("Window title must be set");
-
-        // Map interior color through blue window palette
-        // Uses WINDOW_BACKGROUND (index 1) which maps to app palette 8 = LightGray on Blue
-        let app_palette_data = palettes::get_app_palette();
-        let palette = Palette::from_slice(palettes::CP_BLUE_WINDOW);
-        let app_index = palette.get(WINDOW_BACKGROUND as usize);
-        let interior_color = Attr::from_u8(app_palette_data[app_index as usize - 1]);
 
         Window::new_with_palette(
             bounds,
             &title,
             super::frame::FramePaletteType::Editor,
-            interior_color,
             WindowPaletteType::Blue,
             self.resizable,
         )

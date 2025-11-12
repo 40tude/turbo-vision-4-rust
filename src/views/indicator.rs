@@ -8,11 +8,11 @@ use crate::core::draw::DrawBuffer;
 use crate::terminal::Terminal;
 use super::view::{View, write_line_to_terminal};
 
-/// Indicator displays the current line and column position,
-/// typically shown in the top-right corner of an editor window.
+/// Indicator displays window size or cursor position,
+/// typically shown in the bottom-left of an editor window.
 pub struct Indicator {
     bounds: Rect,
-    location: Point,  // Line and column (1-based)
+    location: Point,  // Width x Height for window size display
     modified: bool,   // Has the document been modified?
     owner: Option<*const dyn View>,
     owner_type: super::view::OwnerType,
@@ -48,13 +48,6 @@ impl View for Indicator {
         let width = self.bounds.width() as usize;
         let mut buf = DrawBuffer::new(width);
 
-        // Format: " 12:34 " or " 12:34 * " (with modified star)
-        let text = if self.modified {
-            format!(" {}:{} * ", self.location.y, self.location.x)
-        } else {
-            format!(" {}:{} ", self.location.y, self.location.x)
-        };
-
         // Use palette indices from CP_INDICATOR
         // 1 = Normal indicator, 2 = Modified indicator
         let color = if self.modified {
@@ -63,12 +56,27 @@ impl View for Indicator {
             self.map_color(1)
         };
 
-        // Right-align the indicator
-        let text_len = text.len().min(width);
-        let start_pos = width.saturating_sub(text_len);
-
+        // Fill with spaces (background)
         buf.move_char(0, ' ', color, width);
-        buf.move_str(start_pos, &text, color);
+
+        // Show modified star at the left if modified (matching Borland)
+        if self.modified {
+            buf.move_char(0, '*', color, 1);
+        }
+
+        // Format: " WxH " (width x height) centered
+        let text = format!(" {}x{} ", self.location.x, self.location.y);
+
+        // Center the text around the 'x' character
+        if let Some(x_pos) = text.find('x') {
+            let start_pos = (8_i32 - x_pos as i32).max(1) as usize;
+            let start_pos = start_pos.min(width.saturating_sub(text.len()));
+            buf.move_str(start_pos, &text, color);
+        } else {
+            // Fallback: center normally if no 'x' found
+            let start_pos = (width / 2).saturating_sub(text.len() / 2);
+            buf.move_str(start_pos, &text, color);
+        }
 
         write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
     }

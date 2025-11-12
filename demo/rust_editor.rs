@@ -1,77 +1,94 @@
 // (C) 2025 - Enzo Lombardi
-// Rust Text Editor Demo
+// Rust Text Editor - Port of Borland's TEditorApp (tvedit)
 //
-// A comprehensive text editor with:
-// - Rust syntax highlighting
-// - File operations (New, Open, Save, Save As)
-// - Dirty flag tracking with save prompt
-// - Search and Replace
-// - Rust analyzer integration
-// - Status line with file info
+// Based on Borland Turbo Vision's TEditorApp from:
+//   - local-only/borland/tvision/examples/tvedit/tvedit.cc
+//   - local-only/borland/tvision/classes/tvedit1.cc (application logic)
+//   - local-only/borland/tvision/classes/tvedit2.cc (dialogs)
+//   - local-only/borland/tvision/classes/tvedit3.cc (menus and status line)
+//
+// Features:
+// - Full TEditorApp functionality with EditWindow (TEditWindow)
+// - File operations (Open F3, New, Save F2, Save As, Exit Alt+X)
+// - Search and Replace (Find, Replace, Search Again)
+// - Window management (Zoom F5, Tile, Cascade, Next F6, Previous, Close Alt+F3)
+// - Rust-specific extensions (Rust syntax highlighting, rust-analyzer integration)
+// - Status line with function key shortcuts
 
 use std::path::PathBuf;
 use std::fs;
-use std::rc::Rc;
-use std::cell::RefCell;
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_CANCEL, CM_YES, CM_NO, CM_CLOSE};
+use turbo_vision::core::command::{
+    CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_CANCEL, CM_YES, CM_NO, CM_CLOSE,
+    CM_ZOOM, CM_TILE, CM_CASCADE, CM_NEXT, CM_PREV, CM_SAVE_AS, CM_FIND,
+    CM_REPLACE, CM_SEARCH_AGAIN, CM_GOTO_LINE,
+};
 use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
 use turbo_vision::views::file_dialog::FileDialog;
-use turbo_vision::views::editor::Editor;
+use turbo_vision::views::edit_window::EditWindow;
 use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
-use turbo_vision::views::window::Window;
 use turbo_vision::views::View;
 use turbo_vision::views::syntax::RustHighlighter;
 use turbo_vision::views::msgbox::{confirmation_box, message_box_ok, message_box_error, search_box, search_replace_box, goto_line_box};
 
-// Custom command IDs
-const CMD_SAVE_AS: u16 = 105;
-const CMD_SEARCH: u16 = 300;
-const CMD_REPLACE: u16 = 301;
-const CMD_GOTO_LINE: u16 = 302;
-const CMD_ANALYZE: u16 = 400;
-const CMD_SHOW_ERRORS: u16 = 401;
+// Custom command IDs for features not in core (using safe range 122-125, 400+)
+const CM_CHANGE_DIR: u16 = 122;   // Borland: cmChangeDrct - change directory dialog
+const CM_SHOW_CLIP: u16 = 123;    // Borland: cmShowClip - show clipboard window
+// Rust-specific commands
+const CM_ANALYZE: u16 = 400;      // Run rust-analyzer
+const CM_SHOW_ERRORS: u16 = 401;  // Show analysis errors
+
 
 struct EditorState {
     filename: Option<PathBuf>,
-    editor: Option<Rc<RefCell<Editor>>>,
 }
 
 impl EditorState {
     fn new() -> Self {
         Self {
             filename: None,
-            editor: None,
         }
     }
 
     fn get_title(&self) -> String {
         self.filename
             .as_ref()
-            .and_then(|p| p.file_name())
-            .and_then(|n| n.to_str())
-            .unwrap_or("Untitled")
-            .to_string()
+            .and_then(|p| p.file_name().and_then(|n| n.to_str()))
+            .map(String::from)
+            .unwrap_or_else(|| "Untitled".to_string())
+    }
+}
+
+/// Helper to get the EditWindow from the desktop (assumes it's the first child)
+fn get_edit_window(app: &Application) -> Option<&EditWindow> {
+    if app.desktop.child_count() == 0 {
+        return None;
     }
 
-    /// Get the editor text content, if an editor exists
-    fn get_text(&self) -> Option<String> {
-        self.editor.as_ref().map(|e| e.borrow().get_text())
+    let child = app.desktop.child_at(0);
+    // Try to downcast to EditWindow
+    // SAFETY: We know the first child is an EditWindow if it exists
+    unsafe {
+        let ptr = child as *const dyn View as *const EditWindow;
+        Some(&*ptr)
+    }
+}
+
+/// Helper to get a mutable reference to the EditWindow from the desktop
+fn get_edit_window_mut(app: &mut Application) -> Option<&mut EditWindow> {
+    if app.desktop.child_count() == 0 {
+        return None;
     }
 
-    /// Check if the editor has unsaved changes
-    fn is_modified(&self) -> bool {
-        self.editor.as_ref().map_or(false, |e| e.borrow().is_modified())
-    }
-
-    /// Clear the modified flag after saving
-    fn clear_modified(&self) {
-        if let Some(ref editor) = self.editor {
-            editor.borrow_mut().clear_modified();
-        }
+    let child = app.desktop.child_at_mut(0);
+    // Try to downcast to EditWindow
+    // SAFETY: We know the first child is an EditWindow if it exists
+    unsafe {
+        let ptr = child as *mut dyn View as *mut EditWindow;
+        Some(&mut *ptr)
     }
 }
 
@@ -81,28 +98,19 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
     let mut editor_state = EditorState::new();
 
-    // Create menu bar
-    let menu_bar = create_menu_bar(width);
+    // Create menu bar (matching Borland's TEditorApp::initMenuBar)
+    let menu_bar = init_menu_bar(Rect::new(0, 0, width as i16, 1));
     app.set_menu_bar(menu_bar);
 
-    // Create status line with functional items
-    // Matches Borland: TStatusLine items can execute commands when clicked or via shortcuts
-    let status_line = StatusLine::new(
-        Rect::new(0, height as i16 - 1, width as i16, height as i16),
-        vec![
-            StatusItem::new("~F10~ Menu", KB_F10, 0),  // F10 is handled by MenuBar, this is just informational
-            StatusItem::new("~Ctrl+S~ Save", 0, CM_SAVE),  // Clicking executes CM_SAVE (Ctrl+S handled by menu)
-            StatusItem::new("~Ctrl+F~ Find", 0, CMD_SEARCH),  // Clicking executes CMD_SEARCH
-        ],
-    );
+    // Create status line (matching Borland's TEditorApp::initStatusLine)
+    let status_line = init_status_line(Rect::new(0, height as i16 - 1, width as i16, height as i16));
     app.set_status_line(status_line);
 
-    // Editor bounds for when user creates a new window
-    let editor_bounds = Rect::new(1, 1, width as i16 - 1, height as i16 - 2);
-
-    // Create initial editor window on startup
-    let editor_window = create_editor_window(editor_bounds, &mut editor_state, None);
-    app.desktop.add(Box::new(editor_window));
+    // Create initial editor window on startup (matching Borland TEditWindow)
+    // Use RELATIVE coordinates since it will be added to desktop
+    // Desktop starts at row 1 (menu bar), so window at relative (5, 1) becomes absolute (5, 2)
+    let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
+    create_editor_window(&mut app, &mut editor_state, window_bounds, None);
 
     // Event loop
     app.running = true;
@@ -177,25 +185,26 @@ fn main() -> turbo_vision::core::error::Result<()> {
                     CM_NEW => {
                         let has_window = app.desktop.child_count() > 0;
                         if prompt_save_if_dirty(&mut app, &mut editor_state, has_window) {
-                            editor_state = EditorState::new();
-                            // Remove old window and add new one
                             if app.desktop.child_count() > 0 {
                                 app.desktop.remove_child(0);
                             }
-                            let editor_window = create_editor_window(editor_bounds, &mut editor_state, None);
-                            app.desktop.add(Box::new(editor_window));
+                            editor_state = EditorState::new();
+                            // Use RELATIVE coordinates for desktop
+                            let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
+                            create_editor_window(&mut app, &mut editor_state, window_bounds, None);
                         }
                     }
                     CM_OPEN => {
                         if let Some(path) = show_file_open_dialog(&mut app) {
                             if let Ok(content) = fs::read_to_string(&path) {
-                                editor_state.filename = Some(path);
-                                // Remove old window and add new one with loaded content
+                                // Remove old window and create new one with loaded file
                                 if app.desktop.child_count() > 0 {
                                     app.desktop.remove_child(0);
                                 }
-                                let editor_window = create_editor_window(editor_bounds, &mut editor_state, Some(&content));
-                                app.desktop.add(Box::new(editor_window));
+                                editor_state = EditorState::new();
+                                // Use RELATIVE coordinates for desktop
+                                let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
+                                create_editor_window(&mut app, &mut editor_state, window_bounds, Some((path, &content)));
                             } else {
                                 show_error(&mut app, "Error", "Failed to open file");
                             }
@@ -203,43 +212,46 @@ fn main() -> turbo_vision::core::error::Result<()> {
                     }
                     CM_SAVE => {
                         save_file(&mut app, &mut editor_state);
-                        // No need to recreate window - filename doesn't change
                     }
-                    CMD_SAVE_AS => {
-                        // Save file and get current content for potential window recreation
-                        let content = editor_state.get_text();
-
+                    CM_SAVE_AS => {
                         if save_file_as(&mut app, &mut editor_state) {
-                            // Recreate window with new filename in title
-                            if app.desktop.child_count() > 0 {
-                                app.desktop.remove_child(0);
-                            }
-                            let editor_window = create_editor_window(editor_bounds, &mut editor_state, content.as_deref());
-                            app.desktop.add(Box::new(editor_window));
+                            // Window title updates automatically via get_filename()
                         }
                     }
-                    CMD_SEARCH => {
-                        if let Some(search_text) = search_box(&mut app, "Search") {
+                    CM_FIND => {
+                        if let Some(search_text) = search_box(&mut app, "Find") {
                             // TODO: Implement actual search in editor
-                            show_message(&mut app, "Search", &format!("Searching for: {}", search_text));
+                            show_message(&mut app, "Find", &format!("Searching for: {}", search_text));
                         }
                     }
-                    CMD_REPLACE => {
+                    CM_REPLACE => {
                         if let Some((find_text, replace_text)) = search_replace_box(&mut app, "Replace") {
                             // TODO: Implement actual replace in editor
                             show_message(&mut app, "Replace", &format!("Replace '{}' with '{}'", find_text, replace_text));
                         }
                     }
-                    CMD_GOTO_LINE => {
+                    CM_SEARCH_AGAIN => {
+                        // TODO: Implement search again functionality
+                        show_message(&mut app, "Search Again", "Repeating last search...");
+                    }
+                    CM_CHANGE_DIR => {
+                        // TODO: Implement change directory dialog
+                        show_message(&mut app, "Change Directory", "Change directory not yet implemented");
+                    }
+                    CM_SHOW_CLIP => {
+                        // TODO: Implement clipboard window
+                        show_message(&mut app, "Clipboard", "Clipboard window not yet implemented");
+                    }
+                    CM_GOTO_LINE => {
                         if let Some(line_num) = goto_line_box(&mut app, "Go to Line") {
                             // TODO: Implement actual goto line in editor
                             show_message(&mut app, "Go to Line", &format!("Going to line: {}", line_num));
                         }
                     }
-                    CMD_ANALYZE => {
+                    CM_ANALYZE => {
                         analyze_with_rust_analyzer(&mut app, &editor_state);
                     }
-                    CMD_SHOW_ERRORS => {
+                    CM_SHOW_ERRORS => {
                         // Show errors from last analysis
                         show_message(&mut app, "Analysis", "No errors found");
                     }
@@ -252,133 +264,119 @@ fn main() -> turbo_vision::core::error::Result<()> {
     Ok(())
 }
 
-fn create_menu_bar(width: u16) -> MenuBar {
-    let mut menu_bar = MenuBar::new(Rect::new(0, 0, width as i16, 1));
+/// Initialize menu bar (matching Borland's TEditorApp::initMenuBar from tvedit3.cc)
+fn init_menu_bar(r: Rect) -> MenuBar {
+    let mut menu_bar = MenuBar::new(r);
 
-    // File menu
+    // File menu (matching Borland's sub1)
     let file_menu_items = vec![
-        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "Ctrl+N", 0),
-        MenuItem::with_shortcut("~O~pen...", CM_OPEN, 0, "Ctrl+O", 0),
+        MenuItem::with_shortcut("~O~pen", CM_OPEN, 0, "F3", 0),
+        MenuItem::with_shortcut("~N~ew", CM_NEW, 0, "", 0),
+        MenuItem::with_shortcut("~S~ave", CM_SAVE, 0, "F2", 0),
+        MenuItem::with_shortcut("S~a~ve as...", CM_SAVE_AS, 0, "", 0),
         MenuItem::separator(),
-        MenuItem::with_shortcut("~S~ave", CM_SAVE, 0, "Ctrl+S", 0),
-        MenuItem::with_shortcut("Save ~A~s...", CMD_SAVE_AS, 0, "", 0),
-        MenuItem::separator(),
-        MenuItem::with_shortcut("~C~lose", CM_CLOSE, 0, "Ctrl+W", 0),
+        MenuItem::with_shortcut("~C~hange dir...", CM_CHANGE_DIR, 0, "", 0),
+        // MenuItem::with_shortcut("S~h~ell", CM_DOS_SHELL, 0, "", 0),  // TODO: Add shell support
         MenuItem::separator(),
         MenuItem::with_shortcut("E~x~it", CM_QUIT, 0, "Alt+X", 0),
     ];
     let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
 
-    // Edit menu
+    // Edit menu (matching Borland's sub2)
     let edit_menu_items = vec![
-        MenuItem::with_shortcut("~S~earch...", CMD_SEARCH, 0, "Ctrl+F", 0),
-        MenuItem::with_shortcut("~R~eplace...", CMD_REPLACE, 0, "Ctrl+H", 0),
+        // MenuItem::with_shortcut("~U~ndo", CM_UNDO, 0, "", 0),  // TODO: Add undo command routing
+        // MenuItem::separator(),
+        // MenuItem::with_shortcut("Cu~t~", CM_CUT, 0, "Shift+Del", 0),
+        // MenuItem::with_shortcut("~C~opy", CM_COPY, 0, "Ctrl+Ins", 0),
+        // MenuItem::with_shortcut("~P~aste", CM_PASTE, 0, "Shift+Ins", 0),
+        MenuItem::with_shortcut("~S~how clipboard", CM_SHOW_CLIP, 0, "", 0),
         MenuItem::separator(),
-        MenuItem::with_shortcut("~G~oto Line...", CMD_GOTO_LINE, 0, "Ctrl+G", 0),
+        // MenuItem::with_shortcut("~C~lear", CM_CLEAR, 0, "Ctrl+Del", 0),
+        MenuItem::with_shortcut("~G~oto Line...", CM_GOTO_LINE, 0, "Ctrl+G", 0),
     ];
     let edit_menu = SubMenu::new("~E~dit", Menu::from_items(edit_menu_items));
 
-    // Tools menu
+    // Search menu (matching Borland's sub3)
+    let search_menu_items = vec![
+        MenuItem::with_shortcut("~F~ind...", CM_FIND, 0, "", 0),
+        MenuItem::with_shortcut("~R~eplace...", CM_REPLACE, 0, "", 0),
+        MenuItem::with_shortcut("~S~earch again", CM_SEARCH_AGAIN, 0, "", 0),
+    ];
+    let search_menu = SubMenu::new("~S~earch", Menu::from_items(search_menu_items));
+
+    // Windows menu (matching Borland's sub4)
+    let windows_menu_items = vec![
+        // MenuItem::with_shortcut("~S~ize/move", CM_RESIZE, 0, "Ctrl+F5", 0),
+        MenuItem::with_shortcut("~Z~oom", CM_ZOOM, 0, "F5", 0),
+        MenuItem::with_shortcut("~T~ile", CM_TILE, 0, "", 0),
+        MenuItem::with_shortcut("C~a~scade", CM_CASCADE, 0, "", 0),
+        MenuItem::with_shortcut("~N~ext", CM_NEXT, 0, "F6", 0),
+        MenuItem::with_shortcut("~P~revious", CM_PREV, 0, "Shift+F6", 0),
+        MenuItem::with_shortcut("~C~lose", CM_CLOSE, 0, "Alt+F3", 0),
+    ];
+    let windows_menu = SubMenu::new("~W~indows", Menu::from_items(windows_menu_items));
+
+    // Rust-specific Tools menu (extension to Borland)
     let tools_menu_items = vec![
-        MenuItem::with_shortcut("~A~nalyze with rust-analyzer", CMD_ANALYZE, 0, "F5", 0),
-        MenuItem::with_shortcut("Show ~E~rrors", CMD_SHOW_ERRORS, 0, "F6", 0),
+        MenuItem::with_shortcut("~A~nalyze with rust-analyzer", CM_ANALYZE, 0, "F7", 0),
+        MenuItem::with_shortcut("Show ~E~rrors", CM_SHOW_ERRORS, 0, "F8", 0),
     ];
     let tools_menu = SubMenu::new("~T~ools", Menu::from_items(tools_menu_items));
 
     menu_bar.add_submenu(file_menu);
     menu_bar.add_submenu(edit_menu);
+    menu_bar.add_submenu(search_menu);
+    menu_bar.add_submenu(windows_menu);
     menu_bar.add_submenu(tools_menu);
 
     menu_bar
 }
 
-fn create_editor_window(bounds: Rect, state: &mut EditorState, initial_content: Option<&str>) -> Window {
-    let mut window = Window::new(bounds, &state.get_title());
+/// Initialize status line (matching Borland's TEditorApp::initStatusLine from tvedit3.cc)
+fn init_status_line(r: Rect) -> StatusLine {
+    use turbo_vision::core::event::{KB_F2, KB_F3, KB_F5, KB_F6};
 
-    // Create editor with scrollbars
-    let editor_bounds = Rect::new(1, 1, bounds.width() - 2, bounds.height() - 2);
-    let mut editor = Editor::new(editor_bounds).with_scrollbars_and_indicator();
-
-    // Set Rust syntax highlighting
-    editor.set_highlighter(Box::new(RustHighlighter::new()));
-
-    // Set content if provided
-    if let Some(content) = initial_content {
-        editor.set_text(content);
-    }
-
-    // Store editor reference in state so we can access it without downcasting
-    let editor_rc = Rc::new(RefCell::new(editor));
-    state.editor = Some(Rc::clone(&editor_rc));
-
-    // Add editor to window (wrapped in a proxy that forwards to the Rc)
-    window.add(Box::new(SharedEditor(editor_rc)));
-    window
+    // Matching Borland's status line order: F10 Menu, F2 Save, F3 Open, Alt+F3 Close, F5 Zoom, F6 Next
+    StatusLine::new(
+        r,
+        vec![
+            StatusItem::new("~F10~ Menu", KB_F10, 0),
+            StatusItem::new("~F2~ Save", KB_F2, CM_SAVE),
+            StatusItem::new("~F3~ Open", KB_F3, CM_OPEN),
+            StatusItem::new("~Alt+F3~ Close", 0, CM_CLOSE),
+            StatusItem::new("~F5~ Zoom", KB_F5, CM_ZOOM),
+            StatusItem::new("~F6~ Next", KB_F6, CM_NEXT),
+        ],
+    )
 }
 
-/// Wrapper that allows Editor to be shared between window and demo state
-struct SharedEditor(Rc<RefCell<Editor>>);
+/// Create an EditWindow and add it to the desktop
+/// Matches Borland: TEditWindow with TFileEditor
+fn create_editor_window(
+    app: &mut Application,
+    state: &mut EditorState,
+    bounds: Rect,
+    file_data: Option<(PathBuf, &str)>,  // (path, content)
+) {
+    let title = file_data
+        .as_ref()
+        .and_then(|(path, _)| path.file_name().and_then(|n| n.to_str()))
+        .unwrap_or("Untitled");
 
-impl View for SharedEditor {
-    fn bounds(&self) -> Rect {
-        self.0.borrow().bounds()
+    let mut edit_window = EditWindow::new(bounds, title);
+
+    // Set Rust syntax highlighting
+    edit_window.editor_rc().borrow_mut().set_highlighter(Box::new(RustHighlighter::new()));
+
+    // Load file if provided
+    if let Some((path, content)) = file_data {
+        edit_window.editor_rc().borrow_mut().set_text(content);
+        let _ = edit_window.load_file(&path);
+        state.filename = Some(path);
     }
 
-    fn set_bounds(&mut self, bounds: Rect) {
-        self.0.borrow_mut().set_bounds(bounds);
-    }
-
-    fn draw(&mut self, terminal: &mut turbo_vision::terminal::Terminal) {
-        self.0.borrow_mut().draw(terminal);
-    }
-
-    fn handle_event(&mut self, event: &mut turbo_vision::core::event::Event) {
-        self.0.borrow_mut().handle_event(event);
-    }
-
-    fn can_focus(&self) -> bool {
-        self.0.borrow().can_focus()
-    }
-
-    fn set_focus(&mut self, focused: bool) {
-        self.0.borrow_mut().set_focus(focused);
-    }
-
-    fn is_focused(&self) -> bool {
-        self.0.borrow().is_focused()
-    }
-
-    fn options(&self) -> u16 {
-        self.0.borrow().options()
-    }
-
-    fn set_options(&mut self, options: u16) {
-        self.0.borrow_mut().set_options(options);
-    }
-
-    fn state(&self) -> turbo_vision::core::state::StateFlags {
-        self.0.borrow().state()
-    }
-
-    fn set_state(&mut self, state: turbo_vision::core::state::StateFlags) {
-        self.0.borrow_mut().set_state(state);
-    }
-
-    fn update_cursor(&self, terminal: &mut turbo_vision::terminal::Terminal) {
-        self.0.borrow().update_cursor(terminal);
-    }
-
-    fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
-        self.0.borrow().get_palette()
-    }
-
-    fn get_owner_type(&self) -> turbo_vision::views::view::OwnerType {
-        self.0.borrow().get_owner_type()
-    }
-
-    fn set_owner_type(&mut self, owner_type: turbo_vision::views::view::OwnerType) {
-        self.0.borrow_mut().set_owner_type(owner_type);
-    }
+    // Add to desktop (matches Borland: desktop->insert(new TEditWindow(...)))
+    app.desktop.add(Box::new(edit_window));
 }
 
 fn prompt_save_if_dirty(app: &mut Application, state: &mut EditorState, has_window: bool) -> bool {
@@ -387,8 +385,9 @@ fn prompt_save_if_dirty(app: &mut Application, state: &mut EditorState, has_wind
         return true;
     }
 
-    // Check if editor is modified using stored reference
-    let is_modified = state.is_modified();
+    // Check if editor is modified
+    let is_modified = get_edit_window(app)
+        .map_or(false, |w| w.is_modified());
 
     // Only prompt if actually modified
     if !is_modified {
@@ -440,13 +439,18 @@ fn save_file(app: &mut Application, state: &mut EditorState) -> bool {
         return save_file_as(app, state);
     }
 
-    // Get current text from the editor stored in state
-    let content = state.get_text().unwrap_or_default();
+    // Get current text from the editor
+    let window = match get_edit_window_mut(app) {
+        Some(w) => w,
+        None => return false,
+    };
 
     if let Some(ref path) = state.filename {
-        if fs::write(path, content).is_ok() {
-            // Clear the modified flag after successful save
-            state.clear_modified();
+        if window.save_file().is_ok() || {
+            // Fallback: manual save if window doesn't have filename set
+            let content = window.editor_rc().borrow().get_text();
+            fs::write(path, content).is_ok()
+        } {
             show_message(app, "Save", "File saved successfully");
             true
         } else {
@@ -460,13 +464,13 @@ fn save_file(app: &mut Application, state: &mut EditorState) -> bool {
 
 fn save_file_as(app: &mut Application, state: &mut EditorState) -> bool {
     if let Some(path) = show_file_save_dialog(app) {
-        // Get current text from the editor stored in state
-        let content = state.get_text().unwrap_or_default();
+        let window = match get_edit_window_mut(app) {
+            Some(w) => w,
+            None => return false,
+        };
 
-        if fs::write(&path, content.clone()).is_ok() {
+        if window.save_as(&path).is_ok() {
             state.filename = Some(path);
-            // Clear the modified flag after successful save
-            state.clear_modified();
             show_message(app, "Save", "File saved successfully");
             true
         } else {

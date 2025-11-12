@@ -13,6 +13,8 @@ use super::scrollbar::ScrollBar;
 use super::indicator::Indicator;
 use super::syntax::SyntaxHighlighter;
 use std::cmp::min;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 // Control key codes
 const KB_CTRL_A: u16 = 0x0001;  // Ctrl+A - Select All
@@ -79,6 +81,8 @@ impl EditAction {
 }
 
 /// Editor - Advanced multi-line text editor with undo/redo and find/replace
+///
+/// Matches Borland: TEditor receives pointers to scrollbars/indicator created by parent window
 pub struct Editor {
     bounds: Rect,
     lines: Vec<String>,
@@ -86,9 +90,9 @@ pub struct Editor {
     delta: Point,
     selection_start: Option<Point>,
     state: StateFlags,
-    v_scrollbar: Option<Box<ScrollBar>>,
-    h_scrollbar: Option<Box<ScrollBar>>,
-    indicator: Option<Box<Indicator>>,
+    v_scrollbar: Option<Rc<RefCell<ScrollBar>>>,
+    h_scrollbar: Option<Rc<RefCell<ScrollBar>>>,
+    indicator: Option<Rc<RefCell<Indicator>>>,
     read_only: bool,
     modified: bool,
     tab_size: usize,
@@ -136,36 +140,21 @@ impl Editor {
         }
     }
 
-    /// Create with scrollbars and indicator
-    pub fn with_scrollbars_and_indicator(mut self) -> Self {
-        // Indicator at top
-        let indicator_bounds = Rect::new(
-            self.bounds.a.x,
-            self.bounds.a.y,
-            self.bounds.b.x,
-            self.bounds.a.y + 1,
-        );
-        self.indicator = Some(Box::new(Indicator::new(indicator_bounds)));
-
-        // Vertical scrollbar on right edge
-        let v_bounds = Rect::new(
-            self.bounds.b.x - 1,
-            self.bounds.a.y + 1,
-            self.bounds.b.x,
-            self.bounds.b.y - 1,
-        );
-        self.v_scrollbar = Some(Box::new(ScrollBar::new_vertical(v_bounds)));
-
-        // Horizontal scrollbar on bottom edge
-        let h_bounds = Rect::new(
-            self.bounds.a.x,
-            self.bounds.b.y - 1,
-            self.bounds.b.x - 1,
-            self.bounds.b.y,
-        );
-        self.h_scrollbar = Some(Box::new(ScrollBar::new_horizontal(h_bounds)));
-
-        self
+    /// Create with scrollbars and indicator (Borland style)
+    /// Matches Borland: TEditor receives pointers to scrollbars/indicator created by parent
+    pub fn with_scrollbars(
+        bounds: Rect,
+        h_scrollbar: Option<Rc<RefCell<ScrollBar>>>,
+        v_scrollbar: Option<Rc<RefCell<ScrollBar>>>,
+        indicator: Option<Rc<RefCell<Indicator>>>,
+    ) -> Self {
+        let mut editor = Self::new(bounds);
+        editor.h_scrollbar = h_scrollbar;
+        editor.v_scrollbar = v_scrollbar;
+        editor.indicator = indicator;
+        editor.update_scrollbars();
+        editor.update_indicator();
+        editor
     }
 
     /// Set read-only mode
@@ -481,17 +470,9 @@ impl Editor {
     // Private helper methods
 
     fn get_content_area(&self) -> Rect {
-        let mut area = self.bounds;
-        if self.indicator.is_some() {
-            area.a.y += 1;
-        }
-        if self.v_scrollbar.is_some() {
-            area.b.x -= 1;
-        }
-        if self.h_scrollbar.is_some() {
-            area.b.y -= 1;
-        }
-        area
+        // In the Borland-style architecture, scrollbars are siblings (not children)
+        // So the editor's bounds already exclude scrollbar space - just return full bounds
+        self.bounds
     }
 
     fn max_line_length(&self) -> i16 {
@@ -507,8 +488,8 @@ impl Editor {
         let max_x = self.max_line_length();
         let max_y = self.lines.len() as i16;
 
-        if let Some(ref mut h_bar) = self.h_scrollbar {
-            h_bar.set_params(
+        if let Some(ref h_bar) = self.h_scrollbar {
+            h_bar.borrow_mut().set_params(
                 self.delta.x as i32,
                 0,
                 max_x.saturating_sub(content_area.width()) as i32,
@@ -517,8 +498,8 @@ impl Editor {
             );
         }
 
-        if let Some(ref mut v_bar) = self.v_scrollbar {
-            v_bar.set_params(
+        if let Some(ref v_bar) = self.v_scrollbar {
+            v_bar.borrow_mut().set_params(
                 self.delta.y as i32,
                 0,
                 max_y.saturating_sub(content_area.height()) as i32,
@@ -529,8 +510,8 @@ impl Editor {
     }
 
     fn update_indicator(&mut self) {
-        if let Some(ref mut indicator) = self.indicator {
-            indicator.set_value(
+        if let Some(ref indicator) = self.indicator {
+            indicator.borrow_mut().set_value(
                 Point::new(self.cursor.x + 1, self.cursor.y + 1),
                 self.modified,
             );
@@ -1049,37 +1030,9 @@ impl View for Editor {
 
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
-
-        if let Some(ref mut indicator) = self.indicator {
-            let indicator_bounds = Rect::new(
-                bounds.a.x,
-                bounds.a.y,
-                bounds.b.x,
-                bounds.a.y + 1,
-            );
-            indicator.set_bounds(indicator_bounds);
-        }
-
-        if let Some(ref mut v_bar) = self.v_scrollbar {
-            let v_bounds = Rect::new(
-                bounds.b.x - 1,
-                bounds.a.y + if self.indicator.is_some() { 1 } else { 0 },
-                bounds.b.x,
-                bounds.b.y - if self.h_scrollbar.is_some() { 1 } else { 0 },
-            );
-            v_bar.set_bounds(v_bounds);
-        }
-
-        if let Some(ref mut h_bar) = self.h_scrollbar {
-            let h_bounds = Rect::new(
-                bounds.a.x,
-                bounds.b.y - 1,
-                bounds.b.x - if self.v_scrollbar.is_some() { 1 } else { 0 },
-                bounds.b.y,
-            );
-            h_bar.set_bounds(h_bounds);
-        }
-
+        // Note: Scrollbars and indicator are now children of the Window, not the Editor
+        // The Window's interior Group automatically handles their positioning
+        // We only need to update our internal state
         self.update_scrollbars();
     }
 
@@ -1217,18 +1170,8 @@ impl View for Editor {
             }
         }
 
-        // Draw indicator
-        if let Some(ref mut indicator) = self.indicator {
-            indicator.draw(terminal);
-        }
-
-        // Draw scrollbars
-        if let Some(ref mut h_bar) = self.h_scrollbar {
-            h_bar.draw(terminal);
-        }
-        if let Some(ref mut v_bar) = self.v_scrollbar {
-            v_bar.draw(terminal);
-        }
+        // Note: Scrollbars and indicator are now drawn by the Window's interior Group
+        // They are separate child views, not owned by the Editor
     }
 
     fn handle_event(&mut self, event: &mut Event) {

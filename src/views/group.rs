@@ -403,7 +403,10 @@ impl View for Group {
         }
 
         // Push clipping region for this group's bounds
-        terminal.push_clip(self.bounds);
+        // Expand by 1 on all sides to allow children (like scrollbars) to overlap with parent's frame
+        let mut clip_bounds = self.bounds;
+        clip_bounds.grow(1, 1);
+        terminal.push_clip(clip_bounds);
 
         // Only draw children that intersect with this group's bounds
         // The clipping region ensures children can't render outside parent boundaries
