@@ -95,6 +95,10 @@ Press ~D~ to disable edit commands - buttons turn gray.",
         .build();
     dialog.add(Box::new(instructions));
 
+    // Close button - add it FIRST so it gets initial focus
+    let close_button = ButtonBuilder::new().bounds(Rect::new(22, 13, 38, 15)).title(" Close ").command(CM_QUIT).default(true).build();
+    dialog.add(Box::new(close_button));
+
     // Edit command buttons (will be initially be disabled due to command set)
     let cut_button = ButtonBuilder::new().bounds(Rect::new(2, 7, 14, 9)).title(" C~u~t ").command(CM_CUT).build();
     dialog.add(Box::new(cut_button));
@@ -118,10 +122,6 @@ Press ~D~ to disable edit commands - buttons turn gray.",
     let disable_button = ButtonBuilder::new().bounds(Rect::new(42, 10, 58, 12)).title("~D~isable Edits").command(CMD_DISABLE_EDITS).build();
     dialog.add(Box::new(disable_button));
 
-    // Close button
-    let close_button = ButtonBuilder::new().bounds(Rect::new(22, 13, 38, 15)).title(" Close ").command(CM_QUIT).default(true).build();
-    dialog.add(Box::new(close_button));
-
     // Set the UI in a known state
     command_set::disable_command(CM_COPY);
     command_set::disable_command(CM_CUT);
@@ -132,8 +132,10 @@ Press ~D~ to disable edit commands - buttons turn gray.",
     command_set::enable_command(CMD_ENABLE_EDITS);
     command_set::disable_command(CMD_DISABLE_EDITS);
 
-    // Set initial focus to first focusable child (Enable Edits button)
-    dialog.set_initial_focus();
+    // Note: Close button gets initial focus because it's the first focusable child added
+    // (StaticText at index 0 is not focusable, Close at index 1 is focusable)
+    // When Desktop.add() is called, it will call set_focus() which calls set_initial_focus()
+    // This will give focus to the first focusable child (Close button)
 
     dialog
 }
