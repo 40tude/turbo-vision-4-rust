@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 use turbo_vision::app::Application;
+use turbo_vision::core::event::KB_CTRL_C;
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::views::View;
 use turbo_vision::views::dialog::DialogBuilder;
@@ -14,13 +15,13 @@ use turbo_vision::views::static_text::StaticTextBuilder;
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
 
-    let mut dialog = DialogBuilder::new().bounds(Rect::new(10, 2, 77, 22)).title("File System Tree Demo").build();
+    let mut dialog = DialogBuilder::new().bounds(Rect::new(10, 2, 78, 22)).title("File System Tree Demo").build();
 
     // Add instructions
     dialog.add(Box::new(
         StaticTextBuilder::new()
-            .bounds(Rect::new(2, 2, 63, 4))
-            .text("Use arrows to navigate, Enter to toggle, → expand, ← collapse")
+            .bounds(Rect::new(2, 2, 64, 4))
+            .text("Use arrows to navigate, Enter to toggle, → expand, ← collapse\nCTRL+C to exit.")
             .build(),
     ));
 
@@ -28,7 +29,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     let root = create_file_tree();
 
     // Create outline viewer
-    let mut outline = OutlineViewer::new(Rect::new(2, 4, 63, 16), |name: &String| name.clone());
+    let mut outline = OutlineViewer::new(Rect::new(2, 5, 64, 17), |name: &String| name.clone());
     outline.add_root(root);
 
     dialog.add(Box::new(outline));
@@ -50,7 +51,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
             // Handle Ctrl+C or F10
             if event.what == turbo_vision::core::event::EventType::Keyboard {
                 let key = event.key_code;
-                if key == 0x0003 || key == turbo_vision::core::event::KB_F10 {
+                if key == KB_CTRL_C || key == turbo_vision::core::event::KB_F10 {
                     break;
                 }
             }
