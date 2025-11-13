@@ -167,17 +167,17 @@ impl DirListBox {
             },
             path: self.root_path.clone(),
             level: 0,
-            is_last: path_components.is_empty(),
+            is_last: true,
         });
 
         // Add path components
         for (i, (name, path)) in path_components.iter().enumerate() {
-            let is_last = i == path_components.len() - 1;
+            // Each path component is the only child shown at its level
             self.entries.push(DirEntry {
                 name: name.clone(),
                 path: path.clone(),
                 level: i + 1,
-                is_last,
+                is_last: true,
             });
         }
 
@@ -242,15 +242,20 @@ impl DirListBox {
     fn get_parent_continues(&self, entry: &DirEntry) -> Vec<bool> {
         let mut continues = vec![false; entry.level];
 
-        // Find which parent levels have more siblings after them
+        // Find the current entry's index
         let entry_idx = self.entries.iter().position(|e| e.path == entry.path).unwrap_or(0);
 
-        for i in 0..entry.level {
-            // Check if there are more entries at level i after this entry's ancestor at level i
-            let has_more = self.entries[entry_idx + 1..]
+        // For each parent level, find the ancestor and check if it's not the last child
+        for level in 0..entry.level {
+            // Find the ancestor at this level by searching backwards from current entry
+            if let Some(ancestor) = self.entries[..=entry_idx]
                 .iter()
-                .any(|e| e.level == i);
-            continues[i] = has_more;
+                .rev()
+                .find(|e| e.level == level)
+            {
+                // Show continuation line if ancestor is not the last child
+                continues[level] = !ancestor.is_last;
+            }
         }
 
         continues
