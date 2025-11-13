@@ -6,7 +6,7 @@ use crate::core::geometry::Rect;
 use crate::core::event::{Event, EventType, KB_ESC_ESC, KB_ENTER};
 use crate::core::command::{CommandId, CM_CANCEL};
 use crate::terminal::Terminal;
-use super::view::View;
+use super::view::{View, ViewId};
 use super::window::Window;
 use std::time::Duration;
 
@@ -33,7 +33,7 @@ impl Dialog {
         Box::new(dialog)
     }
 
-    pub fn add(&mut self, view: Box<dyn View>) -> *const dyn View {
+    pub fn add(&mut self, view: Box<dyn View>) -> ViewId {
         self.window.add(view)
     }
 

@@ -16,7 +16,7 @@ use super::listbox::ListBox;
 use super::button::Button;
 use super::label::Label;
 use super::static_text::StaticText;
-use super::View;
+use super::{View, ViewId};
 use super::help_file::HelpFile;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -31,8 +31,8 @@ pub struct HelpIndex {
     #[allow(dead_code)]
     all_topics: Vec<(String, String)>, // (id, title)
     filtered_topics: Vec<(String, String)>,
-    _search_input_ptr: *const dyn View,
-    _topic_list_ptr: *const dyn View,
+    _search_input_id: ViewId,
+    _topic_list_id: ViewId,
     selected_topic: Option<String>,
 }
 
@@ -53,7 +53,7 @@ impl HelpIndex {
 
         let search_data = Rc::new(RefCell::new(String::new()));
         let search_input = InputLine::new(Rect::new(10, 4, bounds.width() - 4, 5), 100, search_data.clone());
-        let search_input_ptr = dialog.add(Box::new(search_input));
+        let search_input_id = dialog.add(Box::new(search_input));
 
         // Topic list
         let list_label = Label::new(Rect::new(2, 6, 12, 7), "Topics:");
@@ -63,7 +63,7 @@ impl HelpIndex {
             Rect::new(2, 7, bounds.width() - 4, bounds.height() - 6),
             CMD_TOPIC_SELECTED
         );
-        let topic_list_ptr = dialog.add(Box::new(topic_list));
+        let topic_list_id = dialog.add(Box::new(topic_list));
 
         // Buttons
         dialog.add(Box::new(Button::new(
@@ -102,8 +102,8 @@ impl HelpIndex {
             _help_file: help_file,
             all_topics,
             filtered_topics,
-            _search_input_ptr: search_input_ptr,
-            _topic_list_ptr: topic_list_ptr,
+            _search_input_id: search_input_id,
+            _topic_list_id: topic_list_id,
             selected_topic: None,
         };
 

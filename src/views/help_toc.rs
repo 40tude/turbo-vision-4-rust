@@ -14,7 +14,7 @@ use super::dialog::Dialog;
 use super::outline::{OutlineViewer, Node};
 use super::button::Button;
 use super::static_text::StaticText;
-use super::View;
+use super::{View, ViewId};
 use super::help_file::HelpFile;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -23,7 +23,7 @@ use std::cell::RefCell;
 /// Matches Borland: THelpToc
 pub struct HelpToc {
     dialog: Dialog,
-    _outline_viewer_ptr: *const dyn View,
+    _outline_viewer_id: ViewId,
     _help_file: Rc<RefCell<HelpFile>>,
     selected_topic: Option<String>,
 }
@@ -59,7 +59,7 @@ impl HelpToc {
         }
         drop(help);
 
-        let outline_viewer_ptr = dialog.add(Box::new(outline));
+        let outline_viewer_id = dialog.add(Box::new(outline));
 
         // Buttons
         dialog.add(Box::new(Button::new(
@@ -78,7 +78,7 @@ impl HelpToc {
 
         Self {
             dialog,
-            _outline_viewer_ptr: outline_viewer_ptr,
+            _outline_viewer_id: outline_viewer_id,
             _help_file: help_file,
             selected_topic: None,
         }

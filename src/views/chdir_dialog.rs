@@ -27,7 +27,7 @@ use super::dir_listbox::DirListBox;
 use super::scrollbar::ScrollBar;
 use super::history::History;
 use super::msgbox::message_box_error;
-use super::View;
+use super::{View, ViewId};
 use std::path::PathBuf;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -130,13 +130,13 @@ pub struct ChDirDialog {
     dir_listbox: Rc<RefCell<DirListBox>>,
     history_id: u16,
     #[allow(dead_code)] // Will be used for navigation implementation
-    dir_list_ptr: *const dyn View,
+    dir_list_id: ViewId,
     #[allow(dead_code)] // Will be used for input updates
-    dir_input_ptr: *const dyn View,
+    dir_input_id: ViewId,
     #[allow(dead_code)] // Will be used for button state management
-    ok_button_ptr: *const dyn View,
+    ok_button_id: ViewId,
     #[allow(dead_code)] // Will be used for button state management
-    chdir_button_ptr: *const dyn View,
+    chdir_button_id: ViewId,
     selected_directory: Option<PathBuf>,
 }
 
@@ -178,7 +178,7 @@ impl ChDirDialog {
         // Directory name input line - Borland: TRect( 3, 3, 30, 4 )
         let input_bounds = Rect::new(3, 3, 30, 4);
         let dir_input = InputLine::new(input_bounds, 255, Rc::clone(&dir_input_data));
-        let dir_input_ptr = dialog.add(Box::new(dir_input));
+        let dir_input_id = dialog.add(Box::new(dir_input));
 
         // Label "Directory name" - Borland: (2, 2)
         let label_bounds = Rect::new(2, 2, 20, 3);
@@ -207,7 +207,7 @@ impl ChDirDialog {
         let current_path = PathBuf::from(&current_dir);
         let dir_list = DirListBox::new(listbox_bounds, &current_path);
         let dir_listbox = Rc::new(RefCell::new(dir_list));
-        let dir_list_ptr = dialog.add(Box::new(SharedDirListBox(Rc::clone(&dir_listbox))));
+        let dir_list_id = dialog.add(Box::new(SharedDirListBox(Rc::clone(&dir_listbox))));
 
         // Label "Directory tree" - Borland: (2, 5)
         let tree_label_bounds = Rect::new(2, 5, 20, 6);
@@ -217,12 +217,12 @@ impl ChDirDialog {
         // OK button - Borland: TRect( 35, 6, 45, 8 )
         let ok_bounds = Rect::new(35, 6, 45, 8);
         let ok_button = Button::new(ok_bounds, "~O~K", CM_OK, true);
-        let ok_button_ptr = dialog.add(Box::new(ok_button));
+        let ok_button_id = dialog.add(Box::new(ok_button));
 
         // Chdir button - Borland: TRect( 35, 9, 45, 11 )
         let chdir_bounds = Rect::new(35, 9, 45, 11);
         let chdir_button = Button::new(chdir_bounds, "~C~hdir", CM_CHANGE_DIR, false);
-        let chdir_button_ptr = dialog.add(Box::new(chdir_button));
+        let chdir_button_id = dialog.add(Box::new(chdir_button));
 
         // Revert button - Borland: TRect( 35, 12, 45, 14 )
         let revert_bounds = Rect::new(35, 12, 45, 14);
@@ -238,10 +238,10 @@ impl ChDirDialog {
             dir_input_data,
             dir_listbox,
             history_id,
-            dir_list_ptr,
-            dir_input_ptr,
-            ok_button_ptr,
-            chdir_button_ptr,
+            dir_list_id,
+            dir_input_id,
+            ok_button_id,
+            chdir_button_id,
             selected_directory: None,
         }
     }

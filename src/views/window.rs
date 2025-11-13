@@ -4,7 +4,7 @@
 
 use super::frame::Frame;
 use super::group::Group;
-use super::view::View;
+use super::view::{View, ViewId};
 use crate::core::command::{CM_CANCEL, CM_CLOSE};
 use crate::core::event::{Event, EventType};
 use crate::core::geometry::{Point, Rect};
@@ -114,7 +114,7 @@ impl Window {
         window
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) -> *const dyn View {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> ViewId {
         // Set the owner type based on whether this is a Dialog or regular Window
         let owner_type = match self.palette_type {
             WindowPaletteType::Dialog => super::view::OwnerType::Dialog,

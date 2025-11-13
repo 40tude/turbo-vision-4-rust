@@ -2,7 +2,7 @@
 
 //! Label view - static text display with optional linked control focus.
 
-use super::view::{write_line_to_terminal, View};
+use super::view::{write_line_to_terminal, View, ViewId};
 use crate::core::draw::DrawBuffer;
 use crate::core::event::Event;
 use crate::core::geometry::Rect;
@@ -12,7 +12,7 @@ use crate::terminal::Terminal;
 pub struct Label {
     bounds: Rect,
     text: String,
-    link: Option<*const dyn View>, // Pointer to linked control
+    link: Option<ViewId>, // ID of linked control
     owner: Option<*const dyn View>,
     owner_type: super::view::OwnerType,
 }
@@ -28,18 +28,11 @@ impl Label {
         }
     }
 
-    /// Set the linked control
+    /// Set the linked control by its ViewId
     /// Matches Borland: TLabel constructor takes TView* aLink parameter
     /// When label is clicked, focus transfers to the linked control
-    ///
-    /// # Safety
-    /// The target view must remain valid for the lifetime of this label.
-    /// This is guaranteed when both views are children of the same Group.
-    pub fn set_link(&mut self, target: &dyn View) {
-        // SAFETY: We're storing a raw pointer to a view that must outlive this label.
-        // This is guaranteed by the Group ownership model where both views are children
-        // of the same parent.
-        self.link = Some(unsafe { std::mem::transmute(target as *const dyn View) });
+    pub fn set_link(&mut self, view_id: ViewId) {
+        self.link = Some(view_id);
     }
 }
 
@@ -72,9 +65,9 @@ impl View for Label {
         // Focus linking is handled by Group
     }
 
-    /// Return the linked control pointer for this label
+    /// Return the linked control ViewId for this label
     /// Matches Borland: TLabel::link field
-    fn label_link(&self) -> Option<*const dyn View> {
+    fn label_link(&self) -> Option<ViewId> {
         self.link
     }
 
@@ -104,7 +97,7 @@ impl View for Label {
 pub struct LabelBuilder {
     bounds: Option<Rect>,
     text: Option<String>,
-    link: Option<*const dyn View>,
+    link: Option<ViewId>,
 }
 
 impl LabelBuilder {
@@ -125,11 +118,8 @@ impl LabelBuilder {
     }
 
     #[must_use]
-    pub fn link(mut self, target: &dyn View) -> Self {
-        // SAFETY: We're storing a raw pointer to a view that must outlive this label.
-        // This is guaranteed by the Group ownership model where both views are children
-        // of the same parent.
-        self.link = Some(unsafe { std::mem::transmute(target as *const dyn View) });
+    pub fn link(mut self, view_id: ViewId) -> Self {
+        self.link = Some(view_id);
         self
     }
 

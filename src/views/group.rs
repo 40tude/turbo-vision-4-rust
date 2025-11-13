@@ -7,13 +7,14 @@ use crate::core::event::{Event, EventType, KB_TAB, KB_SHIFT_TAB};
 use crate::core::draw::DrawBuffer;
 use crate::core::palette::Attr;
 use crate::terminal::Terminal;
-use super::view::{View, write_line_to_terminal};
+use super::view::{View, ViewId, write_line_to_terminal};
 
 /// Group - a container for child views
 /// Matches Borland: TGroup (tgroup.h/tgroup.cc)
 pub struct Group {
     bounds: Rect,
     children: Vec<Box<dyn View>>,
+    view_ids: Vec<ViewId>,  // Parallel vec storing ID for each child
     focused: usize,
     background: Option<Attr>,
     end_state: crate::core::command::CommandId,  // For execute() event loop (Borland: endState)
@@ -25,6 +26,7 @@ impl Group {
         Self {
             bounds,
             children: Vec::new(),
+            view_ids: Vec::new(),
             focused: 0,
             background: None,
             end_state: 0,
@@ -36,6 +38,7 @@ impl Group {
         Self {
             bounds,
             children: Vec::new(),
+            view_ids: Vec::new(),
             focused: 0,
             background: Some(background),
             end_state: 0,
@@ -43,7 +46,7 @@ impl Group {
         }
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) -> *const dyn View {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> ViewId {
         // Set owner pointer for palette chain resolution
         // Child views need to know their parent to traverse the palette chain
         view.set_owner(self as *const _ as *const dyn View);
@@ -58,9 +61,11 @@ impl Group {
             self.bounds.a.y + child_bounds.b.y,
         );
         view.set_bounds(absolute_bounds);
+
+        let view_id = ViewId::new();
         self.children.push(view);
-        let index = self.children.len() - 1;
-        &*self.children[index] as *const dyn View
+        self.view_ids.push(view_id);
+        view_id
     }
 
     pub fn set_initial_focus(&mut self) {
@@ -475,11 +480,9 @@ impl View for Group {
                 if event.what == EventType::MouseDown {
                     // Check if this is a label with a link (Borland: TLabel::focusLink)
                     // If so, focus the linked control instead of the label
-                    if let Some(link_ptr) = self.children[i].label_link() {
-                        // Find the child that matches the link pointer
-                        if let Some(link_index) = self.children.iter().position(|child| {
-                            std::ptr::eq(&**child as *const dyn View, link_ptr)
-                        }) {
+                    if let Some(link_id) = self.children[i].label_link() {
+                        // Find the child with the matching ViewId
+                        if let Some(link_index) = self.view_ids.iter().position(|&id| id == link_id) {
                             if self.children[link_index].can_focus() {
                                 self.clear_all_focus();
                                 self.focused = link_index;

@@ -9,6 +9,19 @@ use crate::core::geometry::Rect;
 use crate::core::state::{StateFlags, SF_FOCUSED, SF_SHADOW, SHADOW_ATTR, SHADOW_SIZE};
 use crate::terminal::Terminal;
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Unique identifier for a view within a Group
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ViewId(usize);
+
+impl ViewId {
+    /// Generate a new unique ViewId
+    pub(crate) fn new() -> Self {
+        static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
+        ViewId(NEXT_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
 
 /// Owner context for palette remapping
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -307,11 +320,11 @@ pub trait View {
         write_line_to_terminal(terminal, bounds.a.x + 1, bounds.b.y, &bottom_buf);
     }
 
-    /// Get the linked control pointer for labels
+    /// Get the linked control ViewId for labels
     /// Matches Borland: TLabel::link field
-    /// Returns Some(pointer) if this is a label with a linked control, None otherwise
+    /// Returns Some(ViewId) if this is a label with a linked control, None otherwise
     /// Used by Group to implement focus transfer when clicking labels
-    fn label_link(&self) -> Option<*const dyn View> {
+    fn label_link(&self) -> Option<ViewId> {
         None // Default: not a label or no link
     }
 

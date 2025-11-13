@@ -15,14 +15,14 @@ use super::dialog::Dialog;
 use super::color_selector::ColorSelector;
 use super::button::Button;
 use super::static_text::StaticText;
-use super::View;
+use super::{View, ViewId};
 
 /// Color Dialog
 /// Matches Borland: TColorDialog (simplified implementation)
 pub struct ColorDialog {
     dialog: Dialog,
-    _fg_selector_ptr: *const dyn View,
-    _bg_selector_ptr: *const dyn View,
+    _fg_selector_id: ViewId,
+    _bg_selector_id: ViewId,
     initial_attr: Attr,
     selected_attr: Option<Attr>,
 }
@@ -50,7 +50,7 @@ impl ColorDialog {
         )));
 
         let fg_selector = ColorSelector::new(Rect::new(2, 5, 26, 8));
-        let fg_selector_ptr = dialog.add(Box::new(fg_selector));
+        let fg_selector_id = dialog.add(Box::new(fg_selector));
 
         // Background color selector
         dialog.add(Box::new(StaticText::new(
@@ -59,7 +59,7 @@ impl ColorDialog {
         )));
 
         let bg_selector = ColorSelector::new(Rect::new(2, 10, 26, 13));
-        let bg_selector_ptr = dialog.add(Box::new(bg_selector));
+        let bg_selector_id = dialog.add(Box::new(bg_selector));
 
         // Preview area (would show the colors in action)
         dialog.add(Box::new(StaticText::new(
@@ -88,8 +88,8 @@ impl ColorDialog {
 
         Self {
             dialog,
-            _fg_selector_ptr: fg_selector_ptr,
-            _bg_selector_ptr: bg_selector_ptr,
+            _fg_selector_id: fg_selector_id,
+            _bg_selector_id: bg_selector_id,
             initial_attr,
             selected_attr: None,
         }
