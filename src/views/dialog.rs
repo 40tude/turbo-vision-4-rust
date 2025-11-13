@@ -67,6 +67,13 @@ impl Dialog {
         self.window.set_title(title);
     }
 
+    /// Get the current end_state (0 if dialog is still running, command ID if ended)
+    /// Used by custom execute() loops to check if dialog should close
+    /// Matches Borland: TGroup::endState field
+    pub fn get_end_state(&self) -> CommandId {
+        self.window.get_end_state()
+    }
+
     /// Execute the dialog with its own event loop (self-contained pattern)
     ///
     /// **Two execution patterns supported:**

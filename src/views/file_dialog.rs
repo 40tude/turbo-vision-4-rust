@@ -108,13 +108,16 @@ impl FileDialog {
         let bounds = self.dialog.bounds();
         let dialog_width = bounds.width();
 
+        // Reserve space for buttons on the right (12 wide + 2 margin)
+        let content_width = dialog_width - 14;
+
         // Label for file name input
         let name_label = Label::new(Rect::new(2, 1, 12, 2), "~N~ame:");
         self.dialog.add(Box::new(name_label));
 
         // File name input line
         let file_input = InputLine::new(
-            Rect::new(12, 1, dialog_width - 4, 2),
+            Rect::new(12, 1, content_width, 2),
             255,
             self.file_name_data.clone()
         );
@@ -122,17 +125,16 @@ impl FileDialog {
 
         // Current path label
         let path_str = format!(" {}", self.current_path.display());
-        let path_label = Label::new(Rect::new(2, 3, dialog_width - 4, 4), &path_str);
+        let path_label = Label::new(Rect::new(2, 3, content_width, 4), &path_str);
         self.dialog.add(Box::new(path_label));
 
         // Label for files list
         let files_label = Label::new(Rect::new(2, 5, 12, 6), "~F~iles:");
         self.dialog.add(Box::new(files_label));
 
-        // File list box - positioned to fill space between label and buttons
-        // Top at row 6, bottom 2 rows above buttons to leave spacing
+        // File list box - leave space on right for buttons
         let mut file_list = ListBox::new(
-            Rect::new(2, 6, dialog_width - 4, bounds.height() - 4),
+            Rect::new(2, 6, content_width, bounds.height() - 2),
             CMD_FILE_SELECTED,
         );
 
@@ -143,10 +145,9 @@ impl FileDialog {
         file_list.set_items(self.files.clone());
         self.dialog.add(Box::new(file_list));
 
-        // Buttons
-        let button_y = bounds.height() - 4;
-        let button_spacing = 14;
-        let mut button_x = 2;
+        // Buttons on the right side (vertically stacked)
+        let button_x = dialog_width - 14;
+        let mut button_y = 6;
 
         let open_button = Button::new(
             Rect::new(button_x, button_y, button_x + 12, button_y + 2),
@@ -155,7 +156,7 @@ impl FileDialog {
             true,
         );
         self.dialog.add(Box::new(open_button));
-        button_x += button_spacing;
+        button_y += 3;
 
         let cancel_button = Button::new(
             Rect::new(button_x, button_y, button_x + 12, button_y + 2),
@@ -174,6 +175,13 @@ impl FileDialog {
     }
 
     pub fn execute(&mut self, app: &mut crate::app::Application) -> Option<PathBuf> {
+        use crate::core::state::SF_MODAL;
+
+        // Set modal flag - file dialogs are modal
+        // Matches Borland: TFileDialog in modal state
+        let old_state = self.dialog.state();
+        self.dialog.set_state(old_state | SF_MODAL);
+
         loop {
             // Update OK button state based on input field
             self.update_ok_button_state();
@@ -194,6 +202,15 @@ impl FileDialog {
 
                 // Let the dialog (and its children) handle the event first
                 self.dialog.handle_event(&mut event);
+
+                // Check if dialog wants to close (e.g., close button clicked)
+                // Dialog::handle_event() calls end_modal() which sets the end_state
+                // Matches Borland: TDialog::execute() checks endState after handleEvent
+                let end_state = self.dialog.get_end_state();
+                if end_state != 0 {
+                    // Dialog closed via close button or ESC - return None (cancel)
+                    return None;
+                }
 
                 // After event is processed, check if ListBox selection changed
                 // Matches Borland: TFileList::focusItem() broadcasts cmFileFocused when selection changes
