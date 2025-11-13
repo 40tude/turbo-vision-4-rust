@@ -19,9 +19,93 @@ use turbo_vision::views::{
     menu_bar::{MenuBar, SubMenu},
     status_line::{StatusItem, StatusLine},
 };
+use std::time::Instant;
 
 // Custom command for About dialog
 const CM_ABOUT: u16 = 100;
+
+// Animated Crab Widget for Status Bar
+struct CrabWidget {
+    bounds: Rect,
+    state: StateFlags,
+    position: usize,      // Current position (0-9)
+    direction: i8,        // 1 for right, -1 for left
+    last_update: Instant,
+}
+
+impl CrabWidget {
+    fn new(x: i16, y: i16) -> Self {
+        Self {
+            bounds: Rect::new(x, y, x + 10, y + 1),
+            state: 0,
+            position: 0,
+            direction: 1,
+            last_update: Instant::now(),
+        }
+    }
+
+    fn idle(&mut self) {
+        // Update animation every 100ms
+        if self.last_update.elapsed().as_millis() > 100 {
+            // Move the crab
+            if self.direction > 0 {
+                self.position += 1;
+                if self.position >= 9 {
+                    self.direction = -1;
+                }
+            } else {
+                if self.position > 0 {
+                    self.position -= 1;
+                }
+                if self.position == 0 {
+                    self.direction = 1;
+                }
+            }
+            self.last_update = Instant::now();
+        }
+    }
+}
+
+impl View for CrabWidget {
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
+
+    fn set_bounds(&mut self, bounds: Rect) {
+        self.bounds = bounds;
+    }
+
+    fn state(&self) -> StateFlags {
+        self.state
+    }
+
+    fn set_state(&mut self, state: StateFlags) {
+        self.state = state;
+    }
+
+    fn draw(&mut self, terminal: &mut Terminal) {
+        let mut buf = DrawBuffer::new(10);
+        // Use status line colors (reverse video)
+        let color = Attr::new(TvColor::Black, TvColor::LightGray);
+
+        // Fill with spaces
+        for i in 0..10 {
+            buf.move_char(i, ' ', color, 1);
+        }
+
+        // Place the crab at current position
+        buf.move_char(self.position, '🦀', color, 1);
+
+        write_line_to_terminal(terminal, self.bounds.a.x, self.bounds.a.y, &buf);
+    }
+
+    fn handle_event(&mut self, _event: &mut Event) {}
+    fn update_cursor(&self, _terminal: &mut Terminal) {}
+
+    fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
+        None
+    }
+}
 
 // The Turbo Vision logo pattern (23 rows x 80 columns)
 // ASCII art logo pattern
@@ -173,10 +257,20 @@ fn main() -> turbo_vision::core::error::Result<()> {
     ));
     app.desktop.add(Box::new(logo_bg));
 
+    // Create animated crab widget on the right side of the status bar
+    let mut crab_widget = CrabWidget::new(width as i16 - 11, height as i16 - 1);
+
     // Main event loop
     app.running = true;
     while app.running {
+        // Update crab animation
+        crab_widget.idle();
+
         app.draw();
+
+        // Draw the crab widget on top of everything
+        crab_widget.draw(&mut app.terminal);
+
         app.terminal.flush()?;
 
         if let Ok(Some(mut event)) = app

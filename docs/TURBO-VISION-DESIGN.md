@@ -12,16 +12,17 @@
 2. [Implementation Status](#implementation-status)
 3. [Focus Architecture](#focus-architecture)
 4. [Event System Architecture](#event-system-architecture)
-5. [State Management](#state-management)
-6. [Modal Dialog Execution](#modal-dialog-execution)
-7. [Owner/Parent Communication](#ownerparent-communication)
-8. [Syntax Highlighting System](#syntax-highlighting-system)
-9. [Validation System](#validation-system)
-10. [FileDialog Implementation](#filedialog-implementation)
-11. [Screen Dump System](#screen-dump-system)
-12. [Command Set System](#command-set-system)
-13. [Palette System](#palette-system)
-14. [Architecture Comparisons](#architecture-comparisons)
+5. [ESC Sequence Tracking for macOS Alt Emulation](#esc-sequence-tracking-for-macos-alt-emulation)
+6. [State Management](#state-management)
+7. [Modal Dialog Execution](#modal-dialog-execution)
+8. [Owner/Parent Communication](#ownerparent-communication)
+9. [Syntax Highlighting System](#syntax-highlighting-system)
+10. [Validation System](#validation-system)
+11. [FileDialog Implementation](#filedialog-implementation)
+12. [Screen Dump System](#screen-dump-system)
+13. [Command Set System](#command-set-system)
+14. [Palette System](#palette-system)
+15. [Architecture Comparisons](#architecture-comparisons)
 
 ---
 
@@ -848,6 +849,334 @@ if event.key_code == KB_ENTER {
 ```
 
 This eliminates the need for raw owner pointers while achieving the same functionality. See [Owner/Parent Communication](#ownerparent-communication) for details.
+
+## ESC Sequence Tracking for macOS Alt Emulation
+
+**Status:** ✅ **Complete** (v0.10.4)
+
+### The Problem
+
+On macOS, the Alt/Option key often doesn't work as expected in terminal applications:
+- **Terminal Setting Impact**: Many macOS terminal emulators (Terminal.app, iTerm2) have settings that make Option keys send escape sequences or act as Meta keys
+- **Inconsistent Behavior**: Alt+letter shortcuts either don't work at all, or produce unexpected characters
+- **Original Turbo Vision**: Borland Turbo Vision relied on Alt+letter shortcuts for menu navigation and commands (Alt+F for File menu, Alt+X to exit)
+- **Broken User Experience**: Without working Alt keys, menu shortcuts and other keyboard navigation becomes unusable on macOS
+
+### The Solution: ESC Tracking
+
+Instead of requiring users to configure their terminals, Turbo Vision implements **ESC sequence tracking** - a transparent mechanism that treats `ESC` followed by a letter (within a timeout) as equivalent to `Alt+letter`.
+
+This approach:
+- ✅ Works on all macOS terminal emulators without configuration
+- ✅ Maintains full compatibility with Alt+letter where it works
+- ✅ Provides double-ESC for dialog dismissal (ESC ESC = close)
+- ✅ Doesn't interfere with vi/emacs ESC usage (timeout-based)
+- ✅ Transparent to application code (no special handling required)
+
+### Architecture
+
+```rust
+pub struct EscSequenceTracker {
+    last_esc_time: Option<Instant>,
+    waiting_for_char: bool,
+    timeout_ms: u64,  // Default: 500ms
+}
+```
+
+**State Machine:**
+
+```
+   ┌──────────┐
+   │  Idle    │
+   └────┬─────┘
+        │
+        │ ESC pressed
+        ▼
+   ┌──────────────┐
+   │  Waiting     │◄──────────┐
+   │  (500ms)     │           │
+   └───┬──────┬───┘           │
+       │      │                │
+       │      └── Timeout ─────┘ Generate KB_ESC
+       │          (> 500ms)
+       │
+       │ Letter pressed (< 500ms)
+       ▼
+   ┌──────────────┐
+   │  Generate    │
+   │  KB_ALT_X    │
+   └──────────────┘
+```
+
+### Key Code Mapping
+
+When ESC+letter is detected within the timeout, it produces **identical key codes** to Alt+letter:
+
+| Sequence | Key Code | Constant | Value | Same As |
+|----------|----------|----------|-------|---------|
+| ESC, F | KB_ALT_F | 0x2100 | Alt+F |
+| ESC, X | KB_ALT_X | 0x2D00 | Alt+X |
+| ESC, A | KB_ALT_A | 0x1E00 | Alt+A |
+| ESC, H | KB_ALT_H | 0x2300 | Alt+H |
+| ESC ESC | KB_ESC_ESC | 0x011C | Double ESC |
+
+**Complete transparency:** Application code cannot distinguish between Alt+F and ESC,F - they produce identical key codes.
+
+### Implementation
+
+#### EscSequenceTracker (src/core/event.rs)
+
+```rust
+impl EscSequenceTracker {
+    /// Process a key event, handling ESC sequences
+    /// Returns the appropriate KeyCode
+    pub fn process_key(&mut self, key: KeyEvent) -> KeyCode {
+        // Check if this is ESC
+        if matches!(key.code, CKC::Esc) {
+            let now = Instant::now();
+
+            // Check if this is a second ESC within timeout
+            if let Some(last_time) = self.last_esc_time {
+                if now.duration_since(last_time) < Duration::from_millis(self.timeout_ms) {
+                    // Double ESC!
+                    self.last_esc_time = None;
+                    self.waiting_for_char = false;
+                    return KB_ESC_ESC;
+                }
+            }
+
+            // First ESC - wait for next character
+            self.last_esc_time = Some(now);
+            self.waiting_for_char = true;
+            return 0; // Don't generate event yet
+        }
+
+        // If we're waiting for a character after ESC
+        if self.waiting_for_char {
+            self.waiting_for_char = false;
+            let esc_time = self.last_esc_time;
+            self.last_esc_time = None;
+
+            // Check if within time limit (treat as ALT+letter)
+            if let Some(last_time) = esc_time {
+                if Instant::now().duration_since(last_time) <= Duration::from_millis(self.timeout_ms) {
+                    // Map ESC+letter to ALT codes (for macOS Alt emulation)
+                    if let CKC::Char(c) = key.code {
+                        if let Some(alt_code) = char_to_alt_code(c.to_ascii_lowercase()) {
+                            return alt_code;
+                        }
+                    }
+                }
+            }
+
+            // Timeout expired - process as normal key
+            return crossterm_to_keycode(key);
+        }
+
+        crossterm_to_keycode(key)
+    }
+}
+```
+
+#### Terminal Integration (src/terminal/mod.rs)
+
+The tracker is integrated directly into the Terminal, ensuring universal coverage:
+
+```rust
+pub struct Terminal {
+    buffer: Vec<Vec<Cell>>,
+    prev_buffer: Vec<Vec<Cell>>,
+    width: u16,
+    height: u16,
+    esc_tracker: EscSequenceTracker,  // ◄─── Integrated tracker
+    // ... other fields
+}
+
+impl Terminal {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            // ...
+            esc_tracker: EscSequenceTracker::new(),
+            // ...
+        })
+    }
+
+    /// Set the ESC timeout in milliseconds
+    /// Default is 500ms, which works well for menu navigation
+    pub fn set_esc_timeout(&mut self, timeout_ms: u64) {
+        self.esc_tracker.set_timeout(timeout_ms);
+    }
+
+    pub fn poll_event(&mut self, timeout: Duration) -> Result<Option<Event>> {
+        // ... event polling ...
+
+        if let CEvent::Key(key) = event {
+            // Process through ESC tracker
+            let key_code = self.esc_tracker.process_key(key);
+            if key_code == 0 {
+                // ESC sequence in progress, don't generate event yet
+                return Ok(None);
+            }
+
+            return Ok(Some(Event::keyboard(key_code)));
+        }
+        // ...
+    }
+}
+```
+
+### Timing Behavior
+
+**500ms Timeout** - Carefully chosen balance:
+
+```
+User action: ESC ... F
+              │     │
+              │     └── < 500ms = Alt+F (menu opens)
+              │
+              └── > 500ms = ESC, then F (separate events)
+```
+
+**Why 500ms?**
+- ✅ Fast enough for deliberate ESC+letter shortcuts
+- ✅ Slow enough not to trigger accidentally when typing
+- ✅ Compatible with vi/emacs users who press ESC frequently
+- ✅ Feels natural for menu navigation
+
+**Double ESC for Dialog Close:**
+```
+User action: ESC ESC
+              │   │
+              └───┘ < 500ms = KB_ESC_ESC (close dialog)
+```
+
+### Example Usage Scenarios
+
+#### Menu Navigation (Transparent)
+
+```rust
+// Application code - no awareness of ESC tracking needed!
+fn handle_event(&mut self, event: &mut Event) {
+    if event.what == EventType::Keyboard {
+        match event.key_code {
+            KB_ALT_F => {
+                // Opens File menu
+                // Works with BOTH:
+                //   - Alt+F (native)
+                //   - ESC, F (tracked)
+            }
+            KB_ALT_X => {
+                // Exit application
+                // Works with BOTH:
+                //   - Alt+X (native)
+                //   - ESC, X (tracked)
+            }
+            _ => {}
+        }
+    }
+}
+```
+
+#### Dialog Dismissal
+
+```rust
+// Dialog code
+fn handle_event(&mut self, event: &mut Event) {
+    match event.key_code {
+        KB_ESC_ESC => {
+            // Close dialog
+            // Triggered by: ESC ESC (within 500ms)
+            *event = Event::command(CM_CANCEL);
+        }
+        _ => {}
+    }
+}
+```
+
+#### Configurable Timeout
+
+```rust
+let mut terminal = Terminal::new()?;
+
+// Make timeout shorter for fast typers (300ms)
+terminal.set_esc_timeout(300);
+
+// Or longer for deliberate menu navigation (800ms)
+terminal.set_esc_timeout(800);
+```
+
+### Benefits Over Alternatives
+
+#### Alternative 1: Require Terminal Configuration
+```
+❌ Problems:
+   - User must configure terminal settings
+   - Different for every terminal (Terminal.app, iTerm2, Alacritty, etc.)
+   - Often forgotten or misconfigured
+   - Breaks other applications that expect Option to send escape sequences
+```
+
+#### Alternative 2: Use Different Keys (Ctrl)
+```
+❌ Problems:
+   - Ctrl+letter often bound to other functions (Ctrl+C = copy/interrupt)
+   - Not compatible with original Turbo Vision shortcuts
+   - Confusing for users familiar with Borland conventions
+```
+
+#### Alternative 3: Mouse-Only Navigation
+```
+❌ Problems:
+   - Slow compared to keyboard shortcuts
+   - Not accessible
+   - Defeats purpose of terminal UI efficiency
+```
+
+#### ESC Tracking Solution
+```
+✅ Advantages:
+   - Works immediately, no configuration
+   - Compatible with all terminals
+   - Transparent to application code
+   - Preserves original Turbo Vision keyboard shortcuts
+   - Allows double-ESC for quick dialog dismissal
+   - Configurable timeout for different user preferences
+```
+
+### Comparison with Borland
+
+| Aspect | Borland (DOS) | Rust (macOS/Linux/Windows) |
+|--------|---------------|----------------------------|
+| Menu shortcuts | Alt+letter only | Alt+letter OR ESC,letter |
+| Platform support | DOS (native Alt) | Cross-platform (transparent) |
+| Configuration | None needed | None needed |
+| Double ESC | Not implemented | KB_ESC_ESC for dialogs |
+| Timeout | N/A (instant) | 500ms (configurable) |
+| Terminal independence | N/A | ✅ Works everywhere |
+
+### Related Files
+
+- **Event System**: `src/core/event.rs` (EscSequenceTracker implementation)
+- **Terminal**: `src/terminal/mod.rs` (Terminal integration)
+- **Key Constants**: `src/core/event.rs` (KB_ALT_*, KB_ESC_ESC)
+- **Changelog**: `CHANGELOG.md` (v0.10.4 release notes)
+
+### Technical Details
+
+**Why Return 0 for "Waiting"?**
+- Returning 0 signals the Terminal not to generate an event yet
+- Allows tracker to "consume" the ESC and wait for next key
+- Clean state machine without special Option<KeyCode> handling
+
+**Thread Safety:**
+- EscSequenceTracker is not thread-safe by design
+- Each Terminal has its own tracker instance
+- No global state - follows Rust ownership principles
+
+**Memory Overhead:**
+- Minimal: 2 fields (Option<Instant> + bool + u64)
+- No allocations during normal operation
+- O(1) processing time per key event
 
 ---
 
