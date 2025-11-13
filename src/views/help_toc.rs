@@ -23,7 +23,7 @@ use std::cell::RefCell;
 /// Matches Borland: THelpToc
 pub struct HelpToc {
     dialog: Dialog,
-    _outline_viewer_idx: usize,
+    _outline_viewer_ptr: *const dyn View,
     _help_file: Rc<RefCell<HelpFile>>,
     selected_topic: Option<String>,
 }
@@ -59,7 +59,7 @@ impl HelpToc {
         }
         drop(help);
 
-        let outline_viewer_idx = dialog.add(Box::new(outline));
+        let outline_viewer_ptr = dialog.add(Box::new(outline));
 
         // Buttons
         dialog.add(Box::new(Button::new(
@@ -78,7 +78,7 @@ impl HelpToc {
 
         Self {
             dialog,
-            _outline_viewer_idx: outline_viewer_idx,
+            _outline_viewer_ptr: outline_viewer_ptr,
             _help_file: help_file,
             selected_topic: None,
         }

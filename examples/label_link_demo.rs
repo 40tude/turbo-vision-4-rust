@@ -25,33 +25,25 @@ fn main() -> turbo_vision::core::error::Result<()> {
     ));
 
     // First Name field with linked label
-    // Add the input first and capture its index
     let first_name_data = Rc::new(RefCell::new(String::new()));
-    let first_name_idx = dialog.add(Box::new(
-        InputLineBuilder::new().bounds(Rect::new(15, 4, 35, 4)).max_length(20).data(Rc::clone(&first_name_data)).build(),
-    ));
-
-    // Create label and link it to the input using a reference
     let mut first_name_label = LabelBuilder::new().bounds(Rect::new(2, 4, 15, 5)).text("~F~irst Name:").build(); // bounds must be on 2 lines
-    first_name_label.set_link(dialog.child_at(first_name_idx));
+    first_name_label.set_link(dialog.add(Box::new(
+        InputLineBuilder::new().bounds(Rect::new(15, 4, 35, 4)).max_length(20).data(Rc::clone(&first_name_data)).build(),
+    )));
     dialog.add(Box::new(first_name_label));
 
     // Last Name field with linked label
     let last_name_data = Rc::new(RefCell::new(String::new()));
-    let last_name_idx = dialog.add(Box::new(
-        InputLineBuilder::new().bounds(Rect::new(15, 6, 35, 6)).max_length(20).data(Rc::clone(&last_name_data)).build(),
-    ));
-
     let mut last_name_label = LabelBuilder::new().bounds(Rect::new(2, 6, 15, 7)).text("~L~ast Name:").build();
-    last_name_label.set_link(dialog.child_at(last_name_idx));
+    last_name_label.set_link(dialog.add(Box::new(
+        InputLineBuilder::new().bounds(Rect::new(15, 6, 35, 6)).max_length(20).data(Rc::clone(&last_name_data)).build(),
+    )));
     dialog.add(Box::new(last_name_label));
 
     // Email field with linked label
     let email_data = Rc::new(RefCell::new(String::new()));
-    let email_idx = dialog.add(Box::new(InputLineBuilder::new().bounds(Rect::new(15, 8, 35, 8)).max_length(20).data(Rc::clone(&email_data)).build()));
-
     let mut email_label = LabelBuilder::new().bounds(Rect::new(2, 8, 15, 9)).text("~E~mail:").build();
-    email_label.set_link(dialog.child_at(email_idx));
+    email_label.set_link(dialog.add(Box::new(InputLineBuilder::new().bounds(Rect::new(15, 8, 35, 8)).max_length(20).data(Rc::clone(&email_data)).build())));
     dialog.add(Box::new(email_label));
 
     // Buttons

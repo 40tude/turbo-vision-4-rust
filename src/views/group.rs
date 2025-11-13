@@ -43,7 +43,7 @@ impl Group {
         }
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) -> usize {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> *const dyn View {
         // Set owner pointer for palette chain resolution
         // Child views need to know their parent to traverse the palette chain
         view.set_owner(self as *const _ as *const dyn View);
@@ -59,7 +59,8 @@ impl Group {
         );
         view.set_bounds(absolute_bounds);
         self.children.push(view);
-        self.children.len() - 1  // Return index of newly added child
+        let index = self.children.len() - 1;
+        &*self.children[index] as *const dyn View
     }
 
     pub fn set_initial_focus(&mut self) {

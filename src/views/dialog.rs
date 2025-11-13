@@ -33,7 +33,7 @@ impl Dialog {
         Box::new(dialog)
     }
 
-    pub fn add(&mut self, view: Box<dyn View>) -> usize {
+    pub fn add(&mut self, view: Box<dyn View>) -> *const dyn View {
         self.window.add(view)
     }
 

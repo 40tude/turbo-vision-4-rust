@@ -44,7 +44,7 @@ impl Desktop {
         // NOTE: We don't set owner pointer to avoid unsafe casting
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) -> usize {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> *const dyn View {
         use crate::core::state::{OF_CENTERED, OF_CENTER_X, OF_CENTER_Y};
 
         // Set owner pointer to Desktop (for drag limits and bounds checking)
@@ -64,7 +64,7 @@ impl Desktop {
         // Matches Borland: TView::locate() constrains position to owner bounds
         view.constrain_to_parent_bounds();
 
-        let index = self.children.add(view);
+        let view_ptr = self.children.add(view);
 
         // Initialize internal owner pointers after view is in final position
         // This is critical for views like Dialog that contain Groups by value
@@ -84,7 +84,7 @@ impl Desktop {
                 self.children.set_focus_to(last_idx);
             }
         }
-        index
+        view_ptr
     }
 
     /// Center a view within the desktop bounds based on its option flags

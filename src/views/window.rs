@@ -114,7 +114,7 @@ impl Window {
         window
     }
 
-    pub fn add(&mut self, mut view: Box<dyn View>) -> usize {
+    pub fn add(&mut self, mut view: Box<dyn View>) -> *const dyn View {
         // Set the owner type based on whether this is a Dialog or regular Window
         let owner_type = match self.palette_type {
             WindowPaletteType::Dialog => super::view::OwnerType::Dialog,
