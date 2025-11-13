@@ -307,11 +307,11 @@ pub trait View {
         write_line_to_terminal(terminal, bounds.a.x + 1, bounds.b.y, &bottom_buf);
     }
 
-    /// Get the linked control index for labels
+    /// Get the linked control pointer for labels
     /// Matches Borland: TLabel::link field
-    /// Returns Some(index) if this is a label with a linked control, None otherwise
+    /// Returns Some(pointer) if this is a label with a linked control, None otherwise
     /// Used by Group to implement focus transfer when clicking labels
-    fn label_link(&self) -> Option<usize> {
+    fn label_link(&self) -> Option<*const dyn View> {
         None // Default: not a label or no link
     }
 

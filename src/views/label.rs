@@ -12,7 +12,7 @@ use crate::terminal::Terminal;
 pub struct Label {
     bounds: Rect,
     text: String,
-    link: Option<usize>, // Index of linked control in parent group
+    link: Option<*const dyn View>, // Pointer to linked control
     owner: Option<*const dyn View>,
     owner_type: super::view::OwnerType,
 }
@@ -28,11 +28,18 @@ impl Label {
         }
     }
 
-    /// Set the linked control index
+    /// Set the linked control
     /// Matches Borland: TLabel constructor takes TView* aLink parameter
     /// When label is clicked, focus transfers to the linked control
-    pub fn set_link(&mut self, link_index: usize) {
-        self.link = Some(link_index);
+    ///
+    /// # Safety
+    /// The target view must remain valid for the lifetime of this label.
+    /// This is guaranteed when both views are children of the same Group.
+    pub fn set_link(&mut self, target: &dyn View) {
+        // SAFETY: We're storing a raw pointer to a view that must outlive this label.
+        // This is guaranteed by the Group ownership model where both views are children
+        // of the same parent.
+        self.link = Some(unsafe { std::mem::transmute(target as *const dyn View) });
     }
 }
 
@@ -65,9 +72,9 @@ impl View for Label {
         // Focus linking is handled by Group
     }
 
-    /// Return the linked control index for this label
+    /// Return the linked control pointer for this label
     /// Matches Borland: TLabel::link field
-    fn label_link(&self) -> Option<usize> {
+    fn label_link(&self) -> Option<*const dyn View> {
         self.link
     }
 
@@ -97,7 +104,7 @@ impl View for Label {
 pub struct LabelBuilder {
     bounds: Option<Rect>,
     text: Option<String>,
-    link: Option<usize>,
+    link: Option<*const dyn View>,
 }
 
 impl LabelBuilder {
@@ -118,8 +125,11 @@ impl LabelBuilder {
     }
 
     #[must_use]
-    pub fn link(mut self, link: usize) -> Self {
-        self.link = Some(link);
+    pub fn link(mut self, target: &dyn View) -> Self {
+        // SAFETY: We're storing a raw pointer to a view that must outlive this label.
+        // This is guaranteed by the Group ownership model where both views are children
+        // of the same parent.
+        self.link = Some(unsafe { std::mem::transmute(target as *const dyn View) });
         self
     }
 

@@ -474,13 +474,18 @@ impl View for Group {
                 if event.what == EventType::MouseDown {
                     // Check if this is a label with a link (Borland: TLabel::focusLink)
                     // If so, focus the linked control instead of the label
-                    if let Some(link_index) = self.children[i].label_link() {
-                        if link_index < self.children.len() && self.children[link_index].can_focus() {
-                            self.clear_all_focus();
-                            self.focused = link_index;
-                            self.children[link_index].set_focus(true);
-                            event.clear();  // Event consumed by focus transfer
-                            return;
+                    if let Some(link_ptr) = self.children[i].label_link() {
+                        // Find the child that matches the link pointer
+                        if let Some(link_index) = self.children.iter().position(|child| {
+                            std::ptr::eq(&**child as *const dyn View, link_ptr)
+                        }) {
+                            if self.children[link_index].can_focus() {
+                                self.clear_all_focus();
+                                self.focused = link_index;
+                                self.children[link_index].set_focus(true);
+                                event.clear();  // Event consumed by focus transfer
+                                return;
+                            }
                         }
                     } else if self.children[i].can_focus() {
                         // Regular focusable view - give it focus
