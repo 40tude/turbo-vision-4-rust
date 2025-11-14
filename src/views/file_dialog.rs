@@ -54,20 +54,20 @@
 //! performance, but could alternatively use direct child access if needed for more
 //! complex scenarios.
 
-use crate::core::geometry::Rect;
-use crate::core::event::{Event, EventType};
-use crate::core::command::{CM_OK, CM_CANCEL, CM_FILE_FOCUSED, CommandId};
-use crate::terminal::Terminal;
+use super::View;
+use super::button::Button;
 use super::dialog::Dialog;
 use super::input_line::InputLine;
-use super::listbox::ListBox;
-use super::button::Button;
 use super::label::Label;
-use super::View;
-use std::path::PathBuf;
-use std::fs;
-use std::rc::Rc;
+use super::listbox::ListBox;
+use crate::core::command::{CM_CANCEL, CM_FILE_FOCUSED, CM_OK, CommandId};
+use crate::core::event::{Event, EventType};
+use crate::core::geometry::Rect;
+use crate::terminal::Terminal;
 use std::cell::RefCell;
+use std::fs;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 const CMD_FILE_SELECTED: u16 = 1000;
 
@@ -81,16 +81,15 @@ pub struct FileDialog {
     wildcard: String,
     file_name_data: Rc<RefCell<String>>,
     files: Vec<String>,
-    selected_file_index: usize,  // Track ListBox selection
+    selected_file_index: usize, // Track ListBox selection
 }
 
 impl FileDialog {
     pub fn new(bounds: Rect, title: &str, wildcard: &str, initial_dir: Option<PathBuf>) -> Self {
         let dialog = Dialog::new(bounds, title);
 
-        let current_path = initial_dir.unwrap_or_else(|| {
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-        });
+        let current_path = initial_dir
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
         let file_name_data = Rc::new(RefCell::new(String::new()));
 
@@ -108,8 +107,8 @@ impl FileDialog {
         let bounds = self.dialog.bounds();
         let dialog_width = bounds.width();
 
-        // Reserve space for buttons on the right (12 wide + 2 margin)
-        let content_width = dialog_width - 14;
+        // Reserve space for buttons on the right
+        let content_width = dialog_width - 15;
 
         // Label for file name input
         let name_label = Label::new(Rect::new(2, 1, 12, 1), "~N~ame:");
@@ -119,7 +118,7 @@ impl FileDialog {
         let file_input = InputLine::new(
             Rect::new(12, 1, content_width, 2),
             255,
-            self.file_name_data.clone()
+            self.file_name_data.clone(),
         );
         self.dialog.add(Box::new(file_input));
 
@@ -146,11 +145,11 @@ impl FileDialog {
         self.dialog.add(Box::new(file_list));
 
         // Buttons on the right side (vertically stacked)
-        let button_x = dialog_width - 14;
+        let button_x = dialog_width - 14; // 15 = 12 (button width) + 2 (right margin) + 1 (end space)
         let mut button_y = 6;
 
         let open_button = Button::new(
-            Rect::new(button_x, button_y, button_x + 12, button_y + 2),
+            Rect::new(button_x, button_y, button_x + 11, button_y + 2),
             "  ~O~pen  ",
             CM_OK,
             true,
@@ -159,7 +158,7 @@ impl FileDialog {
         button_y += 3;
 
         let cancel_button = Button::new(
-            Rect::new(button_x, button_y, button_x + 12, button_y + 2),
+            Rect::new(button_x, button_y, button_x + 11, button_y + 2),
             " ~C~ancel ",
             CM_CANCEL,
             false,
@@ -212,13 +211,20 @@ impl FileDialog {
             let _ = app.terminal.flush();
 
             // Get event with 20ms timeout (matches magiblot's eventTimeoutMs)
-            match app.terminal.poll_event(std::time::Duration::from_millis(20)).ok().flatten() {
+            match app
+                .terminal
+                .poll_event(std::time::Duration::from_millis(20))
+                .ok()
+                .flatten()
+            {
                 Some(mut event) => {
                     // Event received - handle it immediately without calling idle()
                     // Matches magiblot: idle() is NOT called when events are present
 
                     // Handle double ESC to close
-                    if event.what == EventType::Keyboard && event.key_code == crate::core::event::KB_ESC_ESC {
+                    if event.what == EventType::Keyboard
+                        && event.key_code == crate::core::event::KB_ESC_ESC
+                    {
                         return None;
                     }
 
@@ -260,7 +266,9 @@ impl FileDialog {
                                     }
 
                                     // Check if it's a directory navigation request or file selection
-                                    if let Some(path) = self.handle_selection(&file_name, &mut app.terminal) {
+                                    if let Some(path) =
+                                        self.handle_selection(&file_name, &mut app.terminal)
+                                    {
                                         // File selected - return it
                                         return Some(path);
                                     }
@@ -285,7 +293,9 @@ impl FileDialog {
                                 if !file_name.is_empty() {
                                     // Handle the selection (navigate dirs or return file)
                                     // Matches Borland: TFileDialog::valid() reads from input field
-                                    if let Some(path) = self.handle_selection(&file_name, &mut app.terminal) {
+                                    if let Some(path) =
+                                        self.handle_selection(&file_name, &mut app.terminal)
+                                    {
                                         // File selected - return it
                                         return Some(path);
                                     }
@@ -415,7 +425,13 @@ impl FileDialog {
         let old_bounds = self.dialog.bounds();
         let old_title = "Open File"; // TODO: Store title
 
-        *self = Self::new(old_bounds, old_title, &self.wildcard.clone(), Some(self.current_path.clone())).build();
+        *self = Self::new(
+            old_bounds,
+            old_title,
+            &self.wildcard.clone(),
+            Some(self.current_path.clone()),
+        )
+        .build();
 
         // Reset focus to listbox after directory navigation
         // Matches Borland: fileList->select() calls owner->setCurrent(this, normalSelect)
@@ -424,7 +440,9 @@ impl FileDialog {
         if CHILD_LISTBOX < self.dialog.child_count() {
             self.dialog.set_focus_to_child(CHILD_LISTBOX);
             // Also ensure listbox selection is at index 0
-            self.dialog.child_at_mut(CHILD_LISTBOX).set_list_selection(0);
+            self.dialog
+                .child_at_mut(CHILD_LISTBOX)
+                .set_list_selection(0);
         }
 
         // Reset selection index

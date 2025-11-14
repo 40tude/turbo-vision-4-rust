@@ -28,7 +28,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     let (width, height) = app.terminal.size();
 
     // Create file dialog
-    let dialog_width = 60;
+    let dialog_width = 62;
     let dialog_height = 20;
     let dialog_x = (width as i16 - dialog_width) / 2;
     let dialog_y = (height as i16 - dialog_height) / 2;
@@ -36,11 +36,17 @@ fn main() -> turbo_vision::core::error::Result<()> {
     // Show all files with "*" wildcard
     // You can use "*.rs" to show only Rust files, "*.toml" for TOML files, etc.
     let mut file_dialog = FileDialog::new(
-        Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height),
+        Rect::new(
+            dialog_x,
+            dialog_y,
+            dialog_x + dialog_width,
+            dialog_y + dialog_height,
+        ),
         "Open File",
         "*",  // Wildcard: "*" = all files, "*.ext" = specific extension
-        None,    // Start in current directory
-    ).build();
+        None, // Start in current directory
+    )
+    .build();
 
     // Execute (now redraws desktop background on each frame - fixes trailing bug!)
     match file_dialog.execute(&mut app) {

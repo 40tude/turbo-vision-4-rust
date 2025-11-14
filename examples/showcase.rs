@@ -1354,7 +1354,7 @@ fn show_open_file_dialog(app: &mut Application, crab: &Rc<RefCell<CrabWidget>>) 
     let (width, height) = app.terminal.size();
 
     // Create centered file dialog
-    let dialog_width = 60i16;
+    let dialog_width = 62i16;
     let dialog_height = 18i16;
     let dialog_x = (width as i16 - dialog_width) / 2;
     let dialog_y = (height as i16 - dialog_height - 2) / 2;

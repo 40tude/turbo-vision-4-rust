@@ -417,7 +417,7 @@ fn create_editor_window(
 
 fn show_file_open_dialog(app: &mut Application) -> Option<PathBuf> {
     let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 60;
+    let dialog_width = 62;
     let dialog_height = 20;
     let dialog_x = (term_width as i16 - dialog_width) / 2;
     let dialog_y = (term_height as i16 - dialog_height) / 2;
@@ -468,7 +468,7 @@ fn save_file_as(app: &mut Application) {
 
 fn show_file_save_dialog(app: &mut Application) -> Option<PathBuf> {
     let (term_width, term_height) = app.terminal.size();
-    let dialog_width = 60;
+    let dialog_width = 62;
     let dialog_height = 20;
     let dialog_x = (term_width as i16 - dialog_width) / 2;
     let dialog_y = (term_height as i16 - dialog_height) / 2;
