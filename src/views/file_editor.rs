@@ -1,15 +1,18 @@
 // (C) 2025 - Enzo Lombardi
 
 //! FileEditor view - text editor with file loading, saving, and modified state tracking.
-// FileEditor - Editor with file management and save prompts
+// FileEditor - EditWindow with file management and save prompts
 //
 // Matches Borland: TFileEditor (tfileedi.h, tfileedi.cc)
 //
-// Extends Editor with:
+// Extends EditWindow with:
 // - File name tracking
 // - Modified flag tracking
 // - valid(cmClose) for save prompts
 // - Load/Save/SaveAs operations
+//
+// Architecture:
+// Editor (core editing) -> EditWindow (adds frame/scrollbars) -> FileEditor (adds file I/O)
 
 use std::path::PathBuf;
 use crate::core::geometry::Rect;
@@ -18,26 +21,25 @@ use crate::core::command::{CommandId, CM_YES, CM_NO};
 use crate::core::state::StateFlags;
 use crate::terminal::Terminal;
 use crate::app::Application;
-use super::editor::Editor;
+use super::edit_window::EditWindow;
 use super::view::View;
 use super::msgbox::confirmation_box;
 
-/// FileEditor - Editor with file management
+/// FileEditor - EditWindow with file management
 ///
 /// Matches Borland: TFileEditor
 pub struct FileEditor {
-    editor: Editor,
+    edit_window: EditWindow,
     filename: Option<PathBuf>,
 }
 
 impl FileEditor {
-    /// Create a new file editor
+    /// Create a new file editor window
     ///
     /// Matches Borland: TFileEditor(bounds, hScrollBar, vScrollBar, indicator, fileName)
-    /// Note: In the Rust version, scrollbars should be managed by the parent Window
-    pub fn new(bounds: Rect) -> Self {
+    pub fn new(bounds: Rect, title: &str) -> Self {
         Self {
-            editor: Editor::new(bounds),
+            edit_window: EditWindow::new(bounds, title),
             filename: None,
         }
     }
@@ -46,7 +48,7 @@ impl FileEditor {
     ///
     /// Matches Borland: TFileEditor::loadFile()
     pub fn load_file(&mut self, path: PathBuf) -> std::io::Result<()> {
-        self.editor.load_file(path.to_str().unwrap())?;
+        self.edit_window.load_file(&path)?;
         self.filename = Some(path);
         Ok(())
     }
@@ -56,7 +58,7 @@ impl FileEditor {
     /// Matches Borland: TFileEditor::save()
     pub fn save(&mut self) -> std::io::Result<bool> {
         if self.filename.is_some() {
-            self.editor.save_file()?;
+            self.edit_window.save_file()?;
             Ok(true)
         } else {
             Ok(false) // Need to call save_as
@@ -67,7 +69,7 @@ impl FileEditor {
     ///
     /// Matches Borland: TFileEditor::saveAs()
     pub fn save_as(&mut self, path: PathBuf) -> std::io::Result<()> {
-        self.editor.save_as(path.to_str().unwrap())?;
+        self.edit_window.save_as(&path)?;
         self.filename = Some(path);
         Ok(())
     }
@@ -91,12 +93,12 @@ impl FileEditor {
 
     /// Check if modified
     pub fn is_modified(&self) -> bool {
-        self.editor.is_modified()
+        self.edit_window.is_modified()
     }
 
     /// Set text content
     pub fn set_text(&mut self, text: &str) {
-        self.editor.set_text(text);
+        self.edit_window.editor_rc().borrow_mut().set_text(text);
     }
 
     /// Validate before close
@@ -133,59 +135,63 @@ impl FileEditor {
         }
     }
 
-    /// Get mutable reference to the underlying editor
-    pub fn editor_mut(&mut self) -> &mut Editor {
-        &mut self.editor
+    /// Get mutable reference to the underlying edit window
+    pub fn edit_window_mut(&mut self) -> &mut EditWindow {
+        &mut self.edit_window
     }
 
-    /// Get reference to the underlying editor
-    pub fn editor(&self) -> &Editor {
-        &self.editor
+    /// Get reference to the underlying edit window
+    pub fn edit_window(&self) -> &EditWindow {
+        &self.edit_window
     }
 }
 
 impl View for FileEditor {
     fn bounds(&self) -> Rect {
-        self.editor.bounds()
+        self.edit_window.bounds()
     }
 
     fn set_bounds(&mut self, bounds: Rect) {
-        self.editor.set_bounds(bounds);
+        self.edit_window.set_bounds(bounds);
     }
 
     fn draw(&mut self, terminal: &mut Terminal) {
-        self.editor.draw(terminal);
+        self.edit_window.draw(terminal);
     }
 
     fn handle_event(&mut self, event: &mut Event) {
-        self.editor.handle_event(event);
+        self.edit_window.handle_event(event);
     }
 
     fn can_focus(&self) -> bool {
-        self.editor.can_focus()
+        self.edit_window.can_focus()
     }
 
     fn state(&self) -> StateFlags {
-        self.editor.state()
+        self.edit_window.state()
     }
 
     fn set_state(&mut self, state: StateFlags) {
-        self.editor.set_state(state);
+        self.edit_window.set_state(state);
     }
 
     fn get_palette(&self) -> Option<crate::core::palette::Palette> {
-        self.editor.get_palette()
+        self.edit_window.get_palette()
     }
 }
 
 /// Builder for creating file editors with a fluent API.
 pub struct FileEditorBuilder {
     bounds: Option<Rect>,
+    title: String,
 }
 
 impl FileEditorBuilder {
     pub fn new() -> Self {
-        Self { bounds: None }
+        Self {
+            bounds: None,
+            title: "Untitled".to_string(),
+        }
     }
 
     #[must_use]
@@ -194,9 +200,15 @@ impl FileEditorBuilder {
         self
     }
 
+    #[must_use]
+    pub fn title(mut self, title: &str) -> Self {
+        self.title = title.to_string();
+        self
+    }
+
     pub fn build(self) -> FileEditor {
         let bounds = self.bounds.expect("FileEditor bounds must be set");
-        FileEditor::new(bounds)
+        FileEditor::new(bounds, &self.title)
     }
 
     pub fn build_boxed(self) -> Box<FileEditor> {

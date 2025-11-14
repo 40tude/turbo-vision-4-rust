@@ -16,10 +16,9 @@
 // - Status line with function key shortcuts
 
 use std::path::PathBuf;
-use std::fs;
 use turbo_vision::app::Application;
 use turbo_vision::core::command::{
-    CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_CANCEL, CM_YES, CM_NO, CM_CLOSE,
+    CM_QUIT, CM_NEW, CM_OPEN, CM_SAVE, CM_YES, CM_NO, CM_CLOSE,
     CM_ZOOM, CM_TILE, CM_CASCADE, CM_NEXT, CM_PREV, CM_SAVE_AS, CM_FIND,
     CM_REPLACE, CM_SEARCH_AGAIN, CM_GOTO_LINE,
 };
@@ -27,12 +26,12 @@ use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
 use turbo_vision::views::file_dialog::FileDialog;
-use turbo_vision::views::edit_window::EditWindow;
+use turbo_vision::views::file_editor::FileEditor;
 use turbo_vision::views::menu_bar::{MenuBar, SubMenu};
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
 use turbo_vision::views::View;
 use turbo_vision::views::syntax::RustHighlighter;
-use turbo_vision::views::msgbox::{confirmation_box, message_box_ok, message_box_error, search_box, search_replace_box, goto_line_box};
+use turbo_vision::views::msgbox::{message_box_ok, message_box_error, search_box, search_replace_box, goto_line_box};
 
 // Custom command IDs for features not in core (using safe range 122-125, 400+)
 const CM_CHANGE_DIR: u16 = 122;   // Borland: cmChangeDrct - change directory dialog
@@ -42,52 +41,32 @@ const CM_ANALYZE: u16 = 400;      // Run rust-analyzer
 const CM_SHOW_ERRORS: u16 = 401;  // Show analysis errors
 
 
-struct EditorState {
-    filename: Option<PathBuf>,
-}
-
-impl EditorState {
-    fn new() -> Self {
-        Self {
-            filename: None,
-        }
-    }
-
-    fn get_title(&self) -> String {
-        self.filename
-            .as_ref()
-            .and_then(|p| p.file_name().and_then(|n| n.to_str()))
-            .map(String::from)
-            .unwrap_or_else(|| "Untitled".to_string())
-    }
-}
-
-/// Helper to get the EditWindow from the desktop (assumes it's the first child)
-fn get_edit_window(app: &Application) -> Option<&EditWindow> {
+/// Helper to get the FileEditor from the desktop (assumes it's the first child)
+fn get_file_editor(app: &Application) -> Option<&FileEditor> {
     if app.desktop.child_count() == 0 {
         return None;
     }
 
     let child = app.desktop.child_at(0);
-    // Try to downcast to EditWindow
-    // SAFETY: We know the first child is an EditWindow if it exists
+    // Try to downcast to FileEditor
+    // SAFETY: We know the first child is a FileEditor if it exists
     unsafe {
-        let ptr = child as *const dyn View as *const EditWindow;
+        let ptr = child as *const dyn View as *const FileEditor;
         Some(&*ptr)
     }
 }
 
-/// Helper to get a mutable reference to the EditWindow from the desktop
-fn get_edit_window_mut(app: &mut Application) -> Option<&mut EditWindow> {
+/// Helper to get a mutable reference to the FileEditor from the desktop
+fn get_file_editor_mut(app: &mut Application) -> Option<&mut FileEditor> {
     if app.desktop.child_count() == 0 {
         return None;
     }
 
     let child = app.desktop.child_at_mut(0);
-    // Try to downcast to EditWindow
-    // SAFETY: We know the first child is an EditWindow if it exists
+    // Try to downcast to FileEditor
+    // SAFETY: We know the first child is a FileEditor if it exists
     unsafe {
-        let ptr = child as *mut dyn View as *mut EditWindow;
+        let ptr = child as *mut dyn View as *mut FileEditor;
         Some(&mut *ptr)
     }
 }
@@ -95,8 +74,6 @@ fn get_edit_window_mut(app: &mut Application) -> Option<&mut EditWindow> {
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
     let (width, height) = app.terminal.size();
-
-    let mut editor_state = EditorState::new();
 
     // Create menu bar (matching Borland's TEditorApp::initMenuBar)
     let menu_bar = init_menu_bar(Rect::new(0, 0, width as i16, 1));
@@ -110,7 +87,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     // Use RELATIVE coordinates since it will be added to desktop
     // Desktop starts at row 1 (menu bar), so window at relative (5, 1) becomes absolute (5, 2)
     let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
-    create_editor_window(&mut app, &mut editor_state, window_bounds, None);
+    create_editor_window(&mut app, window_bounds, None);
 
     // Event loop
     app.running = true;
@@ -153,17 +130,37 @@ fn main() -> turbo_vision::core::error::Result<()> {
             // AFTER desktop handles events, check if CM_CLOSE was generated
             // Frame converts MouseUp on close button to CM_CLOSE during handle_event
             // Matches Borland: TWindow::close() calls valid(cmClose) before destroying
-            // In Borland, applications override valid() to prompt. Since we're not
-            // subclassing Window, we intercept CM_CLOSE here instead.
+            // Note: We can't call valid() directly due to borrow checker (it needs &mut app)
+            // So we handle the validation logic inline
             if event.what == EventType::Command && event.command == CM_CLOSE {
                 if app.desktop.child_count() > 0 {
-                    // Prompt user before allowing close (like TFileEditor::valid)
-                    if prompt_save_if_dirty(&mut app, &mut editor_state, true) {
+                    // Check if modified (drop borrow before showing dialog)
+                    let is_modified = get_file_editor(&app)
+                        .map_or(false, |fe| fe.is_modified());
+
+                    let should_close = if is_modified {
+                        // Get title for prompt
+                        let title = get_file_editor(&app)
+                            .map(|fe| fe.get_title())
+                            .unwrap_or_else(|| "Untitled".to_string());
+
+                        // Show save prompt (using FileEditor's validation pattern)
+                        let message = format!("Save changes to {}?", title);
+                        match turbo_vision::views::msgbox::confirmation_box(&mut app, &message) {
+                            cmd if cmd == CM_YES => {
+                                save_file(&mut app);
+                                true
+                            }
+                            cmd if cmd == CM_NO => true,
+                            _ => false, // Cancel
+                        }
+                    } else {
+                        true // Not modified, allow close
+                    };
+
+                    if should_close {
                         // User chose Yes or No - allow the close
-                        // Manually remove the window (Window no longer auto-closes)
                         app.desktop.remove_child(0);
-                        // Reset editor state
-                        editor_state = EditorState::new();
                     }
                     // Clear event whether cancelled or completed
                     event.clear();
@@ -177,46 +174,86 @@ fn main() -> turbo_vision::core::error::Result<()> {
             if event.what == EventType::Command {
                 match event.command {
                     CM_QUIT => {
-                        let has_window = app.desktop.child_count() > 0;
-                        if prompt_save_if_dirty(&mut app, &mut editor_state, has_window) {
+                        let should_quit = if app.desktop.child_count() > 0 {
+                            let is_modified = get_file_editor(&app)
+                                .map_or(false, |fe| fe.is_modified());
+
+                            if is_modified {
+                                let title = get_file_editor(&app)
+                                    .map(|fe| fe.get_title())
+                                    .unwrap_or_else(|| "Untitled".to_string());
+
+                                let message = format!("Save changes to {}?", title);
+                                match turbo_vision::views::msgbox::confirmation_box(&mut app, &message) {
+                                    cmd if cmd == CM_YES => {
+                                        save_file(&mut app);
+                                        true
+                                    }
+                                    cmd if cmd == CM_NO => true,
+                                    _ => false,
+                                }
+                            } else {
+                                true
+                            }
+                        } else {
+                            true
+                        };
+
+                        if should_quit {
                             app.running = false;
                         }
                     }
                     CM_NEW => {
-                        let has_window = app.desktop.child_count() > 0;
-                        if prompt_save_if_dirty(&mut app, &mut editor_state, has_window) {
+                        let should_proceed = if app.desktop.child_count() > 0 {
+                            let is_modified = get_file_editor(&app)
+                                .map_or(false, |fe| fe.is_modified());
+
+                            if is_modified {
+                                let title = get_file_editor(&app)
+                                    .map(|fe| fe.get_title())
+                                    .unwrap_or_else(|| "Untitled".to_string());
+
+                                let message = format!("Save changes to {}?", title);
+                                match turbo_vision::views::msgbox::confirmation_box(&mut app, &message) {
+                                    cmd if cmd == CM_YES => {
+                                        save_file(&mut app);
+                                        true
+                                    }
+                                    cmd if cmd == CM_NO => true,
+                                    _ => false,
+                                }
+                            } else {
+                                true
+                            }
+                        } else {
+                            true
+                        };
+
+                        if should_proceed {
                             if app.desktop.child_count() > 0 {
                                 app.desktop.remove_child(0);
                             }
-                            editor_state = EditorState::new();
                             // Use RELATIVE coordinates for desktop
                             let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
-                            create_editor_window(&mut app, &mut editor_state, window_bounds, None);
+                            create_editor_window(&mut app, window_bounds, None);
                         }
                     }
                     CM_OPEN => {
                         if let Some(path) = show_file_open_dialog(&mut app) {
-                            if let Ok(content) = fs::read_to_string(&path) {
-                                // Remove old window and create new one with loaded file
-                                if app.desktop.child_count() > 0 {
-                                    app.desktop.remove_child(0);
-                                }
-                                editor_state = EditorState::new();
-                                // Use RELATIVE coordinates for desktop
-                                let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
-                                create_editor_window(&mut app, &mut editor_state, window_bounds, Some((path, &content)));
-                            } else {
-                                show_error(&mut app, "Error", "Failed to open file");
+                            // Remove old window and create new one with loaded file
+                            if app.desktop.child_count() > 0 {
+                                app.desktop.remove_child(0);
                             }
+                            // Use RELATIVE coordinates for desktop
+                            let window_bounds = Rect::new(5, 1, width as i16 - 5, height as i16 - 4);
+                            create_editor_window(&mut app, window_bounds, Some(path));
                         }
                     }
                     CM_SAVE => {
-                        save_file(&mut app, &mut editor_state);
+                        save_file(&mut app);
                     }
                     CM_SAVE_AS => {
-                        if save_file_as(&mut app, &mut editor_state) {
-                            // Window title updates automatically via get_filename()
-                        }
+                        save_file_as(&mut app);
                     }
                     CM_FIND => {
                         if let Some(search_text) = search_box(&mut app, "Find") {
@@ -249,7 +286,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
                         }
                     }
                     CM_ANALYZE => {
-                        analyze_with_rust_analyzer(&mut app, &editor_state);
+                        analyze_with_rust_analyzer(&mut app);
                     }
                     CM_SHOW_ERRORS => {
                         // Show errors from last analysis
@@ -350,72 +387,32 @@ fn init_status_line(r: Rect) -> StatusLine {
     )
 }
 
-/// Create an EditWindow and add it to the desktop
+/// Create a FileEditor and add it to the desktop
 /// Matches Borland: TEditWindow with TFileEditor
 fn create_editor_window(
     app: &mut Application,
-    state: &mut EditorState,
     bounds: Rect,
-    file_data: Option<(PathBuf, &str)>,  // (path, content)
+    file_path: Option<PathBuf>,
 ) {
-    let title = file_data
+    let title = file_path
         .as_ref()
-        .and_then(|(path, _)| path.file_name().and_then(|n| n.to_str()))
+        .and_then(|p| p.file_name().and_then(|n| n.to_str()))
         .unwrap_or("Untitled");
 
-    let mut edit_window = EditWindow::new(bounds, title);
+    let mut file_editor = FileEditor::new(bounds, title);
 
     // Set Rust syntax highlighting
-    edit_window.editor_rc().borrow_mut().set_highlighter(Box::new(RustHighlighter::new()));
+    file_editor.edit_window_mut().editor_rc().borrow_mut().set_highlighter(Box::new(RustHighlighter::new()));
 
     // Load file if provided
-    if let Some((path, content)) = file_data {
-        edit_window.editor_rc().borrow_mut().set_text(content);
-        let _ = edit_window.load_file(&path);
-        state.filename = Some(path);
-    }
-
-    // Add to desktop (matches Borland: desktop->insert(new TEditWindow(...)))
-    app.desktop.add(Box::new(edit_window));
-}
-
-fn prompt_save_if_dirty(app: &mut Application, state: &mut EditorState, has_window: bool) -> bool {
-    // If no window is open, allow the operation
-    if !has_window {
-        return true;
-    }
-
-    // Check if editor is modified
-    let is_modified = get_edit_window(app)
-        .map_or(false, |w| w.is_modified());
-
-    // Only prompt if actually modified
-    if !is_modified {
-        return true;
-    }
-
-    let message = format!("Save changes to {}?", state.get_title());
-    let result = confirmation_box(app, &message);
-
-    match result {
-        CM_YES => {
-            // Save and continue
-            if state.filename.is_some() {
-                save_file(app, state)
-            } else {
-                save_file_as(app, state)
-            }
+    if let Some(path) = file_path {
+        if let Err(e) = file_editor.load_file(path) {
+            eprintln!("Failed to load file: {}", e);
         }
-        CM_NO => {
-            // Don't save but continue
-            true
-        }
-        CM_CANCEL => {
-            // Cancel the operation
-            false
-        }
-        _ => false,
     }
+
+    // Add to desktop (matches Borland: desktop->insert(new TFileEditor(...)))
+    app.desktop.add(Box::new(file_editor));
 }
 
 fn show_file_open_dialog(app: &mut Application) -> Option<PathBuf> {
@@ -434,51 +431,38 @@ fn show_file_open_dialog(app: &mut Application) -> Option<PathBuf> {
     file_dialog.execute(app)
 }
 
-fn save_file(app: &mut Application, state: &mut EditorState) -> bool {
-    if state.filename.is_none() {
-        return save_file_as(app, state);
-    }
-
-    // Get current text from the editor
-    let window = match get_edit_window_mut(app) {
-        Some(w) => w,
-        None => return false,
+fn save_file(app: &mut Application) {
+    let file_editor = match get_file_editor_mut(app) {
+        Some(fe) => fe,
+        None => return,
     };
 
-    if let Some(ref path) = state.filename {
-        if window.save_file().is_ok() || {
-            // Fallback: manual save if window doesn't have filename set
-            let content = window.editor_rc().borrow().get_text();
-            fs::write(path, content).is_ok()
-        } {
+    match file_editor.save() {
+        Ok(true) => {
             show_message(app, "Save", "File saved successfully");
-            true
-        } else {
-            show_error(app, "Error", "Failed to save file");
-            false
         }
-    } else {
-        false
+        Ok(false) => {
+            // No filename, need save_as
+            save_file_as(app);
+        }
+        Err(_) => {
+            show_error(app, "Error", "Failed to save file");
+        }
     }
 }
 
-fn save_file_as(app: &mut Application, state: &mut EditorState) -> bool {
+fn save_file_as(app: &mut Application) {
     if let Some(path) = show_file_save_dialog(app) {
-        let window = match get_edit_window_mut(app) {
-            Some(w) => w,
-            None => return false,
+        let file_editor = match get_file_editor_mut(app) {
+            Some(fe) => fe,
+            None => return,
         };
 
-        if window.save_as(&path).is_ok() {
-            state.filename = Some(path);
+        if file_editor.save_as(path).is_ok() {
             show_message(app, "Save", "File saved successfully");
-            true
         } else {
             show_error(app, "Error", "Failed to save file");
-            false
         }
-    } else {
-        false
     }
 }
 
@@ -498,7 +482,7 @@ fn show_file_save_dialog(app: &mut Application) -> Option<PathBuf> {
     file_dialog.execute(app)
 }
 
-fn analyze_with_rust_analyzer(app: &mut Application, state: &EditorState) {
+fn analyze_with_rust_analyzer(app: &mut Application) {
     // For now, just show a message about rust-analyzer integration
     // In a real implementation, we would:
     // 1. Save the file temporarily
@@ -506,7 +490,10 @@ fn analyze_with_rust_analyzer(app: &mut Application, state: &EditorState) {
     // 3. Parse the results
     // 4. Display errors/warnings
 
-    if state.filename.is_none() {
+    let has_filename = get_file_editor(app)
+        .map_or(false, |fe| fe.filename().is_some());
+
+    if !has_filename {
         show_error(app, "Analysis", "Please save the file first");
         return;
     }
