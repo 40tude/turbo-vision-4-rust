@@ -799,6 +799,51 @@ impl Editor {
         self.ensure_cursor_visible();
     }
 
+    /// Move cursor left (previous character), wrapping to previous line if at start
+    fn move_cursor_left(&mut self, extend_selection: bool) {
+        if !extend_selection {
+            self.selection_start = None;
+        } else if self.selection_start.is_none() {
+            self.selection_start = Some(self.cursor);
+        }
+
+        if self.cursor.x > 0 {
+            // Not at start of line - move left within current line
+            self.cursor.x -= 1;
+        } else if self.cursor.y > 0 {
+            // At start of line - wrap to end of previous line
+            self.cursor.y -= 1;
+            let line_char_len = self.lines[self.cursor.y as usize].chars().count() as i16;
+            self.cursor.x = line_char_len;
+        }
+        // else: at position (0,0) - can't move further left
+
+        self.ensure_cursor_visible();
+    }
+
+    /// Move cursor right (following character), wrapping to next line if at end
+    fn move_cursor_right(&mut self, extend_selection: bool) {
+        if !extend_selection {
+            self.selection_start = None;
+        } else if self.selection_start.is_none() {
+            self.selection_start = Some(self.cursor);
+        }
+
+        let line_char_len = self.lines[self.cursor.y as usize].chars().count() as i16;
+
+        if self.cursor.x < line_char_len {
+            // Not at end of line - move right within current line
+            self.cursor.x += 1;
+        } else if self.cursor.y < (self.lines.len() - 1) as i16 {
+            // At end of line - wrap to start of following line
+            self.cursor.y += 1;
+            self.cursor.x = 0;
+        }
+        // else: at end of last line - can't move further right
+
+        self.ensure_cursor_visible();
+    }
+
     fn has_selection(&self) -> bool {
         self.selection_start.is_some()
     }
@@ -1224,11 +1269,13 @@ impl View for Editor {
                     event.clear();
                 }
                 KB_LEFT => {
-                    self.move_cursor(-1, 0, shift_pressed);
+                    // Move left (previous character), wrapping to previous line if at start
+                    self.move_cursor_left(shift_pressed);
                     event.clear();
                 }
                 KB_RIGHT => {
-                    self.move_cursor(1, 0, shift_pressed);
+                    // Move right (following character), wrapping to following line if at end
+                    self.move_cursor_right(shift_pressed);
                     event.clear();
                 }
                 KB_HOME => {
