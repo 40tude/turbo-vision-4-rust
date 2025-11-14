@@ -31,9 +31,6 @@ use turbo_vision::views::window::WindowBuilder;
 
 const CMD_ABOUT: u16 = 100;
 const CMD_HELP: u16 = 101;
-// const CMD_TILE: u16 = 101;
-// const CMD_CASCADE: u16 = 101;
-// const CMD_NEXT: u16 = 101;
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
@@ -72,13 +69,27 @@ fn run_event_loop(app: &mut Application) {
             // Convert global keyboard shortcuts to commands so that F1, Ctrl+N etc. work even when menus are closed
             handle_global_shortcuts(&mut event);
 
-            // Desktop handles events (window drag, resize, z-order)
-            app.desktop.handle_event(&mut event);
+            // IMPORTANT: Event handling order matters!
+            // When a menu is open, it must handle events BEFORE the desktop to capture arrow keys.
+            // Otherwise, the active window would consume arrow keys instead of the menu.
+            //
+            // Order when menu is open:
+            //   1. Menu bar (consumes arrow keys for navigation)
+            //   2. Desktop (only processes events the menu didn't consume)
+            //
+            // Order when menu is closed:
+            //   1. Menu bar (captures Alt+F, Alt+W, etc. to open menus)
+            //   2. Desktop (handles window interactions, arrow keys for scrolling)
+            //
+            // This matches Borland Turbo Vision behavior where menus have priority when active.
 
-            // Menu bar handles events
+            // Menu bar handles events FIRST (priority when menu is open)
             if let Some(ref mut menu_bar) = app.menu_bar {
                 menu_bar.handle_event(&mut event);
             }
+
+            // Desktop handles events AFTER menu bar (only if not consumed)
+            app.desktop.handle_event(&mut event);
 
             // Status line handles events
             if let Some(ref mut status_line) = app.status_line {
@@ -163,7 +174,7 @@ fn setup_menu_bar(app: &mut Application) {
     ];
     let file_menu = SubMenu::new("~F~ile", Menu::from_items(file_menu_items));
 
-    // Window menu
+    // Window menu - No action behind
     let window_menu_items = vec![
         MenuItem::new("~T~ile", 0, 0, 0),
         MenuItem::new("~C~ascade", 0, 0, 0),
@@ -174,7 +185,7 @@ fn setup_menu_bar(app: &mut Application) {
 
     // Help menu with shortcuts
     let help_menu_items = vec![
-        MenuItem::with_shortcut("~H~elp Index", CMD_HELP, 0, "F1", 0),
+        MenuItem::with_shortcut("~H~elp", CMD_HELP, 0, "F1", 0),
         MenuItem::separator(),
         MenuItem::new("~A~bout", CMD_ABOUT, 0, 0),
     ];
@@ -200,22 +211,14 @@ fn setup_status_line(app: &mut Application) {
 fn setup_win1(app: &mut Application) {
     let mut window1 = WindowBuilder::new().bounds(Rect::new(2, 2, 50, 18)).title("Resize & Shortcuts Demo").build();
 
-    let instructions = "WINDOW RESIZING:\n\
-    \n\
-    Try resizing this window!\n\
-    \n\
-    1. Move your mouse to the\n\
-    bottom-right corner\n\
-    \n\
-    2. Click and drag when you\n\
-    see the last 2 columns\n\
-    and last row\n\
-    \n\
-    3. The window will resize\n\
-    as you drag\n\
-    \n\
-    MINIMUM SIZE: 16x6\n\
-    (enforced automatically)";
+    let instructions = r"WINDOW RESIZING:
+
+1. Move your mouse to the bottom-right corner
+2. Click and drag when you see the last 2 columns and last row
+3. The window will resize as you drag
+
+Note: minimum size = 16x6
+";
 
     let mut text_viewer = TextViewer::new(Rect::new(1, 1, 46, 14)).with_scrollbars(false).with_indicator(false);
     text_viewer.set_text(instructions);
@@ -227,24 +230,21 @@ fn setup_win1(app: &mut Application) {
 fn setup_win2(app: &mut Application) {
     let mut window2 = WindowBuilder::new().bounds(Rect::new(52, 2, 100, 18)).title("Menu Shortcuts").build();
 
-    let shortcuts_info = "KEYBOARD SHORTCUTS:\n\
-        \n\
-        Open the File menu to see\n\
-        keyboard shortcuts displayed\n\
-        right-aligned:\n\
-        \n\
-        New      Ctrl+N\n\
-        Open     Ctrl+O\n\
-        Save     Ctrl+S\n\
-        Exit     Alt+X\n\
-        \n\
-        Help menu also shows:\n\
-        \n\
-        Help     F1\n\
-        \n\
-        Shortcuts are visual aids\n\
-        showing users what keys\n\
-        to press.";
+    let shortcuts_info = r"KEYBOARD SHORTCUTS:
+
+Shortcuts are visual aids showing users what keys to press.
+
+File menu shows:
+New      Ctrl+N
+Open     Ctrl+O
+Save     Ctrl+S
+Exit     Alt+X
+
+Help menu shows:
+Help     F1
+
+Note: F1 can be pressed anytime to show help, but About must be accessed by opening the Help menu.
+";
 
     let mut text_viewer2 = TextViewer::new(Rect::new(1, 1, 44, 14)).with_scrollbars(false).with_indicator(false);
     text_viewer2.set_text(shortcuts_info);
@@ -256,23 +256,23 @@ fn setup_win2(app: &mut Application) {
 fn setup_win3(app: &mut Application) {
     let mut window3 = WindowBuilder::new().bounds(Rect::new(26, 10, 76, 24)).title("Features").build();
 
-    let features = "FEATURES DEMONSTRATED:\n\
-        \n\
-        ✓ Window Resizing\n\
-          - Drag bottom-right corner\n\
-          - Minimum size enforced\n\
-          - Child views auto-update\n\
-        \n\
-        ✓ Menu Shortcuts Display\n\
-          - Right-aligned in menus\n\
-          - Auto-width calculation\n\
-          - Professional appearance\n\
-        \n\
-        ✓ Window Dragging\n\
-          - Click title bar to drag\n\
-          - Z-order management\n\
-        \n\
-        All matching Borland TV!";
+    let features = r"FEATURES DEMONSTRATED:
+
+✓ Window Resizing
+  - Drag bottom-right corner
+  - Minimum size enforced
+  - Child views auto-update
+
+✓ Menu Shortcuts Display
+  - Right-aligned in menus
+  - Auto-width calculation
+  - Professional appearance
+
+✓ Window Dragging
+  - Click title bar to drag
+  - Z-order management
+
+All matching Borland TV!";
 
     let mut text_viewer3 = TextViewer::new(Rect::new(1, 1, 48, 12)).with_scrollbars(false).with_indicator(false);
     text_viewer3.set_text(features);
@@ -286,14 +286,15 @@ fn show_welcome(app: &mut Application) {
     let dialog_height = 15;
 
     let title = "Window Resize & Menu Shortcuts Demo";
-    let text = "This example demonstrates:\n\
-        \n\
-        • Window resizing (drag bottom-right corner)\n\
-        • Menu keyboard shortcuts (displayed right-aligned)\n\
-        • Window dragging (drag title bar)\n\
-        • Multiple overlapping windows\n\
-        \n\
-        Try resizing the windows and check out the File menu!";
+    let text = r"This example demonstrates:
+
+• Window resizing (drag bottom-right corner)
+• Menu keyboard shortcuts (displayed right-aligned)
+• Window dragging (drag title bar)
+• Multiple overlapping windows
+
+Resize the windows and check out the menus.";
+
     show_msg(app, text, title, dialog_width, dialog_height);
 }
 
@@ -303,13 +304,14 @@ fn show_about(app: &mut Application) {
     let dialog_height = 14;
 
     let title = "About";
-    let text = "Turbo Vision for Rust: Version 0.1.8\n\
-        \n\
-        Features:\n\
-        • Status Line Hot Spots (v0.1.8)\n\
-        • Window Resize Support (v0.1.6)\n\
-        • Menu Shortcuts Display (v0.1.7)\n\
-        • Based on Borland Turbo Vision";
+    let text = r"Turbo Vision for Rust: Version 0.1.8
+
+Features:
+• Status Line Hot Spots (v0.1.8)
+• Window Resize Support (v0.1.6)
+• Menu Shortcuts Display (v0.1.7)
+• Based on Borland Turbo Vision";
+
     show_msg(app, text, title, dialog_width, dialog_height);
 }
 
@@ -319,18 +321,18 @@ fn show_help(app: &mut Application) {
     let dialog_height = 19;
 
     let title = "Help";
-    let text = "WINDOW OPERATIONS:\n\
-        Move:   Click and drag the title bar\n\
-        Resize: Click and drag the bottom-right corner\n\
-        Close:  Click the [■] button in the title bar\n\
-        Focus:  Click anywhere on the window\n\
-        \n\
-        MENUS:\n\
-        Open:   Click on menu name or press Alt+Letter\n\
-        Select: Use arrow keys or click on item\n\
-        Close:  Press Esc or click outside menu\n\
-        \n\
-        Keyboard shortcuts are shown in menus.";
+    let text = r"WINDOW OPERATIONS:
+Move:   Click and drag the title bar
+Resize: Click and drag the bottom-right corner
+Close:  Click the [■] button in the title bar
+Focus:  Click anywhere on the window
+
+MENUS:
+Open:   Click on menu name or press Alt+Letter
+Select: Use arrow keys or click on item
+Close:  Press Esc or click outside menu
+
+Keyboard shortcuts are shown in menus.";
     show_msg(app, text, title, dialog_width, dialog_height);
 }
 
