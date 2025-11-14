@@ -1197,57 +1197,245 @@ Turbo Vision implements a true event-driven architecture with efficient CPU yiel
 
 ## Historical Context
 
-### Original Borland (1990s): Busy-Wait
-```cpp
-// Borland: SYSTEM.CPP - TSystemError::resume()
-void TProgram::run() {
-    execute();
-}
+The CPU consumption issue was a significant problem as computing evolved from single-tasking DOS to multitasking operating systems in the 1990s.
 
-void TProgram::getEvent(TEvent& event) {
-    if (pending.what != evNothing) {
+### Evolution Timeline
+
+1. **Original Borland TV (1990)**: Designed for DOS, where busy-waiting was acceptable
+2. **Windows/Linux Era (1995-2000)**: Busy-wait became problematic, consuming CPU from other processes
+3. **K-TVision Fix (1999)**: Quick fix by Salvador E. Tropea - added sleep calls in idle()
+4. **Modern Solution (2018+)**: magiblot's proper event-driven architecture with blocking I/O
+
+### Original Borland TV 1.0: Busy-Wait (100% CPU)
+
+The original implementation was a tight busy-wait loop that continuously polled for events without yielding CPU to the OS.
+
+```cpp
+// Borland TV 1.0: tprogram.cpp
+void TProgram::getEvent(TEvent& event)
+{
+    if (pending.what != evNothing)
+    {
         event = pending;
         pending.what = evNothing;
-    } else {
+    }
+    else
+    {
         event.getMouseEvent();
-        if (event.what == evNothing) {
+        if (event.what == evNothing)
+        {
             event.getKeyEvent();
-            if (event.what == evNothing) {
-                idle();  // ← Called every iteration, even with events!
-            }
+            if (event.what == evNothing)
+                idle();  // ← Called every iteration when no events!
         }
     }
 }
-```
 
-**Problem:** `idle()` called constantly, causing 100% CPU usage even when application was truly idle.
+void TProgram::idle()
+{
+    if (statusLine != 0)
+        statusLine->update();
 
-### K-TVision: Sleep in idle()
-```cpp
-// K-TVision workaround
-void TProgram::idle() {
-    sleep(50);  // Sleep 50ms every iteration
-    TProgram::idle();
+    if (commandSetChanged == True)
+    {
+        message(this, evBroadcast, cmCommandSetChanged, 0);
+        commandSetChanged = False;
+    }
+    // NO CPU RELEASE - returns immediately!
 }
 ```
 
-**Problem:** Reduces CPU but still inefficient - sleeps even when events are present, adds latency.
+**The Problem:** The event loop calls `getEvent()` repeatedly in a tight loop. When there are no events, `idle()` is called but returns immediately. The loop continues spinning, consuming 100% CPU even when truly idle.
 
-### Magiblot's Modern Approach: True Event-Driven
+### K-TVision (1999): Sleep in idle() (~5% CPU)
+
+**Author:** Salvador E. Tropea (SET)
+**Date:** Version 1.0.8 (July 27, 1999)
+**Approach:** Add explicit CPU release calls in the `idle()` method
+
 ```cpp
-// magiblot's tvision
-void TProgram::getEvent(TEvent& event) {
-    // Block waiting for events with timeout
-    if (!pollForEvents(20)) {  // 20ms timeout
-        // Timeout - NO events available
-        idle();
-        event.what = evNothing;
-    } else {
-        // Event received - return immediately WITHOUT calling idle()
-        getNextEvent(event);
+// TProgram static variables
+static char doNotReleaseCPU = 0;  // Default: release CPU enabled
+
+void TProgram::idle()
+{
+    if (statusLine != 0)
+        statusLine->update();
+
+    if (commandSetChanged == True)
+    {
+        message(this, evBroadcast, cmCommandSetChanged, 0);
+        commandSetChanged = False;
+    }
+
+    // SET: Release the CPU unless the user doesn't want it
+    if (!doNotReleaseCPU)
+    {
+        CLY_ReleaseCPU(); // Platform-specific CPU release
     }
 }
 ```
+
+**Platform-Specific Implementations:**
+
+```c
+// Linux (compat/releasec.c)
+void CLY_ReleaseCPU()
+{
+    usleep(1000);   // Sleep for 1ms
+}
+
+// DOS/DJGPP
+void CLY_ReleaseCPU()
+{
+    __dpmi_yield(); // Release time slice to OS
+}
+
+// Windows NT (Anatoli's port)
+void CLY_ReleaseCPU()
+{
+    __tvWin32Yield(-1); // Wait for console messages
+}
+
+// Windows (Vadim's port)
+void CLY_ReleaseCPU()
+{
+    Sleep(100);  // Sleep for 100ms
+}
+```
+
+**From K-TVision readme.txt:**
+```
+10. CPU usage:
+--------------
+
+  Since v1.0.8 the TProgram::idle() member releases the CPU to the OS. If for
+some reason you want to eat 100% of the CPU or you want to use a method
+different than the used by this function just set TProgram::doNotReleaseCPU
+to 1 and the class won't release the CPU.
+```
+
+**Advantages:**
+- ✅ Minimal code changes - only modifies `idle()` method
+- ✅ Backward compatible - applications continue working without modification
+- ✅ Configurable - can disable with `doNotReleaseCPU = 1`
+- ✅ Platform-specific tuning - each platform can optimize sleep duration
+
+**Disadvantages:**
+- ❌ Still calls `idle()` on every iteration, even when events are present
+- ❌ Fixed sleep duration not responsive to actual event arrival
+- ❌ Inconsistent behavior across platforms:
+  - Linux: 1ms (responsive)
+  - DOS: yield (efficient)
+  - Windows: 100ms (very sluggish!)
+- ❌ Adds latency even when events are available
+
+### Magiblot TVision (2018+): Event-Driven (~0% CPU)
+
+**Author:** magiblot
+**Date:** Modern port (2018-2020)
+**Approach:** Replace busy-wait with blocking event wait with timeout
+
+```cpp
+// TProgram static variable
+static int eventTimeoutMs = 20;  // 50 wake-ups per second
+
+int TProgram::eventWaitTimeout()
+{
+    int timerTimeoutMs = min(timerQueue.timeUntilNextTimeout(), (int32_t)INT_MAX);
+    if (timerTimeoutMs < 0)
+        return eventTimeoutMs;
+    if (eventTimeoutMs < 0)
+        return timerTimeoutMs;
+    return min(eventTimeoutMs, timerTimeoutMs);
+}
+
+void TProgram::getEvent(TEvent& event)
+{
+    if (pending.what != evNothing)
+    {
+        event = pending;
+        pending.what = evNothing;
+    }
+    else
+    {
+        // BLOCKS until event or timeout!
+        TEventQueue::waitForEvents(eventWaitTimeout());
+        event.getMouseEvent();
+        if (event.what == evNothing)
+        {
+            event.getKeyEvent();
+            if (event.what == evNothing)
+                idle();  // Only called after timeout, not on every iteration
+        }
+    }
+}
+
+void TProgram::idle()
+{
+    if (statusLine != 0)
+        statusLine->update();
+
+    if (commandSetChanged == True)
+    {
+        message(this, evBroadcast, cmCommandSetChanged, 0);
+        commandSetChanged = False;
+    }
+
+    timerQueue.collectExpiredTimers(handleTimeout, this);
+    // NO explicit sleep needed - waitForEvents already blocked
+}
+```
+
+**Event Waiting Architecture:**
+
+```cpp
+// Platform layer (events.cpp)
+void EventWaiter::waitForEvents(int ms) noexcept
+{
+    auto now = steady_clock::now();
+    const auto end = ms < 0 ? time_point::max() : now + milliseconds(ms);
+    while (!hasReadyEvent() && now <= end)
+    {
+        // Blocks on select/poll/etc
+        pollSources(ms < 0 ? -1 : pollDelayMs(now, end));
+        now = steady_clock::now();
+    }
+}
+
+// Hardware layer (hardware.cpp)
+void THardwareInfo::waitForEvents(int timeoutMs) noexcept
+{
+    if (!eventCount)
+    {
+        // Flush the screen once for every time all events have been processed
+        flushScreen();
+        platf->waitForEvents(timeoutMs);  // Platform-specific blocking wait
+    }
+}
+```
+
+**Key Features:**
+1. **Blocking I/O**: Uses `select()`, `poll()`, or platform-specific mechanisms to block until:
+   - An input event arrives (keyboard/mouse)
+   - A timer expires
+   - The timeout occurs (default 20ms)
+2. **Automatic screen flushing**: Screen updates are flushed when blocking for events
+3. **Timer integration**: Wakes up early for pending timers
+4. **Thread-safe wake-up**: `TEventQueue::wakeUp()` can interrupt the wait from other threads
+
+**Advantages:**
+- ✅ True event-driven - only wakes up when events arrive or timers fire
+- ✅ Lower CPU usage - blocks in kernel, no active polling
+- ✅ More responsive - wakes immediately on events (no sleep delay)
+- ✅ Consistent behavior - same 20ms timeout on all platforms
+- ✅ Better integration - handles timers, screen flushing, multi-threading
+- ✅ Configurable - `TProgram::eventTimeoutMs` can be adjusted
+
+**Disadvantages:**
+- ⚠️ Larger code changes - requires platform abstraction layer
+- ⚠️ More complex - event queue, hardware layer, platform coordination
+- ⚠️ Not compatible with DOS - original BIOS doesn't support blocking input
 
 **Key insight:** `idle()` should only be called when the application is *truly idle* (no events after timeout), not on every iteration.
 
@@ -1595,24 +1783,56 @@ With 20ms timeout:
    }
    ```
 
-## Comparison with Borland
+## Implementation Comparison
 
-| Aspect | Borland (1990s) | Rust (2025) |
-|--------|----------------|-------------|
-| Event wait | Busy polling | Blocking poll (epoll/kqueue) |
-| idle() frequency | Every iteration | Only on timeout (no events) |
-| CPU usage (idle) | 100% | ~0% |
-| Timeout | None | 20ms (configurable) |
-| Animation support | Yes (via idle()) | Yes (via IdleView trait) |
-| Modal dialog animations | Yes (idle() continues) | Yes (overlay widgets) |
-| Thread safety | Not considered | Safe by design (ownership) |
+| Feature | Original TV 1.0 | K-TVision (1999) | Magiblot (2018+) | Rust (2025) |
+|---------|----------------|------------------|------------------|-------------|
+| **CPU Usage (idle)** | 100% | 1-5% | <1% | ~0% |
+| **Event Loop** | Busy-wait | Busy-wait + sleep | Blocking wait | Blocking poll |
+| **Sleep Method** | None | Platform-specific | select/poll | crossterm::poll |
+| **Responsiveness** | Instant | 1-100ms delay | Near-instant | Near-instant |
+| **Code Complexity** | Simple | Simple | Complex | Medium |
+| **Platform Support** | DOS, Windows, Unix | DOS, Windows, Unix | Windows, Unix (no DOS) | All (via crossterm) |
+| **Timer Support** | Manual | Manual | Integrated | Future feature |
+| **Screen Flush** | Manual | Manual | Automatic | Automatic |
+| **Configurability** | None | `doNotReleaseCPU` | `eventTimeoutMs` | Duration parameter |
+| **Timeout** | None | Varies (1-100ms) | 20ms | 20ms (configurable) |
+| **Animation Support** | Yes (via idle()) | Yes (via idle()) | Yes (via idle()) | Yes (IdleView trait) |
+| **Modal Animations** | Yes | Yes | Yes | Yes (overlay widgets) |
+| **Thread Safety** | No | No | Yes | Safe by design |
 
 ## References
 
-- **Original implementation**: `src/app/application.rs:205-230` (get_event)
+### Rust Implementation
+
+- **Core implementation**: `src/app/application.rs:205-230` (get_event method)
 - **Modal loops**: `src/views/dialog.rs:85-150` (Dialog::execute)
+- **File dialog**: `src/views/file_dialog.rs` (FileDialog::execute)
+- **IdleView trait**: `src/views/view.rs` (trait definition)
 - **Animation example**: `examples/showcase.rs:154-259` (CrabWidget)
-- **Historical context**: `local-only/IDLE.md` (magiblot's documentation)
+
+### Historical Source Files
+
+**Borland TV 1.0 (Original)**:
+- `local-only/legacy/tv1.0/source/TPROGRAM.CPP` - Original busy-wait implementation
+
+**K-TVision (Salvador E. Tropea)**:
+- `local-only/k-tvision/classes/tprogram.cc` - idle() with CPU release
+- `local-only/k-tvision/include/tv/program.h` - doNotReleaseCPU declaration
+- `local-only/k-tvision/compat/releasec.c` - Platform-specific CLY_ReleaseCPU()
+- `local-only/k-tvision/readme.txt` - Documentation (section 10: CPU usage)
+- `local-only/k-tvision/change1.log` - Change history (revision 1.82)
+
+**Magiblot TVision (Modern Port)**:
+- `local-only/magiblot-tvision/source/tvision/tprogram.cpp` - Event-driven implementation
+- `local-only/magiblot-tvision/source/platform/events.cpp` - EventWaiter::waitForEvents()
+- `local-only/magiblot-tvision/source/platform/hardware.cpp` - THardwareInfo layer
+- `local-only/magiblot-tvision/README.md` - Project documentation
+
+### Documentation
+
+- **This document**: Comprehensive idle processing architecture
+- **Historical analysis**: `local-only/IDLE.md` - Detailed comparison of all approaches
 - **Borland reference**: Turbo Vision 2.0 source - `tprogram.cc:105-174`
 
 ---
