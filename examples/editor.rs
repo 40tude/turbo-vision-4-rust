@@ -15,8 +15,7 @@ use turbo_vision::views::{
     dialog::DialogBuilder,
     button::ButtonBuilder,
     static_text::StaticTextBuilder,
-    window::WindowBuilder,
-    editor::Editor,
+    edit_window::EditWindow,
     syntax::RustHighlighter,
     view::View,
 };
@@ -115,23 +114,20 @@ Make some changes, then use Ctrl+Z to undo.\n\
 \n\
 Press ESC to exit.";
 
-    // Create modal window with editor
-    let mut window = WindowBuilder::new()
-        .bounds(Rect::new(5, 3, 75, 22))
-        .title("Basic Editing Demo")
-        .build();
+    // Create EditWindow with editor, scrollbars, and indicator
+    let mut edit_window = EditWindow::new(
+        Rect::new(5, 3, 75, 22),
+        "Basic Editing Demo"
+    );
 
-    let editor_bounds = Rect::new(1, 1, 69, 18);
-    let mut editor = Editor::new(editor_bounds);
-    editor.set_text(sample_text);
-    editor.set_auto_indent(true);
-
-    window.add(Box::new(editor));
+    // Set text and configure editor
+    edit_window.editor_rc().borrow_mut().set_text(sample_text);
+    edit_window.editor_rc().borrow_mut().set_auto_indent(true);
 
     // Make window modal
-    window.set_state(window.state() | SF_MODAL);
+    edit_window.set_state(edit_window.state() | SF_MODAL);
 
-    app.exec_view(Box::new(window));
+    app.exec_view(Box::new(edit_window));
 }
 
 fn demo_search_replace(app: &mut Application) {
@@ -165,22 +161,19 @@ in the Editor API but UI controls would need to be added.\n\
 \n\
 Press ESC to exit.";
 
-    // Create modal window with editor
-    let mut window = WindowBuilder::new()
-        .bounds(Rect::new(5, 3, 75, 22))
-        .title("Search and Replace Demo")
-        .build();
+    // Create EditWindow with editor, scrollbars, and indicator
+    let mut edit_window = EditWindow::new(
+        Rect::new(5, 3, 75, 22),
+        "Search and Replace Demo"
+    );
 
-    let editor_bounds = Rect::new(1, 1, 69, 18);
-    let mut editor = Editor::new(editor_bounds);
-    editor.set_text(sample_text);
-
-    window.add(Box::new(editor));
+    // Set text
+    edit_window.editor_rc().borrow_mut().set_text(sample_text);
 
     // Make window modal
-    window.set_state(window.state() | SF_MODAL);
+    edit_window.set_state(edit_window.state() | SF_MODAL);
 
-    app.exec_view(Box::new(window));
+    app.exec_view(Box::new(edit_window));
 }
 
 fn demo_syntax_highlighting(app: &mut Application) {
@@ -240,25 +233,24 @@ fn main() {
 
 "#;
 
-    // Create modal window with editor
-    let mut window = WindowBuilder::new()
-        .bounds(Rect::new(5, 3, 75, 22))
-        .title("Syntax Highlighting Demo")
-        .build();
+    // Create EditWindow with editor, scrollbars, and indicator
+    let mut edit_window = EditWindow::new(
+        Rect::new(5, 3, 75, 22),
+        "Syntax Highlighting Demo"
+    );
 
-    let editor_bounds = Rect::new(1, 1, 69, 18);
-    let mut editor = Editor::new(editor_bounds);
-    editor.set_text(sample_code);
-
-    // Enable Rust syntax highlighting
-    editor.set_highlighter(Box::new(RustHighlighter::new()));
-
-    window.add(Box::new(editor));
+    // Set text and enable Rust syntax highlighting
+    {
+        let editor_rc = edit_window.editor_rc();
+        let mut editor = editor_rc.borrow_mut();
+        editor.set_text(sample_code);
+        editor.set_highlighter(Box::new(RustHighlighter::new()));
+    }
 
     // Make window modal
-    window.set_state(window.state() | SF_MODAL);
+    edit_window.set_state(edit_window.state() | SF_MODAL);
 
-    app.exec_view(Box::new(window));
+    app.exec_view(Box::new(edit_window));
 }
 
 fn demo_file_operations(app: &mut Application) {
@@ -318,20 +310,17 @@ File > Open, File > Save, File > Save As, etc.\n\
 \n\
 Press ESC to exit.";
 
-    // Create modal window with editor
-    let mut window = WindowBuilder::new()
-        .bounds(Rect::new(5, 3, 75, 22))
-        .title("File Operations Demo")
-        .build();
+    // Create EditWindow with editor, scrollbars, and indicator
+    let mut edit_window = EditWindow::new(
+        Rect::new(5, 3, 75, 22),
+        "File Operations Demo"
+    );
 
-    let editor_bounds = Rect::new(1, 1, 69, 18);
-    let mut editor = Editor::new(editor_bounds);
-    editor.set_text(sample_text);
-
-    window.add(Box::new(editor));
+    // Set text
+    edit_window.editor_rc().borrow_mut().set_text(sample_text);
 
     // Make window modal
-    window.set_state(window.state() | SF_MODAL);
+    edit_window.set_state(edit_window.state() | SF_MODAL);
 
-    app.exec_view(Box::new(window));
+    app.exec_view(Box::new(edit_window));
 }
