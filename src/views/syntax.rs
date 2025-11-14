@@ -290,7 +290,15 @@ impl SyntaxHighlighter for RustHighlighter {
                 continue;
             }
 
-            // Skip other characters (whitespace, punctuation)
+            // Special characters (braces, parentheses, brackets, semicolons, etc.)
+            // Create tokens for these so they're visible with proper color
+            if matches!(ch, '{' | '}' | '(' | ')' | '[' | ']' | ';' | ',' | ':' | '.' | '?' | '@' | '#') {
+                tokens.push(Token::new(i, i + 1, TokenType::Special));
+                i += 1;
+                continue;
+            }
+
+            // Skip whitespace (don't create tokens for it)
             i += 1;
         }
 

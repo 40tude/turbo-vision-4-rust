@@ -470,6 +470,14 @@ impl View for EditWindow {
     fn get_palette(&self) -> Option<crate::core::palette::Palette> {
         self.window.get_palette()
     }
+
+    fn get_end_state(&self) -> crate::core::command::CommandId {
+        self.window.get_end_state()
+    }
+
+    fn set_end_state(&mut self, command: crate::core::command::CommandId) {
+        self.window.set_end_state(command);
+    }
 }
 
 #[cfg(test)]
