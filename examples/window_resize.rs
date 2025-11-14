@@ -31,9 +31,9 @@ use turbo_vision::views::window::WindowBuilder;
 
 const CMD_ABOUT: u16 = 100;
 const CMD_HELP: u16 = 101;
-const CMD_TILE: u16 = 101;
-const CMD_CASCADE: u16 = 101;
-const CMD_NEXT: u16 = 101;
+// const CMD_TILE: u16 = 101;
+// const CMD_CASCADE: u16 = 101;
+// const CMD_NEXT: u16 = 101;
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
@@ -165,10 +165,10 @@ fn setup_menu_bar(app: &mut Application) {
 
     // Window menu
     let window_menu_items = vec![
-        MenuItem::new("~T~ile", CMD_TILE, 0, 0),
-        MenuItem::new("~C~ascade", CMD_CASCADE, 0, 0),
+        MenuItem::new("~T~ile", 0, 0, 0),
+        MenuItem::new("~C~ascade", 0, 0, 0),
         MenuItem::separator(),
-        MenuItem::new("~N~ext", CMD_NEXT, 0, 0),
+        MenuItem::new("~N~ext", 0, 0, 0),
     ];
     let window_menu = SubMenu::new("~W~indow", Menu::from_items(window_menu_items));
 
