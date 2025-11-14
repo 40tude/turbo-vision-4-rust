@@ -2,30 +2,30 @@
 // Biorhythm Calculator - Working Demo
 // Displays biorhythm charts with semi-graphical ASCII visualization
 
+use std::cell::RefCell;
+use std::f64::consts::PI;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use turbo_vision::app::Application;
-use turbo_vision::views::{
-    dialog::DialogBuilder,
-    button::ButtonBuilder,
-    static_text::StaticTextBuilder,
-    input_line::InputLineBuilder,
-    menu_bar::{MenuBar, SubMenu},
-    status_line::{StatusLine, StatusItem},
-    View,
-    validator::RangeValidator,
-};
-use turbo_vision::core::command::{CM_QUIT, CM_OK, CM_CANCEL, CM_CLOSE};
-use turbo_vision::core::event::{Event, EventType, KB_F1, KB_F10};
+use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_OK, CM_QUIT};
+use turbo_vision::core::draw::DrawBuffer;
+use turbo_vision::core::event::{Event, EventType, KB_ALT_C, KB_ALT_X, KB_CTRL_C, KB_ESC_ESC, KB_F1, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
+use turbo_vision::core::palette::{Attr, TvColor, colors};
 use turbo_vision::core::state::*;
-use turbo_vision::core::palette::{colors, Attr, TvColor};
-use turbo_vision::core::draw::DrawBuffer;
 use turbo_vision::terminal::Terminal;
 use turbo_vision::views::view::write_line_to_terminal;
-use std::f64::consts::PI;
-use std::sync::{Arc, Mutex};
-use std::rc::Rc;
-use std::cell::RefCell;
+use turbo_vision::views::{
+    View,
+    button::ButtonBuilder,
+    dialog::DialogBuilder,
+    input_line::InputLineBuilder,
+    menu_bar::{MenuBar, SubMenu},
+    static_text::StaticTextBuilder,
+    status_line::{StatusItem, StatusLine},
+    validator::RangeValidator,
+};
 
 // Custom commands
 const CM_BIORHYTHM: u16 = 100;
@@ -45,7 +45,13 @@ fn days_in_month(month: u32, year: i32) -> u32 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
-        2 => if is_leap_year(year) { 29 } else { 28 },
+        2 => {
+            if is_leap_year(year) {
+                29
+            } else {
+                28
+            }
+        }
         _ => 0,
     }
 }
@@ -120,7 +126,7 @@ fn calculate_days_alive(birth_year: i32, birth_month: u32, birth_day: u32) -> Op
 
     let days_alive = today_days - birth_days;
     if days_alive < 0 {
-        None  // Birth date is in the future
+        None // Birth date is in the future
     } else {
         Some(days_alive)
     }
@@ -160,11 +166,7 @@ struct BiorhythmChart {
 
 impl BiorhythmChart {
     fn new(bounds: Rect, biorhythm: Arc<Mutex<Option<Biorhythm>>>) -> Self {
-        Self {
-            bounds,
-            biorhythm,
-            state: SF_VISIBLE,
-        }
+        Self { bounds, biorhythm, state: SF_VISIBLE }
     }
 }
 
@@ -225,7 +227,7 @@ impl View for BiorhythmChart {
                 } else if y == center_y {
                     // Center Y-axis label and horizontal line
                     line.move_str(4, " 0.0", colors::DIALOG_NORMAL);
-                    for x in 9..9+chart_width {
+                    for x in 9..9 + chart_width {
                         line.move_char(x, '-', colors::DIALOG_NORMAL, 1);
                     }
                 } else if y == chart_top + chart_height {
@@ -259,7 +261,8 @@ impl View for BiorhythmChart {
 
                             if target_y == y {
                                 let x = 9 + i;
-                                if x != today_x {  // Don't overwrite today marker
+                                if x != today_x {
+                                    // Don't overwrite today marker
                                     line.move_char(x, *symbol, *color, 1);
                                 }
                             }
@@ -306,16 +309,19 @@ impl View for BiorhythmChart {
     }
 }
 
-fn create_biorhythm_dialog(prev_day: &str, prev_month: &str, prev_year: &str, _screen_width: u16, _screen_height: u16) -> (turbo_vision::views::dialog::Dialog, Rc<RefCell<String>>, Rc<RefCell<String>>, Rc<RefCell<String>>) {
+fn create_biorhythm_dialog(
+    prev_day: &str,
+    prev_month: &str,
+    prev_year: &str,
+    _screen_width: u16,
+    _screen_height: u16,
+) -> (turbo_vision::views::dialog::Dialog, Rc<RefCell<String>>, Rc<RefCell<String>>, Rc<RefCell<String>>) {
     // Dialog dimensions: 50 wide, 12 tall
     let dialog_width = 50i16;
     let dialog_height = 12i16;
 
     // Create dialog with dummy position - OF_CENTERED will auto-center it
-    let mut dialog = DialogBuilder::new()
-        .bounds(Rect::new(0, 0, dialog_width, dialog_height))
-        .title("Enter Birth Date")
-        .build();
+    let mut dialog = DialogBuilder::new().bounds(Rect::new(0, 0, dialog_width, dialog_height)).title("Enter Birth Date").build();
 
     // Enable automatic centering (matches Borland's ofCentered option)
     dialog.set_options(OF_CENTERED);
@@ -323,10 +329,12 @@ fn create_biorhythm_dialog(prev_day: &str, prev_month: &str, prev_year: &str, _s
     // Get today's date for display
     let (today_year, today_month, today_day) = get_current_date();
 
-    dialog.add(Box::new(StaticTextBuilder::new()
-        .bounds(Rect::new(2, 2, 46, 4))
-        .text(&format!("Enter your birth date (Today: {}/{}/{})", today_day, today_month, today_year))
-        .build()));
+    dialog.add(Box::new(
+        StaticTextBuilder::new()
+            .bounds(Rect::new(2, 2, 46, 4))
+            .text(&format!("Enter your birth date (Today: {}/{}/{})", today_day, today_month, today_year))
+            .build(),
+    ));
 
     // Labels
     dialog.add(Box::new(StaticTextBuilder::new().bounds(Rect::new(2, 4, 12, 5)).text("Day:").build()));
@@ -341,37 +349,27 @@ fn create_biorhythm_dialog(prev_day: &str, prev_month: &str, prev_year: &str, _s
     // Input fields with validators
     // Day: 1-31
     let day_validator = Rc::new(RefCell::new(RangeValidator::new(1, 31)));
-    let mut day_input = InputLineBuilder::new()
-        .bounds(Rect::new(12, 4, 18, 5))
-        .max_length(2)
-        .data(Rc::clone(&day_data))
-        .build();
+    let mut day_input = InputLineBuilder::new().bounds(Rect::new(12, 4, 18, 5)).max_length(2).data(Rc::clone(&day_data)).build();
     day_input.set_validator(day_validator);
     dialog.add(Box::new(day_input));
 
     // Month: 1-12
     let month_validator = Rc::new(RefCell::new(RangeValidator::new(1, 12)));
-    let mut month_input = InputLineBuilder::new()
-        .bounds(Rect::new(12, 5, 18, 6))
-        .max_length(2)
-        .data(Rc::clone(&month_data))
-        .build();
+    let mut month_input = InputLineBuilder::new().bounds(Rect::new(12, 5, 18, 6)).max_length(2).data(Rc::clone(&month_data)).build();
     month_input.set_validator(month_validator);
     dialog.add(Box::new(month_input));
 
     // Year: 1900-2100
     let year_validator = Rc::new(RefCell::new(RangeValidator::new(1900, 2100)));
-    let mut year_input = InputLineBuilder::new()
-        .bounds(Rect::new(12, 6, 20, 7))
-        .max_length(4)
-        .data(Rc::clone(&year_data))
-        .build();
+    let mut year_input = InputLineBuilder::new().bounds(Rect::new(12, 6, 20, 7)).max_length(4).data(Rc::clone(&year_data)).build();
     year_input.set_validator(year_validator);
     dialog.add(Box::new(year_input));
 
     // Buttons (child indices 8 and 9)
     dialog.add(Box::new(ButtonBuilder::new().bounds(Rect::new(15, 8, 25, 10)).title("  OK  ").command(CM_OK).default(true).build()));
-    dialog.add(Box::new(ButtonBuilder::new().bounds(Rect::new(27, 8, 37, 10)).title("Cancel").command(CM_CANCEL).default(false).build()));
+    dialog.add(Box::new(
+        ButtonBuilder::new().bounds(Rect::new(27, 8, 37, 10)).title("Cancel").command(CM_CANCEL).default(false).build(),
+    ));
 
     dialog.set_initial_focus();
     (dialog, day_data, month_data, year_data)
@@ -409,25 +407,26 @@ fn validate_birth_date(day_str: &str, month_str: &str, year_str: &str) -> bool {
 }
 
 fn show_about_dialog(app: &mut Application) {
-    use turbo_vision::helpers::msgbox::{message_box, MF_ABOUT, MF_OK_BUTTON};
+    use turbo_vision::helpers::msgbox::{MF_ABOUT, MF_OK_BUTTON, message_box};
 
-    let message = "Biorhythm Calculator v1.0\n\
-                   \n\
-                   Calculates three cycles:\n\
-                   • Physical (23 days)\n\
-                   • Emotional (28 days)\n\
-                   • Intellectual (33 days)\n\
-                   \n\
-                   Semi-graphical ASCII chart";
+    let message = r"Biorhythm Calculator v1.0
+
+Calculates three cycles:
+  • Physical (23 days)
+  • Emotional (28 days)
+  • Intellectual (33 days)
+
+Semi-graphical ASCII chart";
 
     message_box(app, message, MF_ABOUT | MF_OK_BUTTON);
 }
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
+
     let (width, height) = app.terminal.size();
 
-    let biorhythm_data = Arc::new(Mutex::new(None));  // Start with no data
+    let biorhythm_data = Arc::new(Mutex::new(None)); // Start with no data
 
     // Store previous birth date values (default: empty - will prompt on startup)
     let mut prev_day = String::from("");
@@ -441,9 +440,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
         MenuItem::separator(),
         MenuItem::with_shortcut("E~x~it", CM_QUIT, 0, "Alt+X", 0),
     ]);
-    let help_menu = Menu::from_items(vec![
-        MenuItem::with_shortcut("~A~bout", CM_ABOUT, 0, "F1", 0),
-    ]);
+    let help_menu = Menu::from_items(vec![MenuItem::with_shortcut("~A~bout", CM_ABOUT, 0, "F1", 0)]);
     menu_bar.add_submenu(SubMenu::new("~B~iorhythm", biorhythm_menu));
     menu_bar.add_submenu(SubMenu::new("~H~elp", help_menu));
     app.set_menu_bar(menu_bar);
@@ -461,23 +458,23 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
     // Calculate window size: fixed width, maximum height
     // Account for menu bar (1 row), status line (1 row), and shadow (2 cols, 1 row)
-    let window_width = 76i16;  // Fixed width for optimal chart readability
+    let window_width = 76i16; // Fixed width for optimal chart readability
     let available_width = width as i16;
-    let available_height = height as i16 - 2;  // Subtract menu bar and status line
+    let available_height = height as i16 - 2; // Subtract menu bar and status line
 
     // Use maximum available height with small top/bottom margins
-    let margin_vertical = 1i16;    // Leave 1 row top and bottom
-    let window_height = available_height - (margin_vertical * 2) - 1;  // -1 for shadow
+    let margin_vertical = 1i16; // Leave 1 row top and bottom
+    let window_height = available_height - (margin_vertical * 2) - 1; // -1 for shadow
 
     // Center the window horizontally, position vertically with margin
     let window_x = (available_width - (window_width + 2)) / 2;
-    let window_y = 1 + margin_vertical;  // 1 for menu bar + vertical margin
+    let window_y = 1 + margin_vertical; // 1 for menu bar + vertical margin
 
     // Show birthdate dialog at startup
     // Custom event loop with validation
-    use turbo_vision::core::command_set;
-    use turbo_vision::core::command::CM_COMMAND_SET_CHANGED;
     use std::time::Duration;
+    use turbo_vision::core::command::CM_COMMAND_SET_CHANGED;
+    use turbo_vision::core::command_set;
 
     let (mut dialog, day_data, month_data, year_data) = create_biorhythm_dialog(&prev_day, &prev_month, &prev_year, width, height);
 
@@ -486,11 +483,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     dialog.set_state(old_state | SF_MODAL);
 
     // Initial validation and command state
-    let is_valid = validate_birth_date(
-        &day_data.borrow(),
-        &month_data.borrow(),
-        &year_data.borrow()
-    );
+    let is_valid = validate_birth_date(&day_data.borrow(), &month_data.borrow(), &year_data.borrow());
 
     // Enable/disable CM_OK command based on validation
     if is_valid {
@@ -521,6 +514,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
         // Poll for event
         if let Some(mut event) = app.terminal.poll_event(Duration::from_millis(50)).ok().flatten() {
+            // Convert global keyboard shortcuts to commands so that F1, Ctrl+N etc. work even when menus are closed
+            handle_global_shortcuts(&mut event);
+
             // Handle the event through the desktop child
             if let Some(dialog_view) = app.desktop.window_at_mut(dialog_index) {
                 dialog_view.handle_event(&mut event);
@@ -532,11 +528,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
             }
 
             // After every event, revalidate and update command state
-            let is_valid = validate_birth_date(
-                &day_data.borrow(),
-                &month_data.borrow(),
-                &year_data.borrow()
-            );
+            let is_valid = validate_birth_date(&day_data.borrow(), &month_data.borrow(), &year_data.borrow());
 
             // Enable/disable CM_OK command and broadcast change
             if is_valid {
@@ -584,11 +576,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
         let month_str = month_data.borrow().clone();
         let year_str = year_data.borrow().clone();
 
-        if let (Ok(day), Ok(month), Ok(year)) = (
-            day_str.parse::<u32>(),
-            month_str.parse::<u32>(),
-            year_str.parse::<i32>(),
-        ) {
+        if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<i32>()) {
             if let Some(days_alive) = calculate_days_alive(year, month, day) {
                 *biorhythm_data.lock().unwrap() = Some(Biorhythm::new(days_alive));
                 // Update previous values for next time
@@ -606,12 +594,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
         .build();
 
     // Chart uses interior space (dialog minus frame), with 1-column margins
-    let chart_width = window_width - 2;   // Subtract frame (2 chars total)
+    let chart_width = window_width - 2; // Subtract frame (2 chars total)
     let chart_height = window_height - 2; // Subtract frame (2 chars total)
-    let chart = BiorhythmChart::new(
-        Rect::new(1, 1, chart_width, chart_height),
-        Arc::clone(&biorhythm_data)
-    );
+    let chart = BiorhythmChart::new(Rect::new(1, 1, chart_width, chart_height), Arc::clone(&biorhythm_data));
     main_dialog.add(Box::new(chart));
     app.desktop.add(Box::new(main_dialog));
 
@@ -624,6 +609,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
         app.terminal.flush()?;
 
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+            // Convert global keyboard shortcuts to commands so that F1, Ctrl+N etc. work even when menus are closed
+            handle_global_shortcuts(&mut event);
+
             // Let menu bar handle events first (including F10)
             if let Some(ref mut menu_bar) = app.menu_bar {
                 menu_bar.handle_event(&mut event);
@@ -658,11 +646,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
                         dialog.set_state(old_state | SF_MODAL);
 
                         // Initial validation and command state
-                        let is_valid = validate_birth_date(
-                            &day_data.borrow(),
-                            &month_data.borrow(),
-                            &year_data.borrow()
-                        );
+                        let is_valid = validate_birth_date(&day_data.borrow(), &month_data.borrow(), &year_data.borrow());
 
                         // Enable/disable CM_OK command based on validation
                         if is_valid {
@@ -704,11 +688,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
                                 }
 
                                 // After every event, revalidate and update command state
-                                let is_valid = validate_birth_date(
-                                    &day_data.borrow(),
-                                    &month_data.borrow(),
-                                    &year_data.borrow()
-                                );
+                                let is_valid = validate_birth_date(&day_data.borrow(), &month_data.borrow(), &year_data.borrow());
 
                                 // Enable/disable CM_OK command and broadcast change
                                 if is_valid {
@@ -751,11 +731,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
                             let month_str = month_data.borrow().clone();
                             let year_str = year_data.borrow().clone();
 
-                            if let (Ok(day), Ok(month), Ok(year)) = (
-                                day_str.parse::<u32>(),
-                                month_str.parse::<u32>(),
-                                year_str.parse::<i32>(),
-                            ) {
+                            if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<i32>()) {
                                 if let Some(days_alive) = calculate_days_alive(year, month, day) {
                                     *biorhythm_data.lock().unwrap() = Some(Biorhythm::new(days_alive));
                                     // Update previous values for next time
@@ -794,4 +770,23 @@ fn main() -> turbo_vision::core::error::Result<()> {
     }
 
     Ok(())
+}
+
+/// Convert global keyboard shortcuts to command events
+/// These shortcuts work regardless of whether menus are open or not
+fn handle_global_shortcuts(event: &mut Event) {
+    if event.what != EventType::Keyboard {
+        return;
+    }
+
+    let command = match event.key_code {
+        KB_ALT_C => Some(CM_BIORHYTHM),
+        KB_ALT_X | KB_CTRL_C | KB_ESC_ESC => Some(CM_QUIT),
+        KB_F1 => Some(CM_ABOUT),
+        _ => None,
+    };
+
+    if let Some(cmd) = command {
+        *event = Event::command(cmd);
+    }
 }
