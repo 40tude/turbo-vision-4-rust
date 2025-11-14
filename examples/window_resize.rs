@@ -16,7 +16,7 @@
 // - Minimum size is enforced (16x6)
 // - Use File menu to see keyboard shortcuts displayed
 
-use turbo_vision::core::command::{CM_NEW, CM_OK, CM_OPEN, CM_QUIT, CM_SAVE};
+use turbo_vision::core::command::{CM_NEW, CM_OPEN, CM_QUIT, CM_SAVE};
 use turbo_vision::core::event::{KB_ALT_X, KB_CTRL_C, KB_CTRL_N, KB_CTRL_O, KB_CTRL_S, KB_ESC_ESC, KB_F1, KB_F10};
 use turbo_vision::core::menu_data::{Menu, MenuItem};
 use turbo_vision::prelude::*;
