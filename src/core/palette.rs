@@ -388,13 +388,13 @@ pub mod colors {
     pub const SYNTAX_NORMAL: Attr = Attr::new(TvColor::LightGray, TvColor::Blue);
     pub const SYNTAX_KEYWORD: Attr = Attr::new(TvColor::Yellow, TvColor::Blue);
     pub const SYNTAX_STRING: Attr = Attr::new(TvColor::LightRed, TvColor::Blue);
-    pub const SYNTAX_COMMENT: Attr = Attr::new(TvColor::LightCyan, TvColor::Blue);
+    pub const SYNTAX_COMMENT: Attr = Attr::new(TvColor::White, TvColor::Blue);
     pub const SYNTAX_NUMBER: Attr = Attr::new(TvColor::LightMagenta, TvColor::Blue);
     pub const SYNTAX_OPERATOR: Attr = Attr::new(TvColor::White, TvColor::Blue);
     pub const SYNTAX_IDENTIFIER: Attr = Attr::new(TvColor::LightGray, TvColor::Blue);
     pub const SYNTAX_TYPE: Attr = Attr::new(TvColor::LightGreen, TvColor::Blue);
-    pub const SYNTAX_PREPROCESSOR: Attr = Attr::new(TvColor::LightCyan, TvColor::Blue);
-    pub const SYNTAX_FUNCTION: Attr = Attr::new(TvColor::Cyan, TvColor::Blue);
+    pub const SYNTAX_PREPROCESSOR: Attr = Attr::new(TvColor::White, TvColor::Blue);
+    pub const SYNTAX_FUNCTION: Attr = Attr::new(TvColor::White, TvColor::Blue);
     pub const SYNTAX_SPECIAL: Attr = Attr::new(TvColor::White, TvColor::Blue);
 
     // Help system colors
