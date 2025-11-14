@@ -126,7 +126,42 @@ impl View for Button {
 
         // Shadow attribute - Borland uses spaces where BG is visible, we use blocks where FG is visible
         // So we swap FG/BG: 0x70 (Black on LightGray) becomes 0x07 (LightGray on Black)
-        let shadow_attr = self.map_color(BUTTON_SHADOW).swap();
+        let mut shadow_attr = self.map_color(BUTTON_SHADOW);
+
+        // If shadow mapping failed (button in wrong owner context like Window instead of Dialog),
+        // query the window background directly from the app palette based on owner type
+        if shadow_attr.to_u8() == 0xCF {  // ERROR_ATTR
+            use crate::core::palette::{palettes, Attr, Palette};
+
+            // Get background color by directly querying the appropriate palette
+            // All window/dialog types use index 1 for background
+            let app_palette_data = palettes::get_app_palette();
+            let app_palette = Palette::from_slice(&app_palette_data);
+
+            let bg_app_index = match self.owner_type {
+                super::view::OwnerType::Window => {
+                    // Blue Window: palette[1] = 8 → app[8] = 0x17 (White on Blue)
+                    let window_palette = Palette::from_slice(palettes::CP_BLUE_WINDOW);
+                    window_palette.get(1)
+                }
+                super::view::OwnerType::Dialog => {
+                    // Dialog: palette[1] = 32 → app[32] = 0x70 (Black on LightGray)
+                    let dialog_palette = Palette::from_slice(palettes::CP_GRAY_DIALOG);
+                    dialog_palette.get(1)
+                }
+                super::view::OwnerType::None => {
+                    8  // Default to Blue Window background
+                }
+            };
+
+            let bg_color = app_palette.get(bg_app_index as usize);
+            let bg_attr = Attr::from_u8(bg_color);
+
+            // Shadow is White on owner's background color
+            shadow_attr = Attr::new(crate::core::palette::TvColor::White, bg_attr.bg);
+        }
+
+        let shadow_attr = shadow_attr.swap();
 
         // Shortcut attributes
         let shortcut_attr = if is_disabled {
