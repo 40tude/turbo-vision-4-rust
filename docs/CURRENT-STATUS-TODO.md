@@ -708,7 +708,7 @@ All critical Borland patterns are now implemented. Remaining features are increm
 
 When adding new features:
 
-1. **Reference Borland source** - Check `local-only/borland-tvision/` for patterns
+1. **Reference Borland patterns** - Follow original Turbo Vision 2.0 design patterns
 2. **Write tests** - Aim for comprehensive test coverage
 3. **Update documentation** - Keep this file and README.md current
 4. **Follow patterns** - Use existing trait/struct patterns
@@ -724,8 +724,4 @@ When adding new features:
 
 ---
 
-*This document consolidates:*
-- `local-only/REAL-TO-DO.md`
-- `local-only/TO_DO_NEXT_MINOR.md`
-- `docs/TO-DO-LIST.md`
-- `docs/MISSING_FEATURES.md`
+*This document tracks the current implementation status and future development roadmap for Turbo Vision for Rust.*

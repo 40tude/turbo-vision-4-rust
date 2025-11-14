@@ -4,7 +4,7 @@ Complete reference of all palette mappings from the original Borland Turbo Visio
 
 ## Source
 
-This chart is derived from the original Borland Turbo Vision 2.0 C++ source code located in `local-only/borland/tvision/`.
+This chart is derived from the original Borland Turbo Vision 2.0 C++ source code.
 
 ## Palette Hierarchy
 

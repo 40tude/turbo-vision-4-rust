@@ -1811,29 +1811,17 @@ With 20ms timeout:
 - **IdleView trait**: `src/views/view.rs` (trait definition)
 - **Animation example**: `examples/showcase.rs:154-259` (CrabWidget)
 
-### Historical Source Files
+### External References
 
-**Borland TV 1.0 (Original)**:
-- `local-only/legacy/tv1.0/source/TPROGRAM.CPP` - Original busy-wait implementation
+This implementation is based on the evolution of Turbo Vision idle processing:
 
-**K-TVision (Salvador E. Tropea)**:
-- `local-only/k-tvision/classes/tprogram.cc` - idle() with CPU release
-- `local-only/k-tvision/include/tv/program.h` - doNotReleaseCPU declaration
-- `local-only/k-tvision/compat/releasec.c` - Platform-specific CLY_ReleaseCPU()
-- `local-only/k-tvision/readme.txt` - Documentation (section 10: CPU usage)
-- `local-only/k-tvision/change1.log` - Change history (revision 1.82)
+**Borland TV 1.0 (1990)**: Original busy-wait implementation in `TPROGRAM.CPP` with 100% CPU usage.
 
-**Magiblot TVision (Modern Port)**:
-- `local-only/magiblot-tvision/source/tvision/tprogram.cpp` - Event-driven implementation
-- `local-only/magiblot-tvision/source/platform/events.cpp` - EventWaiter::waitForEvents()
-- `local-only/magiblot-tvision/source/platform/hardware.cpp` - THardwareInfo layer
-- `local-only/magiblot-tvision/README.md` - Project documentation
+**K-TVision (1999)**: Salvador E. Tropea's fix adding `CLY_ReleaseCPU()` in `idle()` with platform-specific sleep calls (1ms on Linux, 100ms on Windows).
 
-### Documentation
+**Magiblot TVision (2018+)**: Modern event-driven architecture using blocking I/O (`select`/`poll`) with `eventTimeoutMs = 20` configurable timeout. Implementations in `tprogram.cpp`, `events.cpp`, and `hardware.cpp`.
 
-- **This document**: Comprehensive idle processing architecture
-- **Historical analysis**: `local-only/IDLE.md` - Detailed comparison of all approaches
-- **Borland reference**: Turbo Vision 2.0 source - `tprogram.cc:105-174`
+**Rust Implementation (2025)**: Adopts magiblot's approach using `crossterm::event::poll()` with 20ms timeout, achieving near-zero CPU usage while maintaining animation support via `IdleView` trait.
 
 ---
 
@@ -3195,11 +3183,7 @@ When fully implemented, the command set system:
 
 ## References
 
-- Borland: `/local-only/borland-tvision/include/tv/cmdset.h`
-- Borland: `/local-only/borland-tvision/classes/tcommand.cc`
-- Borland: `/local-only/borland-tvision/classes/tview.cc` (lines 142-389)
-- Borland: `/local-only/borland-tvision/classes/tbutton.cc` (lines 255-262)
-- Borland: `/local-only/borland-tvision/classes/tprogram.cc` (lines 248-257)
+**Borland Turbo Vision 2.0**: Original implementation in `cmdset.h`, `tcommand.cc`, `tview.cc`, `tbutton.cc`, and `tprogram.cc`. The command set system used bitflags stored in `TCommandSet` (256 bits) with thread-local static `curCommandSet` for tracking enabled commands.
 
 ---
 
