@@ -196,10 +196,11 @@ impl EditWindow {
         let ind_bounds = Rect::new(2, window_height - 1, 16, window_height);
         let indicator = Rc::new(RefCell::new(Indicator::new(ind_bounds)));
 
-        // Create editor with Borland bounds: r.grow(-1,-1) from interior
-        // This means (1, 1, interior_width - 1, interior_height - 1)
+        // Create editor with bounds relative to interior
+        // Interior is the window content area (inset by 1 from frame)
+        // Editor bounds are RELATIVE, so start at (0,0) within interior
         // The editor will overlap with scrollbars at the edges, scrollbars draw on top
-        let editor_bounds = Rect::new(1, 1, interior_width - 1, interior_height - 1);
+        let editor_bounds = Rect::new(0, 0, interior_width, interior_height);
         let editor = Rc::new(RefCell::new(Editor::with_scrollbars(
             editor_bounds,
             Some(Rc::clone(&h_scrollbar)),
@@ -221,7 +222,7 @@ impl EditWindow {
             false,
         );
 
-        Self {
+        let mut edit_window = Self {
             window,
             editor,
             h_scrollbar,
@@ -230,7 +231,12 @@ impl EditWindow {
             h_scrollbar_idx,
             v_scrollbar_idx,
             indicator_idx,
-        }
+        };
+
+        // Give the editor focus immediately when the EditWindow is created
+        edit_window.window.set_focus(true);
+
+        edit_window
     }
 
     /// Load a file into the editor
@@ -437,17 +443,18 @@ impl View for EditWindow {
             let window_height = new_bounds.height();
 
             // Update Editor bounds to match new interior size
-            // Editor is a child of the interior Group, so it needs ABSOLUTE coordinates
+            // Editor is a child of the interior Group, which uses ABSOLUTE coordinates
+            // Interior starts at (window.x + 1, window.y + 1), accounting for frame
             let interior_width = window_width.saturating_sub(2);  // Subtract frame
             let interior_height = window_height.saturating_sub(2);
 
-            if interior_width > 2 && interior_height > 2 {
+            if interior_width > 0 && interior_height > 0 {
                 let interior_a = Point::new(new_bounds.a.x + 1, new_bounds.a.y + 1);  // Interior top-left
                 let editor_bounds = Rect::new(
-                    interior_a.x + 1,
-                    interior_a.y + 1,
-                    interior_a.x + interior_width - 1,
-                    interior_a.y + interior_height - 1,
+                    interior_a.x,
+                    interior_a.y,
+                    interior_a.x + interior_width,
+                    interior_a.y + interior_height,
                 );
                 self.editor.borrow_mut().set_bounds(editor_bounds);
             }
