@@ -207,10 +207,24 @@ fn setup_status_line(app: &mut Application) {
     app.set_status_line(status_line);
 }
 
+/// Create a window with a text viewer
+///
+/// This helper function creates a window containing a TextViewer with the given content.
+/// The TextViewer automatically fills the window's client area with appropriate margins.
+fn create_text_window(app: &mut Application, bounds: Rect, title: &str, content: &str) {
+    let mut window = WindowBuilder::new().bounds(bounds).title(title).build();
+
+    // Calculate TextViewer bounds to fit inside window with margins
+    let text_viewer_bounds = Rect::new(1, 1, bounds.width() - 2, bounds.height() - 4);
+    let mut text_viewer = TextViewer::new(text_viewer_bounds).with_scrollbars(false).with_indicator(false);
+
+    text_viewer.set_text(content);
+    window.add(Box::new(text_viewer));
+    app.desktop.add(Box::new(window));
+}
+
 /// Create window 1 - Instructions
 fn setup_win1(app: &mut Application) {
-    let mut window1 = WindowBuilder::new().bounds(Rect::new(2, 2, 50, 18)).title("Resize & Shortcuts Demo").build();
-
     let instructions = r"WINDOW RESIZING:
 
 1. Move your mouse to the bottom-right corner
@@ -219,17 +233,11 @@ fn setup_win1(app: &mut Application) {
 
 Note: minimum size = 16x6
 ";
-
-    let mut text_viewer = TextViewer::new(Rect::new(1, 1, 46, 14)).with_scrollbars(false).with_indicator(false);
-    text_viewer.set_text(instructions);
-    window1.add(Box::new(text_viewer));
-    app.desktop.add(Box::new(window1));
+    create_text_window(app, Rect::new(2, 2, 50, 18), "Resize & Shortcuts Demo", instructions);
 }
 
 // Create window 2 - Menu Shortcuts Info
 fn setup_win2(app: &mut Application) {
-    let mut window2 = WindowBuilder::new().bounds(Rect::new(52, 2, 100, 18)).title("Menu Shortcuts").build();
-
     let shortcuts_info = r"KEYBOARD SHORTCUTS:
 
 Shortcuts are visual aids showing users what keys to press.
@@ -245,17 +253,11 @@ Help     F1
 
 Note: F1 can be pressed anytime to show help, but About must be accessed by opening the Help menu.
 ";
-
-    let mut text_viewer2 = TextViewer::new(Rect::new(1, 1, 44, 14)).with_scrollbars(false).with_indicator(false);
-    text_viewer2.set_text(shortcuts_info);
-    window2.add(Box::new(text_viewer2));
-    app.desktop.add(Box::new(window2));
+    create_text_window(app, Rect::new(52, 2, 100, 18), "Menu Shortcuts", shortcuts_info);
 }
 
 // Create window 3 - Features
 fn setup_win3(app: &mut Application) {
-    let mut window3 = WindowBuilder::new().bounds(Rect::new(26, 10, 76, 24)).title("Features").build();
-
     let features = r"FEATURES DEMONSTRATED:
 
 ✓ Window Resizing
@@ -273,11 +275,39 @@ fn setup_win3(app: &mut Application) {
   - Z-order management
 
 All matching Borland TV!";
+    create_text_window(app, Rect::new(26, 10, 76, 24), "Features", features);
+}
 
-    let mut text_viewer3 = TextViewer::new(Rect::new(1, 1, 48, 12)).with_scrollbars(false).with_indicator(false);
-    text_viewer3.set_text(features);
-    window3.add(Box::new(text_viewer3));
-    app.desktop.add(Box::new(window3));
+/// Display a modal dialog box with text content and an OK button
+///
+/// Creates a centered dialog containing the given text and an OK button.
+/// The dialog is modal and blocks until the user dismisses it.
+fn show_msg(app: &mut Application, text: &str, title: &str, dialog_width: i16, dialog_height: i16) {
+    let (term_width, term_height) = app.terminal.size();
+
+    let dialog_x = (term_width as i16 - dialog_width) / 2;
+    let dialog_y = (term_height as i16 - dialog_height) / 2;
+
+    let mut dialog = DialogBuilder::new()
+        .bounds(Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height))
+        .title(title)
+        .build();
+
+    let text = StaticTextBuilder::new().bounds(Rect::new(2, 1, dialog_width - 4, dialog_height - 6)).text(text).build();
+    dialog.add(Box::new(text));
+
+    let button_width = 10;
+    let button_x = (dialog_width - 2 - button_width) / 2;
+    let button = ButtonBuilder::new()
+        .bounds(Rect::new(button_x, dialog_height - 4, button_x + button_width, dialog_height - 2))
+        .title("~O~K")
+        .command(CM_OK)
+        .default(true)
+        .build();
+    dialog.add(Box::new(button));
+    dialog.set_initial_focus();
+
+    dialog.execute(app);
 }
 
 /// Prepare content of the welcome dialog box
@@ -334,33 +364,4 @@ Close:  Press Esc or click outside menu
 
 Keyboard shortcuts are shown in menus.";
     show_msg(app, text, title, dialog_width, dialog_height);
-}
-
-/// Display a message in a modal dialog box
-fn show_msg(app: &mut Application, text: &str, title: &str, dialog_width: i16, dialog_height: i16) {
-    let (term_width, term_height) = app.terminal.size();
-
-    let dialog_x = (term_width as i16 - dialog_width) / 2;
-    let dialog_y = (term_height as i16 - dialog_height) / 2;
-
-    let mut dialog = DialogBuilder::new()
-        .bounds(Rect::new(dialog_x, dialog_y, dialog_x + dialog_width, dialog_y + dialog_height))
-        .title(title)
-        .build();
-
-    let text = StaticTextBuilder::new().bounds(Rect::new(2, 1, dialog_width - 4, dialog_height - 6)).text(text).build();
-    dialog.add(Box::new(text));
-
-    let button_width = 10;
-    let button_x = (dialog_width - 2 - button_width) / 2;
-    let button = ButtonBuilder::new()
-        .bounds(Rect::new(button_x, dialog_height - 4, button_x + button_width, dialog_height - 2))
-        .title("~O~K")
-        .command(CM_OK)
-        .default(true)
-        .build();
-    dialog.add(Box::new(button));
-    dialog.set_initial_focus();
-
-    dialog.execute(app);
 }
