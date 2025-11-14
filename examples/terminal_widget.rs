@@ -1,20 +1,76 @@
 // (C) 2025 - Enzo Lombardi
-// Terminal Widget Demo - demonstrates scrolling output viewer
+// Terminal Widget Demo - demonstrates scrolling output viewer with simulated build log
 //
 // This matches Borland's terminal.cc example structure:
 // - Terminal widget inside a Dialog/Window
 // - With horizontal and vertical scrollbars
 // - Buttons inside the same Dialog/Window
+//
+// Enhanced with:
+// - Simulated streaming build log output
+// - Color-coded messages (warnings, errors, success)
+// - Interactive buttons to control log playback
 
+use std::time::{Duration, Instant};
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_OK, CM_QUIT};
+use turbo_vision::core::command::CM_QUIT;
 use turbo_vision::core::event::{EventType, KB_ALT_X};
 use turbo_vision::core::geometry::Rect;
+use turbo_vision::core::palette::Attr;
 use turbo_vision::views::button::ButtonBuilder;
 use turbo_vision::views::dialog::DialogBuilder;
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
 use turbo_vision::views::terminal_widget::TerminalWidget;
 use turbo_vision::views::View;
+
+const CM_START_LOG: u16 = 100;
+const CM_STOP_LOG: u16 = 101;
+const CM_CLEAR_LOG: u16 = 102;
+
+// Simulated build log entries
+const BUILD_LOG: &[(&str, u8)] = &[
+    ("========================================", 0x07),
+    ("Starting build process...", 0x0F),
+    ("", 0x07),
+    ("[00:00.000] Checking dependencies...", 0x07),
+    ("[00:00.123] Found 156 packages", 0x0A),
+    ("[00:00.234] Resolving package versions...", 0x07),
+    ("[00:00.456] Resolution complete", 0x0A),
+    ("", 0x07),
+    ("[00:01.000] Compiling core v0.1.0", 0x0E),
+    ("[00:01.234] Compiling utils v0.2.3", 0x0E),
+    ("[00:01.567] Compiling config v1.0.0", 0x0E),
+    ("[00:02.100] warning: unused import `std::fs`", 0x0C),
+    ("[00:02.101]  --> src/config.rs:12:5", 0x08),
+    ("[00:02.345] Compiling network v0.5.0", 0x0E),
+    ("[00:03.123] Compiling database v2.1.0", 0x0E),
+    ("[00:03.456] warning: field is never read: `timestamp`", 0x0C),
+    ("[00:03.457]  --> src/database/model.rs:45:5", 0x08),
+    ("[00:04.000] Compiling api v1.0.0", 0x0E),
+    ("[00:05.234] Compiling server v0.8.0", 0x0E),
+    ("", 0x07),
+    ("[00:06.000] Building static assets...", 0x07),
+    ("[00:06.500] Bundling JavaScript modules...", 0x07),
+    ("[00:07.000] Minifying CSS files...", 0x07),
+    ("[00:07.500] Optimizing images...", 0x07),
+    ("[00:08.000] Assets ready", 0x0A),
+    ("", 0x07),
+    ("[00:08.500] Running post-build tasks...", 0x07),
+    ("[00:09.000] Generating documentation...", 0x07),
+    ("[00:09.500] Creating distribution package...", 0x07),
+    ("", 0x07),
+    ("[00:10.000] Build Summary:", 0x0F),
+    ("[00:10.000] ================", 0x0F),
+    ("[00:10.000] Compiled: 8 crates", 0x0A),
+    ("[00:10.000] Warnings: 2", 0x0C),
+    ("[00:10.000] Errors: 0", 0x0A),
+    ("[00:10.000] Time: 10.00s", 0x0A),
+    ("", 0x07),
+    ("    Finished dev [unoptimized + debuginfo]", 0x0A),
+    ("", 0x07),
+    ("Build completed successfully!", 0x0A),
+    ("========================================", 0x07),
+];
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
@@ -29,35 +85,60 @@ fn main() -> turbo_vision::core::error::Result<()> {
     );
     app.set_status_line(status_line);
 
-    // Create dialog (matches Borland: TDialog(TRect(0,0,60,18),"Dumb terminal"))
+    // Create dialog (matches Borland structure but larger for more content)
     let mut dialog = DialogBuilder::new()
-        .bounds(Rect::new(10, 3, 70, 21))
-        .title("Dumb Terminal")
+        .bounds(Rect::new(5, 2, 75, 22))
+        .title("Build Output Terminal")
         .build();
 
-    // Create terminal widget inside dialog (matches Borland: TRect(1,1,57,12))
-    // Note: Borland coordinates are relative to dialog interior
-    let mut terminal = TerminalWidget::new(Rect::new(1, 1, 57, 12)).with_scrollbar();
+    // Create terminal widget inside dialog
+    let mut terminal = TerminalWidget::new(Rect::new(1, 1, 66, 14)).with_scrollbar();
 
-    // Add initial content (matches Borland's do_sputn call)
-    terminal.append_text("Hello!");
-    terminal.append_text("That's just a test in the buffer.");
-    terminal.append_text("That's all folks.");
+    // Add initial welcome message
+    terminal.append_text("Build Output Viewer");
+    terminal.append_text("==================");
     terminal.append_text("");
+    terminal.append_text("Press 'Start Log' to simulate build output.");
     terminal.append_text("Use arrow keys or PgUp/PgDn to scroll.");
-    terminal.append_text("Auto-scrolls when at bottom.");
+    terminal.append_text("");
 
     dialog.add(Box::new(terminal));
 
-    // Add OK button (matches Borland: TRect(25,15,35,17),"O~K~")
+    // Add control buttons
     dialog.add(Box::new(ButtonBuilder::new()
-        .bounds(Rect::new(25, 13, 35, 15))
-        .title("~O~K")
-        .command(CM_OK)
+        .bounds(Rect::new(2, 15, 17, 17))
+        .title("~S~tart Log")
+        .command(CM_START_LOG)
+        .default(false)
+        .build()));
+
+    dialog.add(Box::new(ButtonBuilder::new()
+        .bounds(Rect::new(18, 15, 33, 17))
+        .title("S~t~op Log")
+        .command(CM_STOP_LOG)
+        .default(false)
+        .build()));
+
+    dialog.add(Box::new(ButtonBuilder::new()
+        .bounds(Rect::new(34, 15, 49, 17))
+        .title("~C~lear Log")
+        .command(CM_CLEAR_LOG)
+        .default(false)
+        .build()));
+
+    dialog.add(Box::new(ButtonBuilder::new()
+        .bounds(Rect::new(50, 15, 61, 17))
+        .title("~Q~uit")
+        .command(CM_QUIT)
         .default(true)
         .build()));
 
     app.desktop.add(Box::new(dialog));
+
+    // Log playback state
+    let mut log_playing = false;
+    let mut log_index = 0;
+    let mut last_log_time = Instant::now();
 
     // Main event loop
     app.running = true;
@@ -70,9 +151,27 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
         let _ = app.terminal.flush();
 
+        // Simulate log streaming
+        if log_playing && log_index < BUILD_LOG.len() {
+            if last_log_time.elapsed() >= Duration::from_millis(150) {
+                // Access terminal widget (first child of dialog, which is first child of desktop)
+                let dialog_view = app.desktop.child_at_mut(0);
+                if let Some(dialog) = dialog_view.as_any_mut().downcast_mut::<turbo_vision::views::dialog::Dialog>() {
+                    // Get interior group and access first child (terminal)
+                    let terminal_view = dialog.child_at_mut(0);
+                    if let Some(terminal) = terminal_view.as_any_mut().downcast_mut::<TerminalWidget>() {
+                        let (text, color) = BUILD_LOG[log_index];
+                        terminal.append_line_colored(text.to_string(), Attr::from_u8(color));
+                        log_index += 1;
+                        last_log_time = Instant::now();
+                    }
+                }
+            }
+        }
+
         if let Some(mut event) = app
             .terminal
-            .poll_event(std::time::Duration::from_millis(50))
+            .poll_event(Duration::from_millis(50))
             .ok()
             .flatten()
         {
@@ -84,7 +183,36 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
             if event.what == EventType::Command {
                 match event.command {
-                    CM_OK | CM_QUIT => {
+                    CM_START_LOG => {
+                        log_playing = true;
+                        if log_index == 0 {
+                            // Clear welcome message before starting
+                            let dialog_view = app.desktop.child_at_mut(0);
+                            if let Some(dialog) = dialog_view.as_any_mut().downcast_mut::<turbo_vision::views::dialog::Dialog>() {
+                                let terminal_view = dialog.child_at_mut(0);
+                                if let Some(terminal) = terminal_view.as_any_mut().downcast_mut::<TerminalWidget>() {
+                                    terminal.clear();
+                                }
+                            }
+                        }
+                    }
+                    CM_STOP_LOG => {
+                        log_playing = false;
+                    }
+                    CM_CLEAR_LOG => {
+                        log_playing = false;
+                        log_index = 0;
+                        let dialog_view = app.desktop.child_at_mut(0);
+                        if let Some(dialog) = dialog_view.as_any_mut().downcast_mut::<turbo_vision::views::dialog::Dialog>() {
+                            let terminal_view = dialog.child_at_mut(0);
+                            if let Some(terminal) = terminal_view.as_any_mut().downcast_mut::<TerminalWidget>() {
+                                terminal.clear();
+                                terminal.append_text("Log cleared. Press 'Start Log' to replay.");
+                                terminal.append_text("");
+                            }
+                        }
+                    }
+                    CM_QUIT => {
                         app.running = false;
                     }
                     _ => {}
