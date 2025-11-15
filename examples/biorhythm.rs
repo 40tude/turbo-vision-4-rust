@@ -348,19 +348,19 @@ fn create_biorhythm_dialog(
     let year_data = Rc::new(RefCell::new(prev_year.to_string()));
 
     // Input fields with validators
-    // Day: 1-31
+    // Day: [1-31]
     let day_validator = Rc::new(RefCell::new(RangeValidator::new(1, 31)));
     let mut day_input = InputLineBuilder::new().bounds(Rect::new(12, 4, 17, 5)).max_length(2).data(Rc::clone(&day_data)).build();
     day_input.set_validator(day_validator);
     dialog.add(Box::new(day_input));
 
-    // Month: 1-12
+    // Month: [1-12]
     let month_validator = Rc::new(RefCell::new(RangeValidator::new(1, 12)));
     let mut month_input = InputLineBuilder::new().bounds(Rect::new(12, 5, 17, 6)).max_length(2).data(Rc::clone(&month_data)).build();
     month_input.set_validator(month_validator);
     dialog.add(Box::new(month_input));
 
-    // Year: 1900-2100
+    // Year: [1900-2100]
     let year_validator = Rc::new(RefCell::new(RangeValidator::new(1900, 2100)));
     let mut year_input = InputLineBuilder::new().bounds(Rect::new(12, 6, 17, 7)).max_length(4).data(Rc::clone(&year_data)).build();
     year_input.set_validator(year_validator);
@@ -488,14 +488,14 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
     // Initial validation and command state
     let is_valid = validate_birth_date(&day_data.borrow(), &month_data.borrow(), &year_data.borrow());
 
-    // Enable/disable CM_OK command based on validation
+    // Enable/disable CM_OK command based on the previous validation
     if is_valid {
         command_set::enable_command(CM_OK);
     } else {
         command_set::disable_command(CM_OK);
     }
 
-    // Broadcast the change to update button state
+    // Broadcast the change to update button state globally
     let mut broadcast_event = Event::broadcast(CM_COMMAND_SET_CHANGED);
     dialog.handle_event(&mut broadcast_event);
     command_set::clear_command_set_changed();
@@ -518,6 +518,8 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
 
         // Poll for event
         if let Some(mut event) = app.terminal.poll_event(Duration::from_millis(50)).ok().flatten() {
+            handle_global_shortcuts(&mut event);
+
             // Handle the event through the desktop child
             if let Some(dialog_view) = app.desktop.window_at_mut(dialog_index) {
                 dialog_view.handle_event(&mut event);
@@ -686,11 +688,11 @@ fn add_status_line(app: &mut Application) {
     app.set_status_line(status_line);
 }
 
-///
+/// Desing the chart dialog box
+/// Calculate window dimensions
 fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>) {
-    // Calculate window dimensions for the main chart dialog
     let (width, height) = app.terminal.size();
-    let window_width = 76i16; // TODO should not ba hard coded
+    let window_width = 76i16; // TODO should NOT be hard coded
     let available_width = width as i16;
     let available_height = height as i16 - 3; // Subtract menu bar, status line and shadow
     let margin_vertical: i16 = 1;
