@@ -508,7 +508,23 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
 
         // Poll for event
         if let Some(mut event) = app.terminal.poll_event(Duration::from_millis(50)).ok().flatten() {
-            handle_global_shortcuts(&mut event);
+            //handle_global_shortcuts(&mut event);
+
+            // Handle modal-specific shortcuts
+            if event.what == EventType::Keyboard {
+                match event.key_code {
+                    // KB_F1 => {
+                    //     // Show help without converting to command (to avoid interference)
+                    //     show_about_dialog(app);
+                    //     continue; // Skip rest of event processing
+                    // }
+                    KB_ALT_X | KB_CTRL_C | KB_ESC_ESC => {
+                        // Convert quit shortcuts to CM_CANCEL in modal context
+                        event = Event::command(CM_CANCEL);
+                    }
+                    _ => {}
+                }
+            }
 
             // Handle the event through the desktop child
             if let Some(dialog_view) = app.desktop.window_at_mut(dialog_index) {
