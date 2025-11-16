@@ -4,7 +4,6 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use turbo_vision::app::Application;
 use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_OK, CM_QUIT};
 use turbo_vision::core::draw::DrawBuffer;
@@ -15,6 +14,7 @@ use turbo_vision::core::palette::{Attr, TvColor, colors};
 use turbo_vision::core::state::StateFlags;
 use turbo_vision::core::state::{OF_CENTERED, SF_MODAL, SF_VISIBLE};
 use turbo_vision::terminal::Terminal;
+use turbo_vision::views::validator::Validator;
 use turbo_vision::views::view::write_line_to_terminal;
 use turbo_vision::views::{
     View,
@@ -24,12 +24,96 @@ use turbo_vision::views::{
     menu_bar::{MenuBar, SubMenu},
     static_text::StaticTextBuilder,
     status_line::{StatusItem, StatusLine},
-    validator::RangeValidator,
 };
 
 // Custom commands
 const CM_BIORHYTHM: u16 = 100;
 const CM_ABOUT: u16 = 101;
+
+/// DateFieldValidator - validates numeric date field input (day, month, year)
+/// Checks values during typing, not just characters
+struct DateFieldValidator {
+    min: i64,
+    max: i64,
+}
+
+impl DateFieldValidator {
+    fn new(min: i64, max: i64) -> Self {
+        Self { min, max }
+    }
+}
+
+impl Validator for DateFieldValidator {
+    fn is_valid(&self, input: &str) -> bool {
+        // Empty is invalid for final validation
+        if input.is_empty() {
+            return false;
+        }
+
+        // Try to parse as number
+        match input.parse::<i64>() {
+            Ok(value) => value >= self.min && value <= self.max,
+            Err(_) => false,
+        }
+    }
+
+    fn is_valid_input(&self, input: &str, _append: bool) -> bool {
+        // Empty string is valid during typing
+        if input.is_empty() {
+            return true;
+        }
+
+        // Must be all digits
+        if !input.chars().all(|c| c.is_ascii_digit()) {
+            return false;
+        }
+
+        // Try to parse the value
+        match input.parse::<i64>() {
+            Ok(value) => {
+                // Check if value is already out of range
+                if value > self.max {
+                    return false;
+                }
+
+                // For values below minimum, check if they could potentially become valid
+                // by adding more digits. For example, "1" could become "19" or "190"
+                if value < self.min {
+                    // Calculate how many digits would make this potentially valid
+                    // For example: min=1900, input="1" -> could become "1900" (valid)
+                    //              min=1900, input="2" -> could become "20xx" (valid if max >= 2000)
+                    //              min=1, input="4" -> already > max=31, so invalid
+
+                    // Check if we can still add digits to reach the minimum
+                    let input_len = input.len();
+                    let min_str = self.min.to_string();
+                    let max_str = self.max.to_string();
+
+                    // If input length is less than min length, it could still become valid
+                    if input_len < min_str.len() {
+                        return true;
+                    }
+
+                    // If input length equals min/max length but value < min, it's invalid
+                    if input_len >= min_str.len() && input_len >= max_str.len() {
+                        return false;
+                    }
+
+                    // Could still become valid
+                    return true;
+                }
+
+                // Value is within range
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    fn error(&self) {
+        // Error handling via visual feedback in InputLine
+    }
+}
 
 /// Stores the birth date values
 #[derive(Clone, Default)]
@@ -47,11 +131,11 @@ impl BirthDate {
 
 #[derive(Clone)]
 struct Biorhythm {
-    // Number of days alive is inherently non-negative, keep as u32
     days_alive: u32,
 }
 
 impl Biorhythm {
+    /// Create a new biorhythm instance from the number of days alive
     fn new(days_alive: u32) -> Self {
         Self { days_alive }
     }
@@ -61,21 +145,23 @@ impl Biorhythm {
     const EMOTIONAL_CYCLE: f64 = 28.0;
     const INTELLECTUAL_CYCLE: f64 = 33.0;
 
+    /// Calculate sine wave value for a given cycle period and day offset
     fn cycle_value(&self, offset: i32, period: f64) -> f64 {
-        // days may be negative for past offsets
         let days = self.days_alive as i32 + offset;
         (2.0 * std::f64::consts::PI * days as f64 / period).sin()
     }
 
-    // Accept signed offsets for plotting (past/future relative to today)
+    /// Calculate physical cycle value for a given day offset from today
     fn physical(&self, day_offset: i32) -> f64 {
         self.cycle_value(day_offset, Self::PHYSICAL_CYCLE)
     }
 
+    /// Calculate emotional cycle value for a given day offset from today
     fn emotional(&self, day_offset: i32) -> f64 {
         self.cycle_value(day_offset, Self::EMOTIONAL_CYCLE)
     }
 
+    /// Calculate intellectual cycle value for a given day offset from today
     fn intellectual(&self, day_offset: i32) -> f64 {
         self.cycle_value(day_offset, Self::INTELLECTUAL_CYCLE)
     }
@@ -83,12 +169,13 @@ impl Biorhythm {
 
 struct BiorhythmChart {
     bounds: Rect,
-    biorhythm: Arc<Mutex<Option<Biorhythm>>>, // TODO: why not Rc<RefCell<Option<Biorhythm>>> instead?
+    biorhythm: Rc<RefCell<Option<Biorhythm>>>,
     state: StateFlags,
 }
 
 impl BiorhythmChart {
-    fn new(bounds: Rect, biorhythm: Arc<Mutex<Option<Biorhythm>>>) -> Self {
+    /// Create a new biorhythm chart view with the given bounds and shared data
+    fn new(bounds: Rect, biorhythm: Rc<RefCell<Option<Biorhythm>>>) -> Self {
         Self { bounds, biorhythm, state: SF_VISIBLE }
     }
 }
@@ -122,7 +209,7 @@ impl View for BiorhythmChart {
             return;
         }
 
-        let bio_opt = self.biorhythm.lock().expect("Biorhythm mutex poisoned");
+        let bio_opt = self.biorhythm.borrow();
 
         if let Some(ref bio) = *bio_opt {
             // Draw title
@@ -363,19 +450,19 @@ fn create_biorhythm_dialog(state: &BirthDate) -> (turbo_vision::views::dialog::D
 
     // Input fields with validators
     // Day: [1-31]
-    let day_validator = Rc::new(RefCell::new(RangeValidator::new(1, 31)));
+    let day_validator = Rc::new(RefCell::new(DateFieldValidator::new(1, 31)));
     let mut day_input = InputLineBuilder::new().bounds(Rect::new(12, 4, 17, 5)).max_length(2).data(Rc::clone(&day_data)).build();
     day_input.set_validator(day_validator);
     dialog.add(Box::new(day_input));
 
     // Month: [1-12]
-    let month_validator = Rc::new(RefCell::new(RangeValidator::new(1, 12)));
+    let month_validator = Rc::new(RefCell::new(DateFieldValidator::new(1, 12)));
     let mut month_input = InputLineBuilder::new().bounds(Rect::new(12, 5, 17, 6)).max_length(2).data(Rc::clone(&month_data)).build();
     month_input.set_validator(month_validator);
     dialog.add(Box::new(month_input));
 
     // Year: [1900-2100]
-    let year_validator = Rc::new(RefCell::new(RangeValidator::new(1900, 2100)));
+    let year_validator = Rc::new(RefCell::new(DateFieldValidator::new(1900, 2100)));
     let mut year_input = InputLineBuilder::new().bounds(Rect::new(12, 6, 17, 7)).max_length(4).data(Rc::clone(&year_data)).build();
     year_input.set_validator(year_validator);
     dialog.add(Box::new(year_input));
@@ -617,11 +704,11 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDate) -> Opti
 /// # Returns
 /// `true` if the biorhythm was successfully calculated and stored, `false` if the date
 /// is invalid (e.g., in the future or otherwise impossible)
-fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, state: &BirthDate) -> bool {
+fn process_birth_date_result(biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>, state: &BirthDate) -> bool {
     // Calculate days alive and confirms the birth date in not in the future
     if let Some(days_alive) = is_in_future(&state) {
         // Create and store the biorhythm data
-        *biorhythm_data.lock().expect("Biorhythm mutex poisoned") = Some(Biorhythm::new(days_alive));
+        *biorhythm_data.borrow_mut() = Some(Biorhythm::new(days_alive));
         true
     } else {
         // Date is invalid (e.g., in the future)
@@ -630,7 +717,7 @@ fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, sta
 }
 
 /// Handle command events - returns true if app should continue running
-fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, birth_state: &mut BirthDate) -> bool {
+fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>, birth_state: &mut BirthDate) -> bool {
     match command {
         CM_BIORHYTHM => {
             // Show the birth date dialog and process the result if user confirmed
@@ -700,7 +787,7 @@ fn add_status_line(app: &mut Application) {
 }
 
 /// Design the chart dialog box
-fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>) {
+fn add_chart(app: &mut Application, biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>) {
     // Calculate window dimensions
     let (width, height) = app.terminal.size();
     let window_width = 76i16; // TODO should NOT be hard coded
@@ -719,7 +806,7 @@ fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>
 
     let chart_width = window_width - 2;
     let chart_height = window_height - 2;
-    let chart = BiorhythmChart::new(Rect::new(1, 1, chart_width, chart_height), Arc::clone(&biorhythm_data));
+    let chart = BiorhythmChart::new(Rect::new(1, 1, chart_width, chart_height), Rc::clone(&biorhythm_data));
     main_dialog.add(Box::new(chart));
     app.desktop.add(Box::new(main_dialog));
 }
@@ -730,7 +817,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     add_menu_bar(&mut app);
     add_status_line(&mut app);
 
-    let biorhythm_data = Arc::new(Mutex::new(None));
+    let biorhythm_data = Rc::new(RefCell::new(None));
     let initial_birth_date = BirthDate::new();
 
     // Displays the dialog box for entering the date of birth
