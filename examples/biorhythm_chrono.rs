@@ -6,7 +6,6 @@
 use chrono::{Datelike, Local, NaiveDate};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use turbo_vision::app::Application;
 use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_OK, CM_QUIT};
 use turbo_vision::core::draw::DrawBuffer;
@@ -71,12 +70,12 @@ impl Biorhythm {
 
 struct BiorhythmChart {
     bounds: Rect,
-    biorhythm: Arc<Mutex<Option<Biorhythm>>>, // TODO: why not Rc<RefCell<Option<Biorhythm>>> instead?
+    biorhythm: Rc<RefCell<Option<Biorhythm>>>,
     state: StateFlags,
 }
 
 impl BiorhythmChart {
-    fn new(bounds: Rect, biorhythm: Arc<Mutex<Option<Biorhythm>>>) -> Self {
+    fn new(bounds: Rect, biorhythm: Rc<RefCell<Option<Biorhythm>>>) -> Self {
         Self { bounds, biorhythm, state: SF_VISIBLE }
     }
 }
@@ -110,7 +109,7 @@ impl View for BiorhythmChart {
             return;
         }
 
-        let bio_opt = self.biorhythm.lock().expect("Biorhythm mutex poisoned");
+        let bio_opt = self.biorhythm.borrow();
 
         if let Some(ref bio) = *bio_opt {
             // Draw title
@@ -482,14 +481,14 @@ fn run_modal_birth_date_dialog(app: &mut Application, birth_date: Option<&NaiveD
 /// # Arguments
 /// * `biorhythm_data` - Shared biorhythm data to update
 /// * `birth_date` - The validated birth date
-fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, birth_date: &NaiveDate) {
+fn process_birth_date_result(biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>, birth_date: &NaiveDate) {
     let today = Local::now().date_naive();
     let days_alive = (today - *birth_date).num_days().try_into().unwrap();
-    *biorhythm_data.lock().expect("Biorhythm mutex poisoned") = Some(Biorhythm::new(days_alive));
+    *biorhythm_data.borrow_mut() = Some(Biorhythm::new(days_alive));
 }
 
 /// Handle command events - returns true if app should continue running
-fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, birth_date: &mut Option<NaiveDate>) -> bool {
+fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>, birth_date: &mut Option<NaiveDate>) -> bool {
     match command {
         CM_BIORHYTHM => {
             // Show the birth date dialog and process the result if user confirmed
@@ -559,7 +558,7 @@ fn add_status_line(app: &mut Application) {
 }
 
 /// Design the chart dialog box
-fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>) {
+fn add_chart(app: &mut Application, biorhythm_data: &Rc<RefCell<Option<Biorhythm>>>) {
     // Calculate window dimensions
     let (width, height) = app.terminal.size();
     let window_width = 76i16; // TODO should NOT be hard coded
@@ -578,7 +577,7 @@ fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>
 
     let chart_width = window_width - 2;
     let chart_height = window_height - 2;
-    let chart = BiorhythmChart::new(Rect::new(1, 1, chart_width, chart_height), Arc::clone(&biorhythm_data));
+    let chart = BiorhythmChart::new(Rect::new(1, 1, chart_width, chart_height), Rc::clone(&biorhythm_data));
     main_dialog.add(Box::new(chart));
     app.desktop.add(Box::new(main_dialog));
 }
@@ -589,7 +588,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
     add_menu_bar(&mut app);
     add_status_line(&mut app);
 
-    let biorhythm_data = Arc::new(Mutex::new(None));
+    let biorhythm_data = Rc::new(RefCell::new(None));
 
     // Displays the dialog box for entering the date of birth
     let birth_date_result = run_modal_birth_date_dialog(&mut app, None);
