@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use turbo_vision::app::Application;
 use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_OK, CM_QUIT};
 use turbo_vision::core::draw::DrawBuffer;
-use turbo_vision::core::event::{Event, EventType, KB_ALT_C, KB_ALT_X, KB_CTRL_C, KB_ESC_ESC, KB_F1, KB_F10};
+use turbo_vision::core::event::{Event, EventType, KB_ALT_C, KB_ALT_X, KB_F1, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
 use turbo_vision::core::palette::{Attr, TvColor, colors};
@@ -37,124 +37,44 @@ const PHYSICAL_CYCLE: f64 = 23.0;
 const EMOTIONAL_CYCLE: f64 = 28.0;
 const INTELLECTUAL_CYCLE: f64 = 33.0;
 
-/// Simple date calculation functions (no external dependencies)
-fn is_leap_year(year: i32) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+/// Stores the birth date values
+#[derive(Clone, Default)]
+struct BirthDate {
+    day: u32,
+    month: u32,
+    year: u32,
 }
 
-fn days_in_month(month: u32, year: i32) -> u32 {
-    match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 => {
-            if is_leap_year(year) {
-                29
-            } else {
-                28
-            }
-        }
-        _ => 0,
-    }
-}
-
-fn days_since_epoch(year: i32, month: u32, day: u32) -> i32 {
-    // Calculate days since Jan 1, 1970 (Unix epoch)
-    let mut days = 0;
-
-    // Add days for complete years
-    for y in 1970..year {
-        days += if is_leap_year(y) { 366 } else { 365 };
-    }
-
-    // Add days for complete months in the current year
-    for m in 1..month {
-        days += days_in_month(m, year) as i32;
-    }
-
-    // Add remaining days
-    days += day as i32;
-
-    days
-}
-
-fn get_current_date() -> (i32, u32, u32) {
-    // Get current date from system time
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let total_days = duration.as_secs() / 86400;
-
-    // Simple algorithm to convert days since epoch to Y/M/D
-    let mut days_left = total_days as i32;
-    let mut year = 1970;
-
-    loop {
-        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
-        if days_left >= days_in_year {
-            days_left -= days_in_year;
-            year += 1;
-        } else {
-            break;
-        }
-    }
-
-    let mut month = 1;
-    while month <= 12 {
-        let days_in_current_month = days_in_month(month, year) as i32;
-        if days_left >= days_in_current_month {
-            days_left -= days_in_current_month;
-            month += 1;
-        } else {
-            break;
-        }
-    }
-
-    let day = days_left + 1;
-    (year, month, day as u32)
-}
-
-fn calculate_days_alive(birth_year: i32, birth_month: u32, birth_day: u32) -> Option<i32> {
-    // Validate date
-    if birth_month < 1 || birth_month > 12 || birth_day < 1 {
-        return None;
-    }
-    if birth_day > days_in_month(birth_month, birth_year) {
-        return None;
-    }
-
-    let (today_year, today_month, today_day) = get_current_date();
-    let birth_days = days_since_epoch(birth_year, birth_month, birth_day);
-    let today_days = days_since_epoch(today_year, today_month, today_day);
-
-    let days_alive = today_days - birth_days;
-    if days_alive < 0 {
-        None // Birth date is in the future
-    } else {
-        Some(days_alive)
+impl BirthDate {
+    fn new() -> Self {
+        Default::default()
     }
 }
 
 #[derive(Clone)]
 struct Biorhythm {
-    days_alive: i32,
+    // Number of days alive is inherently non-negative, keep as u32
+    days_alive: u32,
 }
 
 impl Biorhythm {
-    fn new(days_alive: i32) -> Self {
+    fn new(days_alive: u32) -> Self {
         Self { days_alive }
     }
 
+    // Accept signed offsets for plotting (past/future relative to today)
     fn physical(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive + day_offset;
+        let days = self.days_alive as i32 + day_offset;
         (2.0 * PI * days as f64 / PHYSICAL_CYCLE).sin()
     }
 
     fn emotional(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive + day_offset;
+        let days = self.days_alive as i32 + day_offset;
         (2.0 * PI * days as f64 / EMOTIONAL_CYCLE).sin()
     }
 
     fn intellectual(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive + day_offset;
+        let days = self.days_alive as i32 + day_offset;
         (2.0 * PI * days as f64 / INTELLECTUAL_CYCLE).sin()
     }
 }
@@ -310,7 +230,98 @@ impl View for BiorhythmChart {
     }
 }
 
-fn create_biorhythm_dialog(state: &BirthDateState) -> (turbo_vision::views::dialog::Dialog, Rc<RefCell<String>>, Rc<RefCell<String>>, Rc<RefCell<String>>) {
+/// Simple date calculation functions (no external dependencies)
+fn is_leap_year(year: u32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+fn days_in_month(month: u32, year: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if is_leap_year(year) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 0,
+    }
+}
+
+/// Calculate days since Jan 1, 1970 (Unix epoch)
+fn days_since_epoch(year: u32, month: u32, day: u32) -> u32 {
+    let mut days: u32 = 0;
+
+    // Add days for complete years
+    for y in 1970..year {
+        days += if is_leap_year(y) { 366 } else { 365 };
+    }
+
+    // Add days for complete months in the current year
+    for m in 1..month {
+        days += days_in_month(m, year);
+    }
+
+    // Add remaining days
+    days += day;
+
+    days
+}
+
+fn get_current_date() -> (u32, u32, u32) {
+    // Get current date from system time
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    let total_days = duration.as_secs() / 86400;
+
+    // Simple algorithm to convert days since epoch to Y/M/D
+    let mut days_left = total_days as i32;
+    let mut year = 1970;
+
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if days_left >= days_in_year {
+            days_left -= days_in_year;
+            year += 1;
+        } else {
+            break;
+        }
+    }
+
+    let mut month = 1;
+    while month <= 12 {
+        let days_in_current_month = days_in_month(month, year) as i32;
+        if days_left >= days_in_current_month {
+            days_left -= days_in_current_month;
+            month += 1;
+        } else {
+            break;
+        }
+    }
+
+    let day = days_left + 1;
+    (year, month, day as u32)
+}
+
+/// Calculate days alive since the birth date. No need to validate.
+// fn calculate_days_alive(birth_year: u32, birth_month: u32, birth_day: u32) -> Option<u32> {
+fn calculate_days_alive(birth_date: &BirthDate) -> Option<u32> {
+    let (today_year, today_month, today_day) = get_current_date();
+    let birth_days = days_since_epoch(birth_date.year, birth_date.month, birth_date.day);
+    let today_days = days_since_epoch(today_year, today_month, today_day);
+
+    if today_days < birth_days {
+        None // Birth date is in the future
+    } else {
+        // Some(days_alive)
+        Some(today_days - birth_days)
+    }
+}
+
+// The D, M and Y fields use validator
+fn create_biorhythm_dialog(state: &BirthDate) -> (turbo_vision::views::dialog::Dialog, Rc<RefCell<String>>, Rc<RefCell<String>>, Rc<RefCell<String>>) {
     // Dialog dimensions: 50 wide, 12 tall
     let dialog_width = 50i16;
     let dialog_height = 12i16;
@@ -375,24 +386,15 @@ fn create_biorhythm_dialog(state: &BirthDateState) -> (turbo_vision::views::dial
     (dialog, day_data, month_data, year_data)
 }
 
-/// Validate the complete birth date from a BirthDateState
-fn validate_birth_date(state: &BirthDateState) -> bool {
-    let day = state.day;
-    let month = state.month;
-    let year = state.year;
-
-    // Check basic ranges
-    if !(1..=31).contains(&day) || !(1..=12).contains(&month) || !(1900..=2100).contains(&year) {
+/// Extended validation of the birth date (beyond what the validators can do)
+fn validate_birth_date(birth_date: &BirthDate) -> bool {
+    // Check if the date is valid (accounting for month lengths and leap years).
+    if birth_date.day > days_in_month(birth_date.month, birth_date.year) {
         return false;
     }
 
-    // Check if the date is valid (accounting for month lengths and leap years)
-    if day > days_in_month(month, year) {
-        return false;
-    }
-
-    // Check if date is not in the future
-    calculate_days_alive(year, month, day).is_some()
+    // Calculate days alive and confirms the birth date in not set in the future
+    calculate_days_alive(birth_date).is_some()
 }
 
 fn show_about_dialog(app: &mut Application) {
@@ -412,25 +414,11 @@ Semi-graphical ASCII chart";
     message_box(app, message, MF_ABOUT | MF_OK_BUTTON);
 }
 
-/// Stores the previous birth date values for the dialog
-#[derive(Clone, Default)]
-struct BirthDateState {
-    day: u32,
-    month: u32,
-    year: i32,
-}
-
-impl BirthDateState {
-    fn new() -> Self {
-        Default::default()
-    }
-}
-
-/// Helper function to parse three strings into a BirthDateState
+/// Helper function to parse three strings into a BirthDate
 /// Returns None if parsing fails
-fn parse_birth_state(day_str: &str, month_str: &str, year_str: &str) -> Option<BirthDateState> {
-    if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<i32>()) {
-        Some(BirthDateState { day, month, year })
+fn parse_birth_state(day_str: &str, month_str: &str, year_str: &str) -> Option<BirthDate> {
+    if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<u32>()) {
+        Some(BirthDate { day, month, year })
     } else {
         None
     }
@@ -460,11 +448,12 @@ fn parse_birth_state(day_str: &str, month_str: &str, year_str: &str) -> Option<B
 /// simple value types instead of shared references, eliminating the need for reference counting entirely.
 /// In short: Rc<RefCell<T>> enables sharing during the dialog's lifetime, but after the dialog closes,
 /// we only care about the final values, not the shared containers.
-fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) -> Option<BirthDateState> {
+fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDate) -> Option<BirthDate> {
     use std::time::Duration;
     use turbo_vision::core::command::CM_COMMAND_SET_CHANGED;
     use turbo_vision::core::command_set;
 
+    // day_data is of type Rc<RefCell<String>>. See the InputLineBuilder() signature
     let (mut dialog, day_data, month_data, year_data) = create_biorhythm_dialog(state);
 
     // Set modal flag
@@ -518,7 +507,8 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
                     //     show_about_dialog(app);
                     //     continue; // Skip rest of event processing
                     // }
-                    KB_ALT_X | KB_CTRL_C | KB_ESC_ESC => {
+                    // KB_ALT_X | KB_CTRL_C | KB_ESC_ESC => {
+                    KB_ALT_X => {
                         // Convert quit shortcuts to CM_CANCEL in modal context
                         event = Event::command(CM_CANCEL);
                     }
@@ -586,11 +576,23 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
 
         // Parse the validated input strings into numeric values
         // This should always succeed thanks to the validators, but we handle it defensively
-        if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<i32>()) {
-            Some(BirthDateState { day, month, year })
+        // First try a trimmed parse (accept leading/trailing spaces)
+        if let (Ok(day), Ok(month), Ok(year)) = (day_str.parse::<u32>(), month_str.parse::<u32>(), year_str.parse::<u32>()) {
+            Some(BirthDate { day, month, year })
         } else {
-            // Parsing failed - should not happen with proper validators
-            None
+            // Fallback: user may have pasted "DD MM YYYY" into one field - try to split combined input
+            let combined = format!("{day_str} {month_str} {year_str}");
+            let parts: Vec<&str> = combined.split_whitespace().collect();
+            if parts.len() >= 3 {
+                if let (Ok(day), Ok(month), Ok(year)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>(), parts[2].parse::<u32>()) {
+                    Some(BirthDate { day, month, year })
+                } else {
+                    None
+                }
+            } else {
+                // Parsing failed - should not happen with proper validators
+                None
+            }
         }
     } else {
         // User cancelled
@@ -611,9 +613,10 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDateState) ->
 /// # Returns
 /// `true` if the biorhythm was successfully calculated and stored, `false` if the date
 /// is invalid (e.g., in the future or otherwise impossible)
-fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, state: &BirthDateState) -> bool {
-    // Calculate days alive since the birth date
-    if let Some(days_alive) = calculate_days_alive(state.year, state.month, state.day) {
+fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, state: &BirthDate) -> bool {
+    // Calculate days alive and confirms the birth date in not in the future
+    //if let Some(days_alive) = calculate_days_alive(state.year, state.month, state.day) {
+    if let Some(days_alive) = calculate_days_alive(&state) {
         // Create and store the biorhythm data
         *biorhythm_data.lock().unwrap() = Some(Biorhythm::new(days_alive));
         true
@@ -624,7 +627,7 @@ fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, sta
 }
 
 /// Handle command events - returns true if app should continue running
-fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, birth_state: &mut BirthDateState) -> bool {
+fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, birth_state: &mut BirthDate) -> bool {
     match command {
         CM_BIORHYTHM => {
             // Show the birth date dialog and process the result if user confirmed
@@ -645,6 +648,7 @@ fn handle_command_event(command: u16, app: &mut Application, biorhythm_data: &Ar
 
 /// Convert global keyboard shortcuts to command events
 /// These shortcuts work regardless of whether menus are open or not
+/// Note: ESC is NOT converted here - ESC_ESC it's handled by MenuBar to close menus
 fn handle_global_shortcuts(event: &mut Event) {
     if event.what != EventType::Keyboard {
         return;
@@ -652,7 +656,7 @@ fn handle_global_shortcuts(event: &mut Event) {
 
     let command = match event.key_code {
         KB_ALT_C => Some(CM_BIORHYTHM),
-        KB_ALT_X | KB_CTRL_C | KB_ESC_ESC => Some(CM_QUIT),
+        KB_ALT_X => Some(CM_QUIT),
         KB_F1 => Some(CM_ABOUT),
         _ => None,
     };
@@ -692,9 +696,9 @@ fn add_status_line(app: &mut Application) {
     app.set_status_line(status_line);
 }
 
-/// Desing the chart dialog box
-/// Calculate window dimensions
+/// Design the chart dialog box
 fn add_chart(app: &mut Application, biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>) {
+    // Calculate window dimensions
     let (width, height) = app.terminal.size();
     let window_width = 76i16; // TODO should NOT be hard coded
     let available_width = width as i16;
@@ -724,9 +728,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
     add_status_line(&mut app);
 
     let biorhythm_data = Arc::new(Mutex::new(None));
-    let initial_birth_date = BirthDateState::new();
+    let initial_birth_date = BirthDate::new();
 
-    // Show birthdate dialog at startup
+    // Displays the dialog box for entering the date of birth
     let birth_date_result = run_modal_birth_date_dialog(&mut app, &initial_birth_date);
 
     // If user cancelled, quit the app
@@ -747,9 +751,11 @@ fn main() -> turbo_vision::core::error::Result<()> {
         app.terminal.flush()?;
 
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+            // Order matters (very first)
+            // Convert global keyboard shortcuts to commands so that F1, Ctrl+N etc. work even when menus are closed
             handle_global_shortcuts(&mut event);
 
-            // Let menu bar handle events first (including F10)
+            // Let menu bar handle events first
             if let Some(ref mut menu_bar) = app.menu_bar {
                 menu_bar.handle_event(&mut event);
 
