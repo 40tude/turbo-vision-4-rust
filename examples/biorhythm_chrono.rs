@@ -6,7 +6,7 @@ use chrono::{Datelike, Local, NaiveDate};
 use std::cell::RefCell;
 use std::rc::Rc;
 use turbo_vision::app::Application;
-use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_OK, CM_QUIT};
+use turbo_vision::core::command::{CM_CANCEL, CM_CLOSE, CM_CONTINUE, CM_OK, CM_QUIT};
 use turbo_vision::core::draw::DrawBuffer;
 use turbo_vision::core::event::{Event, EventType, KB_ALT_C, KB_ALT_X, KB_F1, KB_F10};
 use turbo_vision::core::geometry::Rect;
@@ -345,10 +345,8 @@ fn run_modal_birth_date_dialog(app: &mut Application, birth_date: Option<&NaiveD
     // Cache the last validated date to avoid re-parsing on OK click
     let mut last_valid_date = None;
 
-    let result;
-
     // Main dialog event loop
-    loop {
+    let result = loop {
         // Draw desktop (which includes the dialog as a child)
         app.desktop.draw(&mut app.terminal);
         // Get cursor position from the dialog through desktop
@@ -409,17 +407,19 @@ fn run_modal_birth_date_dialog(app: &mut Application, birth_date: Option<&NaiveD
             }
         }
 
-        // Check if dialog should close (returns CM_OK or CM_CANCEL)
+        // Check if dialog should close (returns CM_OK, CM_CANCEL, or CM_CONTINUE)
         let end_state = if let Some(dialog_view) = app.desktop.window_at_mut(dialog_index) {
             dialog_view.get_end_state()
         } else {
-            0
+            break None;  // Dialog disappeared = cancellation
         };
-        if end_state != 0 {
-            result = end_state;
-            break;
+
+        match end_state {
+            CM_CONTINUE => continue,  // Dialog still running, continue loop
+            CM_OK => break last_valid_date,  // Return validated date
+            _ => break None,  // Any other command (CM_CANCEL, etc.) = cancellation
         }
-    }
+    };
 
     // Remove dialog from desktop
     app.desktop.remove_child(dialog_index);
@@ -427,9 +427,9 @@ fn run_modal_birth_date_dialog(app: &mut Application, birth_date: Option<&NaiveD
     // Re-enable CM_OK command for future dialogs
     command_set::enable_command(CM_OK);
 
-    // Return the cached validated date if user confirmed, None if cancelled
-    // No need to re-parse: last_valid_date already contains the validated result
-    if result == CM_OK { last_valid_date } else { None }
+    // Return result (already contains the correct Option<NaiveDate>)
+    // No need to re-parse: last_valid_date was cached during validation
+    result
 }
 
 /// Calculate days alive from birth date and update shared biorhythm data
