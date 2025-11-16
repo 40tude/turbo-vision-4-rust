@@ -210,8 +210,35 @@ impl Validator for RangeValidator {
 
     fn is_valid_input(&self, input: &str, _append: bool) -> bool {
         // During typing, allow partial input
-        // Just check that characters are valid
-        input.chars().all(|ch| self.valid_chars.contains(ch))
+        // Smart validation: only allow hex letters (a-f, A-F) if user has typed "0x" prefix
+        // This prevents confusing UX where users can type letters for decimal ranges like 1-12
+
+        let is_hex_input = input.starts_with("0x") || input.starts_with("0X") ||
+                          input.starts_with("+0x") || input.starts_with("+0X") ||
+                          input.starts_with("-0x") || input.starts_with("-0X");
+
+        for ch in input.chars() {
+            // Always allow: digits, signs, and 'x'/'X' for hex prefix
+            if self.valid_chars.contains(ch) &&
+               (ch.is_ascii_digit() || ch == '+' || ch == '-' || ch == 'x' || ch == 'X') {
+                continue;
+            }
+
+            // Only allow hex letters (a-f, A-F) if we're in hex mode
+            if ch.is_ascii_alphabetic() && ch != 'x' && ch != 'X' {
+                if !is_hex_input {
+                    return false;
+                }
+                // In hex mode, only allow a-f/A-F
+                if !matches!(ch.to_ascii_lowercase(), 'a'..='f') {
+                    return false;
+                }
+            } else if !self.valid_chars.contains(ch) {
+                return false;
+            }
+        }
+
+        true
     }
 
     fn error(&self) {
@@ -373,5 +400,64 @@ mod tests {
         assert!(validator.is_valid("077"));  // 63 in decimal
         assert!(validator.is_valid("0100")); // 64 in decimal
         assert!(!validator.is_valid("0200")); // 128 in decimal, out of range
+    }
+
+    #[test]
+    fn test_range_validator_no_hex_letters_without_prefix() {
+        // Issue #56: For decimal ranges like 1-12, users should not be able
+        // to type hex letters (a-f) without first typing "0x"
+        let validator = RangeValidator::new(1, 12);
+
+        // Decimal input should work
+        assert!(validator.is_valid_input("1", false));
+        assert!(validator.is_valid_input("12", false));
+
+        // Hex letters should NOT be allowed without "0x" prefix
+        assert!(!validator.is_valid_input("a", false));
+        assert!(!validator.is_valid_input("1a", false));
+        assert!(!validator.is_valid_input("a1", false));
+        assert!(!validator.is_valid_input("f", false));
+
+        // But hex input WITH "0x" prefix should allow letters
+        assert!(validator.is_valid_input("0x", false));
+        assert!(validator.is_valid_input("0xa", false));
+        assert!(validator.is_valid_input("0xA", false));
+        assert!(validator.is_valid_input("0xFF", false));
+    }
+
+    #[test]
+    fn test_range_validator_hex_letters_after_prefix() {
+        let validator = RangeValidator::new(0, 255);
+
+        // Hex letters only allowed after "0x" prefix
+        assert!(validator.is_valid_input("0x1", false));
+        assert!(validator.is_valid_input("0xa", false));
+        assert!(validator.is_valid_input("0xAB", false));
+        assert!(validator.is_valid_input("0xFF", false));
+
+        // But not without the prefix
+        assert!(!validator.is_valid_input("a", false));
+        assert!(!validator.is_valid_input("FF", false));
+
+        // Decimal still works
+        assert!(validator.is_valid_input("123", false));
+        assert!(validator.is_valid_input("255", false));
+    }
+
+    #[test]
+    fn test_range_validator_hex_with_sign() {
+        let validator = RangeValidator::new(-255, 255);
+
+        // Hex with positive sign
+        assert!(validator.is_valid_input("+0x", false));
+        assert!(validator.is_valid_input("+0xFF", false));
+
+        // Hex with negative sign
+        assert!(validator.is_valid_input("-0x", false));
+        assert!(validator.is_valid_input("-0xFF", false));
+
+        // Letters not allowed without "0x"
+        assert!(!validator.is_valid_input("+a", false));
+        assert!(!validator.is_valid_input("-f", false));
     }
 }
