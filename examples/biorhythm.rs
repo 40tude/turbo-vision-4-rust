@@ -3,7 +3,6 @@
 // Displays biorhythm charts with semi-graphical ASCII visualization
 
 use std::cell::RefCell;
-use std::f64::consts::PI;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use turbo_vision::app::Application;
@@ -32,11 +31,6 @@ use turbo_vision::views::{
 const CM_BIORHYTHM: u16 = 100;
 const CM_ABOUT: u16 = 101;
 
-// Biorhythm cycles (in days)
-const PHYSICAL_CYCLE: f64 = 23.0;
-const EMOTIONAL_CYCLE: f64 = 28.0;
-const INTELLECTUAL_CYCLE: f64 = 33.0;
-
 /// Stores the birth date values
 #[derive(Clone, Default)]
 struct BirthDate {
@@ -62,26 +56,50 @@ impl Biorhythm {
         Self { days_alive }
     }
 
+    // // Accept signed offsets for plotting (past/future relative to today)
+    // fn physical(&self, day_offset: i32) -> f64 {
+    //     let days = self.days_alive as i32 + day_offset;
+    //     (2.0 * PI * days as f64 / PHYSICAL_CYCLE).sin()
+    // }
+
+    // fn emotional(&self, day_offset: i32) -> f64 {
+    //     let days = self.days_alive as i32 + day_offset;
+    //     (2.0 * PI * days as f64 / EMOTIONAL_CYCLE).sin()
+    // }
+
+    // fn intellectual(&self, day_offset: i32) -> f64 {
+    //     let days = self.days_alive as i32 + day_offset;
+    //     (2.0 * PI * days as f64 / INTELLECTUAL_CYCLE).sin()
+    // }
+
+    // Biorhythm cycles (in days)
+    const PHYSICAL_CYCLE: f64 = 23.0;
+    const EMOTIONAL_CYCLE: f64 = 28.0;
+    const INTELLECTUAL_CYCLE: f64 = 33.0;
+
+    fn cycle_value(&self, offset: i32, period: f64) -> f64 {
+        // days may be negative for past offsets
+        let days = self.days_alive as i32 + offset;
+        (2.0 * std::f64::consts::PI * days as f64 / period).sin()
+    }
+
     // Accept signed offsets for plotting (past/future relative to today)
     fn physical(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive as i32 + day_offset;
-        (2.0 * PI * days as f64 / PHYSICAL_CYCLE).sin()
+        self.cycle_value(day_offset, Self::PHYSICAL_CYCLE)
     }
 
     fn emotional(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive as i32 + day_offset;
-        (2.0 * PI * days as f64 / EMOTIONAL_CYCLE).sin()
+        self.cycle_value(day_offset, Self::EMOTIONAL_CYCLE)
     }
 
     fn intellectual(&self, day_offset: i32) -> f64 {
-        let days = self.days_alive as i32 + day_offset;
-        (2.0 * PI * days as f64 / INTELLECTUAL_CYCLE).sin()
+        self.cycle_value(day_offset, Self::INTELLECTUAL_CYCLE)
     }
 }
 
 struct BiorhythmChart {
     bounds: Rect,
-    biorhythm: Arc<Mutex<Option<Biorhythm>>>,
+    biorhythm: Arc<Mutex<Option<Biorhythm>>>, // TODO: why not Rc<RefCell<Option<Biorhythm>>> instead?
     state: StateFlags,
 }
 
@@ -120,7 +138,7 @@ impl View for BiorhythmChart {
             return;
         }
 
-        let bio_opt = self.biorhythm.lock().unwrap();
+        let bio_opt = self.biorhythm.lock().expect("Biorhythm mutex poisoned");
 
         if let Some(ref bio) = *bio_opt {
             // Draw title
@@ -306,7 +324,6 @@ fn get_current_date() -> (u32, u32, u32) {
 }
 
 /// Calculate days alive since the birth date. No need to validate.
-// fn calculate_days_alive(birth_year: u32, birth_month: u32, birth_day: u32) -> Option<u32> {
 fn calculate_days_alive(birth_date: &BirthDate) -> Option<u32> {
     let (today_year, today_month, today_day) = get_current_date();
     let birth_days = days_since_epoch(birth_date.year, birth_date.month, birth_date.day);
@@ -615,10 +632,9 @@ fn run_modal_birth_date_dialog(app: &mut Application, state: &BirthDate) -> Opti
 /// is invalid (e.g., in the future or otherwise impossible)
 fn process_birth_date_result(biorhythm_data: &Arc<Mutex<Option<Biorhythm>>>, state: &BirthDate) -> bool {
     // Calculate days alive and confirms the birth date in not in the future
-    //if let Some(days_alive) = calculate_days_alive(state.year, state.month, state.day) {
     if let Some(days_alive) = calculate_days_alive(&state) {
         // Create and store the biorhythm data
-        *biorhythm_data.lock().unwrap() = Some(Biorhythm::new(days_alive));
+        *biorhythm_data.lock().expect("Biorhythm mutex poisoned") = Some(Biorhythm::new(days_alive));
         true
     } else {
         // Date is invalid (e.g., in the future)
