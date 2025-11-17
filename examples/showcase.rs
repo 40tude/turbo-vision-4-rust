@@ -1404,13 +1404,13 @@ fn update_menu_states(app: &Application) {
     }
 }
 
-fn main() -> turbo_vision::core::error::Result<()> {
-    // Setup panic hook to log crashes
+/// Setup panic handler to log crashes to crash.log
+fn setup_panic_handler() {
     std::panic::set_hook(Box::new(|panic_info| {
         use std::io::Write;
         let mut log_file = std::fs::OpenOptions::new().create(true).append(true).open("crash.log").unwrap();
 
-        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let timestamp = SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
 
         writeln!(log_file, "\n=== PANIC at timestamp {} ===", timestamp).unwrap();
         writeln!(log_file, "{}", panic_info).unwrap();
@@ -1431,7 +1431,11 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
         eprintln!("PANIC! Details written to crash.log");
     }));
+}
 
+/// Initialize application with menu bar, status line, and widgets
+/// Returns (app, clock, crab_widget)
+fn init_application() -> turbo_vision::core::error::Result<(Application, ClockView, Rc<RefCell<CrabWidget>>)> {
     let mut app = Application::new()?;
     let (width, height) = app.terminal.size();
 
@@ -1443,160 +1447,141 @@ fn main() -> turbo_vision::core::error::Result<()> {
     let status_line = create_status_line(width, height);
     app.set_status_line(status_line);
 
-    // Create clock view (right side of menu bar) - Matches Borland: tvdemo1.cc:128
+    // Create clock view (right side of menu bar)
     let clock_width = 9; // "HH:MM:SS" format + space
-    let mut clock = ClockView::new(Rect::new(width as i16 - clock_width, 0, width as i16, 1));
+    let clock = ClockView::new(Rect::new(width as i16 - clock_width, 0, width as i16, 1));
 
     // Create animated crab widget on the right side of the status bar
-    // Add it as an overlay widget so it continues animating even during modal dialogs
-    // Use Rc<RefCell<>> to allow shared ownership for pause/start control
     let crab_widget = Rc::new(RefCell::new(CrabWidget::new(width as i16 - 11, height as i16 - 1)));
     app.add_overlay_widget(Box::new(CrabWidgetWrapper::new(crab_widget.clone())));
 
-    // Main event loop
-    app.running = true;
+    Ok((app, clock, crab_widget))
+}
 
-    // Draw desktop first, then show about dialog on top
-    // app.draw();
-    app.desktop.draw(&mut app.terminal);
+/// Handle event routing through menu bar, status line, and desktop
+fn handle_event_routing(app: &mut Application, event: &mut Event) {
+    // Convert global keyboard shortcuts to commands
+    handle_global_shortcuts(event);
+
+    // Menu bar handles events first
     if let Some(ref mut menu_bar) = app.menu_bar {
-        menu_bar.draw(&mut app.terminal);
+        menu_bar.handle_event(event);
+
+        // Check for cascading submenu
+        if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
+            if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
+                if command != 0 {
+                    *event = Event::command(command);
+                }
+            }
+        }
     }
+
+    // Status line handles events
     if let Some(ref mut status_line) = app.status_line {
-        status_line.draw(&mut app.terminal);
+        status_line.handle_event(event);
     }
-    let _ = app.terminal.flush();
 
-    clock.draw(&mut app.terminal);
-    app.terminal.flush()?;
+    // Desktop handles events
+    app.desktop.handle_event(event);
+}
 
-    // Show about dialog on startup (after desktop is drawn)
-    show_about_dialog(&mut app);
+/// Handle command events
+/// Returns true if redraw is needed
+fn handle_commands(app: &mut Application, command: u16, crab_widget: &Rc<RefCell<CrabWidget>>) -> bool {
+    match command {
+        CM_QUIT => {
+            app.running = false;
+            false
+        }
+        CM_ABOUT => {
+            show_about_dialog(app);
+            true
+        }
+        CM_ASCII_TABLE => {
+            show_ascii_table(app);
+            true
+        }
+        CM_CALCULATOR => {
+            show_calculator_placeholder(app);
+            true
+        }
+        CM_CALENDAR => {
+            show_calendar_placeholder(app);
+            true
+        }
+        CM_PUZZLE => {
+            show_puzzle_placeholder(app);
+            true
+        }
+        CM_OPEN => {
+            show_open_file_dialog(app, crab_widget);
+            true
+        }
+        CM_CHDIR => {
+            show_chdir_dialog(app);
+            true
+        }
+        CM_START_CRAB => {
+            crab_widget.borrow_mut().start();
+            false
+        }
+        CM_PAUSE_CRAB => {
+            crab_widget.borrow_mut().pause();
+            false
+        }
+        CM_NEXT => {
+            app.desktop.select_next();
+            false
+        }
+        CM_PREV => {
+            app.desktop.select_prev();
+            false
+        }
+        CM_TILE => {
+            app.desktop.tile();
+            false
+        }
+        CM_CASCADE => {
+            app.desktop.cascade();
+            false
+        }
+        CM_ZOOM => {
+            app.desktop.zoom_top_window();
+            false
+        }
+        CM_CLOSE => {
+            let window_count = app.desktop.child_count();
+            if window_count > 0 {
+                app.desktop.remove_child(window_count - 1);
+            }
+            true
+        }
+        _ => false,
+    }
+}
 
+/// Main event loop
+fn run_event_loop(app: &mut Application, clock: &mut ClockView, crab_widget: &Rc<RefCell<CrabWidget>>) -> turbo_vision::core::error::Result<()> {
     while app.running {
         // Update menu states based on current desktop state (before drawing)
-        update_menu_states(&app);
+        update_menu_states(app);
 
+        // Draw everything
         app.draw();
-
-        // if let Some(ref mut menu_bar) = app.menu_bar {
-        //     menu_bar.draw(&mut app.terminal);
-        // }
-
-        // Draw clock on top (like Borland's idle() update)
-        // Matches Borland: tvdemo3.cc:173-174
         clock.draw(&mut app.terminal);
         app.terminal.flush()?;
 
+        // Poll for events
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
-            // Order matters
-            // Convert global keyboard shortcuts to commands so that F1, Ctrl+N etc. work even when menus are closed
-            handle_global_shortcuts(&mut event);
+            // Route event through UI components
+            handle_event_routing(app, &mut event);
 
-            // Menu bar handles events first
-            if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
-
-                // Check for cascading submenu
-                if event.what == EventType::Keyboard || event.what == EventType::MouseUp {
-                    if let Some(command) = menu_bar.check_cascading_submenu(&mut app.terminal) {
-                        if command != 0 {
-                            event = Event::command(command);
-                        }
-                    }
-                }
-            }
-
-            // Status line handles events
-            if let Some(ref mut status_line) = app.status_line {
-                status_line.handle_event(&mut event);
-            }
-
-            // Desktop handles events
-            app.desktop.handle_event(&mut event);
-
-            // Handle commands
+            // Handle command events
             if event.what == EventType::Command {
-                let needs_redraw = match event.command {
-                    CM_QUIT => {
-                        app.running = false;
-                        false
-                    }
-                    CM_ABOUT => {
-                        show_about_dialog(&mut app);
-                        true // Modal dialog - need to redraw and update cursor
-                    }
-                    CM_ASCII_TABLE => {
-                        show_ascii_table(&mut app);
-                        true // Modal dialog
-                    }
-                    CM_CALCULATOR => {
-                        show_calculator_placeholder(&mut app);
-                        true // Modal dialog
-                    }
-                    CM_CALENDAR => {
-                        show_calendar_placeholder(&mut app);
-                        true // Modal dialog
-                    }
-                    CM_PUZZLE => {
-                        show_puzzle_placeholder(&mut app);
-                        true // Modal dialog
-                    }
-                    CM_OPEN => {
-                        show_open_file_dialog(&mut app, &crab_widget);
-                        true // Modal dialog
-                    }
-                    CM_CHDIR => {
-                        show_chdir_dialog(&mut app);
-                        true // Modal dialog
-                    }
-                    CM_START_CRAB => {
-                        crab_widget.borrow_mut().start();
-                        false
-                    }
-                    CM_PAUSE_CRAB => {
-                        crab_widget.borrow_mut().pause();
-                        false
-                    }
-                    CM_NEXT => {
-                        // Cycle to next window (bring next window to front)
-                        app.desktop.select_next();
-                        false
-                    }
-                    CM_PREV => {
-                        // Cycle to previous window (bring previous window to front)
-                        app.desktop.select_prev();
-                        false
-                    }
-                    CM_TILE => {
-                        app.desktop.tile();
-                        false
-                    }
-                    CM_CASCADE => {
-                        app.desktop.cascade();
-                        false
-                    }
-                    CM_ZOOM => {
-                        // Zoom/restore the topmost window
-                        // Matches Borland: Desktop handles cmZoom command
-                        app.desktop.zoom_top_window();
-                        false
-                    }
-                    CM_CLOSE => {
-                        // Close the topmost window (last in z-order)
-                        // Matches Borland: TWindow::close() calls valid(cmClose) and destroys itself
-                        // In showcase, windows don't need validation (no unsaved data)
-                        let window_count = app.desktop.child_count();
-                        if window_count > 0 {
-                            // Remove the topmost window (last in z-order = highest index)
-                            app.desktop.remove_child(window_count - 1);
-                        }
-                        true // Window closed - need full redraw
-                    }
-                    _ => false,
-                };
+                let needs_redraw = handle_commands(app, event.command, crab_widget);
 
-                // After modal dialogs, redraw to update cursor position
+                // Redraw if needed (after modal dialogs)
                 if needs_redraw {
                     app.draw();
                     clock.draw(&mut app.terminal);
@@ -1605,10 +1590,41 @@ fn main() -> turbo_vision::core::error::Result<()> {
             }
         }
 
+        // Idle processing and cleanup
         app.idle();
         app.desktop.remove_closed_windows();
         app.desktop.handle_moved_windows(&mut app.terminal);
     }
+
+    Ok(())
+}
+
+fn main() -> turbo_vision::core::error::Result<()> {
+    // Setup panic handler
+    setup_panic_handler();
+
+    // Initialize application (menu, status, clock, crab widget)
+    let (mut app, mut clock, crab_widget) = init_application()?;
+
+    // Initial draw
+    app.desktop.draw(&mut app.terminal);
+    if let Some(ref mut menu_bar) = app.menu_bar {
+        menu_bar.draw(&mut app.terminal);
+    }
+    if let Some(ref mut status_line) = app.status_line {
+        status_line.draw(&mut app.terminal);
+    }
+    clock.draw(&mut app.terminal);
+    app.terminal.flush()?;
+
+    // Show about dialog on startup
+    show_about_dialog(&mut app);
+
+    // Start application
+    app.running = true;
+
+    // Run main event loop
+    run_event_loop(&mut app, &mut clock, &crab_widget)?;
 
     Ok(())
 }
