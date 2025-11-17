@@ -269,6 +269,11 @@ impl EditWindow {
         Rc::clone(&self.editor)
     }
 
+    /// Set the window title
+    pub fn set_title(&mut self, title: &str) {
+        self.window.set_title(title);
+    }
+
     /// Synchronize frame children (scrollbars, indicator) positions with window bounds
     /// Called from draw() to ensure positions are always correct, preventing visual lag during resize
     /// IMPORTANT: Always update positions regardless of size to prevent elements "staying behind"

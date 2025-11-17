@@ -96,6 +96,15 @@ impl FileEditor {
         self.edit_window.is_modified()
     }
 
+    /// Refresh the window title based on current filename
+    ///
+    /// Updates the window's title bar to show the current filename
+    /// (or "Untitled" if no file is loaded)
+    pub fn refresh_title(&mut self) {
+        let title = self.get_title();
+        self.edit_window.set_title(&title);
+    }
+
     /// Set text content
     pub fn set_text(&mut self, text: &str) {
         self.edit_window.editor_rc().borrow_mut().set_text(text);

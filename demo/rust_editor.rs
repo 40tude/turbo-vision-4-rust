@@ -22,6 +22,7 @@ use turbo_vision::core::command::{
     CM_ZOOM, CM_TILE, CM_CASCADE, CM_NEXT, CM_PREV, CM_SAVE_AS, CM_FIND,
     CM_REPLACE, CM_SEARCH_AGAIN, CM_GOTO_LINE,
 };
+use turbo_vision::core::command_set;
 use turbo_vision::core::event::{EventType, KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
@@ -92,6 +93,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
     // Event loop
     app.running = true;
     while app.running {
+        // Update menu states based on current file editor state
+        update_menu_states(&app);
+
         // Draw everything in proper order
         app.desktop.draw(&mut app.terminal);
         if let Some(ref mut menu_bar) = app.menu_bar {
@@ -301,6 +305,32 @@ fn main() -> turbo_vision::core::error::Result<()> {
     Ok(())
 }
 
+/// Update menu command states based on current file editor state
+///
+/// - SAVE is disabled if no window is open OR the current window is "Untitled"
+/// - SAVE_AS is disabled if no window is open
+///
+/// Matches Borland: TEditorApp::updateMenuItems() pattern
+fn update_menu_states(app: &Application) {
+    let has_window = app.desktop.child_count() > 0;
+    let has_filename = has_window && get_file_editor(app)
+        .map_or(false, |fe| fe.filename().is_some());
+
+    // SAVE: enabled only if window exists AND has a filename
+    if has_filename {
+        command_set::enable_command(CM_SAVE);
+    } else {
+        command_set::disable_command(CM_SAVE);
+    }
+
+    // SAVE_AS: enabled only if window exists
+    if has_window {
+        command_set::enable_command(CM_SAVE_AS);
+    } else {
+        command_set::disable_command(CM_SAVE_AS);
+    }
+}
+
 /// Initialize menu bar (matching Borland's TEditorApp::initMenuBar from tvedit3.cc)
 fn init_menu_bar(r: Rect) -> MenuBar {
     let mut menu_bar = MenuBar::new(r);
@@ -449,6 +479,8 @@ fn save_file(app: &mut Application) {
 
     match file_editor.save() {
         Ok(true) => {
+            // Refresh the window title after saving
+            file_editor.refresh_title();
             show_message(app, "Save", "File saved successfully");
         }
         Ok(false) => {
@@ -469,6 +501,8 @@ fn save_file_as(app: &mut Application) {
         };
 
         if file_editor.save_as(path).is_ok() {
+            // Refresh the window title after saving with new filename
+            file_editor.refresh_title();
             show_message(app, "Save", "File saved successfully");
         } else {
             show_error(app, "Error", "Failed to save file");
