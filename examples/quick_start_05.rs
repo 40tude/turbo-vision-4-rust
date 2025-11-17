@@ -1,7 +1,7 @@
 // (C) 2025 - Enzo Lombardi
 // Support global shortcuts (press F1 to see it in action)
 
-use turbo_vision::core::event::{KB_ALT_X, KB_CTRL_O, KB_ESC, KB_ESC_ESC, KB_F1};
+use turbo_vision::core::event::{KB_ALT_X, KB_CTRL_O, KB_F1};
 use turbo_vision::prelude::*;
 
 use turbo_vision::core::menu_data::{Menu, MenuItem};
@@ -11,7 +11,7 @@ use turbo_vision::views::msgbox::message_box_ok;
 use turbo_vision::views::status_line::{StatusItem, StatusLine};
 
 // Custom command IDs for this example
-const CMD_ABOUT: u16 = 100;
+const CMD_ABOUT: u16 = 100; // [100, 255] + [1_000, 65_535]
 
 fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
@@ -31,15 +31,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
 fn setup_status_line(app: &Application) -> StatusLine {
     let (w, h) = app.terminal.size();
 
-    StatusLine::new(
-        Rect::new(0, h as i16 - 1, w as i16, h as i16),
-        vec![
-            // StatusItem::new("~F10~ Menu", KB_F10, 0),
-            StatusItem::new("~Esc-X~ Exit", KB_ESC, CM_QUIT),
-            StatusItem::new("~Alt-X~ Exit", KB_ALT_X, CM_QUIT),
-            StatusItem::new("~Esc-Esc~ Exit", KB_ESC_ESC, CM_QUIT),
-        ],
-    )
+    StatusLine::new(Rect::new(0, h as i16 - 1, w as i16, h as i16), vec![StatusItem::new("~Alt-X~ Exit", KB_ALT_X, CM_QUIT)])
 }
 
 /// Create and configure the menu bar with File and Help menus
@@ -69,10 +61,11 @@ fn run_event_loop(app: &mut Application) {
         redraw_screen(app);
 
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+            // order matters: global > menu > status > command
             handle_global_shortcuts(&mut event);
 
             if let Some(ref mut menu_bar) = app.menu_bar {
-                menu_bar.handle_event(&mut event);
+                menu_bar.handle_event(&mut event); // Handle F10 when pressed
             }
 
             if let Some(ref mut status_line) = app.status_line {
