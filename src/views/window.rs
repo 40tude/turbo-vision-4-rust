@@ -298,6 +298,24 @@ impl Window {
         self.interior.child_at_mut(index)
     }
 
+    /// Get an immutable reference to a child by its ViewId
+    /// Returns None if the ViewId is not found
+    pub fn child_by_id(&self, view_id: ViewId) -> Option<&dyn View> {
+        self.interior.child_by_id(view_id)
+    }
+
+    /// Get a mutable reference to a child by its ViewId
+    /// Returns None if the ViewId is not found
+    pub fn child_by_id_mut(&mut self, view_id: ViewId) -> Option<&mut (dyn View + '_)> {
+        self.interior.child_by_id_mut(view_id)
+    }
+
+    /// Remove a child by its ViewId
+    /// Returns true if a child was found and removed, false otherwise
+    pub fn remove_by_id(&mut self, view_id: ViewId) -> bool {
+        self.interior.remove_by_id(view_id)
+    }
+
     /// Get the union rect of current and previous bounds (for redrawing)
     /// Matches Borland: TView::locate() calculates union rect
     /// Returns None if window hasn't moved yet

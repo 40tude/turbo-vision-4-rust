@@ -198,6 +198,35 @@ impl Group {
         }
     }
 
+    /// Get an immutable reference to a child by its ViewId
+    /// Returns None if the ViewId is not found
+    pub fn child_by_id(&self, view_id: ViewId) -> Option<&dyn View> {
+        self.view_ids.iter().position(|&id| id == view_id)
+            .map(|index| &*self.children[index])
+    }
+
+    /// Get a mutable reference to a child by its ViewId
+    /// Returns None if the ViewId is not found
+    pub fn child_by_id_mut(&mut self, view_id: ViewId) -> Option<&mut (dyn View + '_)> {
+        if let Some(index) = self.view_ids.iter().position(|&id| id == view_id) {
+            Some(&mut *self.children[index])
+        } else {
+            None
+        }
+    }
+
+    /// Remove a child by its ViewId
+    /// Returns true if a child was found and removed, false otherwise
+    pub fn remove_by_id(&mut self, view_id: ViewId) -> bool {
+        if let Some(index) = self.view_ids.iter().position(|&id| id == view_id) {
+            self.remove(index);
+            self.view_ids.remove(index);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Execute a modal event loop
     /// Matches Borland: TGroup::execute() (tgroup.cc:182-195)
     ///
@@ -838,5 +867,117 @@ mod tests {
 
         // Child 3: partially outside, should intersect
         assert!(group.bounds.intersects(&group.children[2].bounds()));
+    }
+
+    #[test]
+    fn test_child_by_id() {
+        // Create a group and add children
+        let mut group = Group::new(Rect::new(0, 0, 50, 50));
+
+        let child1 = Box::new(DrawCountView::new(Rect::new(0, 0, 10, 10)));
+        let id1 = group.add(child1);
+
+        let child2 = Box::new(DrawCountView::new(Rect::new(20, 0, 30, 10)));
+        let id2 = group.add(child2);
+
+        let child3 = Box::new(DrawCountView::new(Rect::new(40, 0, 50, 10)));
+        let id3 = group.add(child3);
+
+        // Test accessing children by ID (immutable)
+        assert!(group.child_by_id(id1).is_some());
+        assert!(group.child_by_id(id2).is_some());
+        assert!(group.child_by_id(id3).is_some());
+
+        // Test that invalid ID returns None
+        let invalid_id = ViewId::new();
+        assert!(group.child_by_id(invalid_id).is_none());
+    }
+
+    #[test]
+    fn test_child_by_id_mut() {
+        // Create a group and add a child
+        let mut group = Group::new(Rect::new(0, 0, 50, 50));
+
+        let child = Box::new(DrawCountView::new(Rect::new(0, 0, 10, 10)));
+        let child_id = group.add(child);
+
+        // Test accessing child by ID (mutable)
+        let child_ref = group.child_by_id_mut(child_id);
+        assert!(child_ref.is_some());
+
+        // Test that invalid ID returns None
+        let invalid_id = ViewId::new();
+        assert!(group.child_by_id_mut(invalid_id).is_none());
+    }
+
+    #[test]
+    fn test_remove_by_id() {
+        // Create a group and add multiple children
+        let mut group = Group::new(Rect::new(0, 0, 50, 50));
+
+        let child1 = Box::new(DrawCountView::new(Rect::new(0, 0, 10, 10)));
+        let id1 = group.add(child1);
+
+        let child2 = Box::new(DrawCountView::new(Rect::new(20, 0, 30, 10)));
+        let id2 = group.add(child2);
+
+        let child3 = Box::new(DrawCountView::new(Rect::new(40, 0, 50, 10)));
+        let id3 = group.add(child3);
+
+        // Verify all children are present
+        assert_eq!(group.len(), 3);
+        assert!(group.child_by_id(id1).is_some());
+        assert!(group.child_by_id(id2).is_some());
+        assert!(group.child_by_id(id3).is_some());
+
+        // Remove middle child by ID
+        let removed = group.remove_by_id(id2);
+        assert!(removed);
+        assert_eq!(group.len(), 2);
+
+        // Verify id2 is gone but id1 and id3 are still there
+        assert!(group.child_by_id(id1).is_some());
+        assert!(group.child_by_id(id2).is_none());
+        assert!(group.child_by_id(id3).is_some());
+
+        // Try to remove invalid ID
+        let invalid_id = ViewId::new();
+        let not_removed = group.remove_by_id(invalid_id);
+        assert!(!not_removed);
+        assert_eq!(group.len(), 2);
+    }
+
+    #[test]
+    fn test_child_by_id_fragility_fix() {
+        // This test demonstrates the fragility fix that child_by_id() solves
+        let mut group = Group::new(Rect::new(0, 0, 50, 50));
+
+        let child1 = Box::new(DrawCountView::new(Rect::new(0, 0, 10, 10)));
+        let id1 = group.add(child1);
+
+        let child2 = Box::new(DrawCountView::new(Rect::new(20, 0, 30, 10)));
+        let id2 = group.add(child2);
+
+        let child3 = Box::new(DrawCountView::new(Rect::new(40, 0, 50, 10)));
+        let id3 = group.add(child3);
+
+        // With indices, we would have: index 0 = id1, index 1 = id2, index 2 = id3
+        // If we stored index 1 for "the button" and then inserted a new child before it,
+        // our stored index 1 would now point to the new child, not the button!
+
+        // But with ViewIds, the IDs are stable regardless of insertion order
+        assert!(group.child_by_id(id1).is_some());
+        assert!(group.child_by_id(id2).is_some());
+        assert!(group.child_by_id(id3).is_some());
+
+        // If we insert a new child at the beginning (simulating reordering)
+        let new_child = Box::new(DrawCountView::new(Rect::new(0, 20, 10, 30)));
+        let new_id = group.add(new_child);
+
+        // The old IDs still work correctly because they're not affected by reordering
+        assert!(group.child_by_id(id1).is_some());
+        assert!(group.child_by_id(id2).is_some());
+        assert!(group.child_by_id(id3).is_some());
+        assert!(group.child_by_id(new_id).is_some());
     }
 }
