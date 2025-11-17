@@ -488,11 +488,12 @@ fn show_file_save_dialog(app: &mut Application) -> Option<PathBuf> {
     // Start in current directory
     let initial_dir = std::env::current_dir().ok();
 
-    // Use standard FileDialogBuilder API
+    // Use standard FileDialogBuilder API with Save button label
     let mut file_dialog = FileDialogBuilder::new()
         .bounds(bounds)
         .title("Save File As")
-        .wildcard("*.rs");
+        .wildcard("*.rs")
+        .button_label("~S~ave");  // Use "Save" button instead of "Open"
 
     if let Some(dir) = initial_dir {
         file_dialog = file_dialog.initial_dir(dir);

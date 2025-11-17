@@ -735,6 +735,7 @@ pub struct FileDialogBuilder {
     title: Option<String>,
     wildcard: String,
     initial_dir: Option<PathBuf>,
+    button_label: String,
 }
 
 impl FileDialogBuilder {
@@ -745,6 +746,7 @@ impl FileDialogBuilder {
             title: None,
             wildcard: "*".to_string(),
             initial_dir: None,
+            button_label: "~O~pen".to_string(),
         }
     }
 
@@ -778,6 +780,15 @@ impl FileDialogBuilder {
         self
     }
 
+    /// Sets the button label (optional, default: "~O~pen").
+    /// Examples: "~S~ave", "~E~xport", "~C~hoose"
+    /// The ~ character indicates the hotkey underline.
+    #[must_use]
+    pub fn button_label(mut self, label: impl Into<String>) -> Self {
+        self.button_label = label.into();
+        self
+    }
+
     /// Builds the FileDialog.
     ///
     /// # Panics
@@ -786,7 +797,9 @@ impl FileDialogBuilder {
     pub fn build(self) -> FileDialog {
         let bounds = self.bounds.expect("FileDialog bounds must be set");
         let title = self.title.expect("FileDialog title must be set");
-        FileDialog::new(bounds, &title, &self.wildcard, self.initial_dir).build()
+        FileDialog::new(bounds, &title, &self.wildcard, self.initial_dir)
+            .with_button_label(&self.button_label)
+            .build()
     }
 
     /// Builds the FileDialog as a Box.
