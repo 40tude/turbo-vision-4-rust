@@ -220,18 +220,14 @@ impl<T: 'static> OutlineViewer<T> {
             drop(node_borrow); // Release borrow before recursing
 
             // Track which parent levels have more siblings
-            if level > 0 {
-                parent_continues.push(!is_last);
-            }
+            parent_continues.push(!is_last);
 
             for (i, child) in node.borrow().children.iter().enumerate() {
                 let child_is_last = i == children_len - 1;
                 self.flatten_node(child.clone(), level + 1, child_is_last, parent_continues);
             }
 
-            if level > 0 {
-                parent_continues.pop();
-            }
+            parent_continues.pop();
         }
     }
 
