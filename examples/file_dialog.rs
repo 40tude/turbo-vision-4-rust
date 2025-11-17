@@ -12,12 +12,18 @@
 // - Arrow keys to navigate
 // - Enter to select files or navigate into folders
 // - Directory navigation: Enter on folders opens them, dialog stays open
+// - Customizable button labels (Open, Save, Export, etc.) via with_button_label()
 //
 // Wildcard patterns:
 // - "*" shows all files
 // - "*.rs" shows only Rust files
 // - "*.toml" shows only TOML files
 // - etc.
+//
+// Examples:
+// - Open dialog (default): FileDialog::new(...).build()
+// - Save dialog: FileDialog::new(...).with_button_label("~S~ave").build()
+// - Export dialog: FileDialog::new(...).with_button_label("~E~xport").build()
 
 use turbo_vision::app::Application;
 use turbo_vision::core::geometry::Rect;

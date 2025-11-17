@@ -54,7 +54,25 @@
 //! performance, but could alternatively use direct child access if needed for more
 //! complex scenarios.
 
-/// FileDialog - A file selection dialog for opening files
+/// FileDialog - A file selection dialog for opening/saving files
+///
+/// ## Usage
+///
+/// ```rust,ignore
+/// // Open dialog (default)
+/// let mut dialog = FileDialog::new(bounds, "Open File", "*.rs", None).build();
+///
+/// // Save dialog with custom button label
+/// let mut dialog = FileDialog::new(bounds, "Save File", "*", None)
+///     .with_button_label("~S~ave")
+///     .build();
+///
+/// // Execute and get selected file path
+/// match dialog.execute(&mut app) {
+///     Some(path) => println!("Selected: {}", path.display()),
+///     None => println!("Canceled"),
+/// }
+/// ```
 ///
 /// ## Dialog Close Behavior
 ///
@@ -72,6 +90,16 @@
 /// - Selection moves to first item in new directory
 ///
 /// This applies to: "..", regular folders "[dirname]", and folder paths like "subdir/*.rs"
+///
+/// ## Button Labels
+///
+/// Customize the button label using `with_button_label()`:
+/// - Default: `"~O~pen"` (Open button)
+/// - For save: `"~S~ave"`
+/// - For export: `"~E~xport"`
+/// - Any other text: `"~C~ustom"`
+///
+/// The `~` character indicates the hotkey underline in the button text.
 ///
 /// ## Known Limitations
 ///
@@ -109,6 +137,7 @@ pub struct FileDialog {
     files: Vec<String>,
     selected_file_index: usize, // Track ListBox selection
     title: String, // Store title for rebuilds
+    button_label: String, // "Open", "Save", etc.
 }
 
 impl FileDialog {
@@ -128,7 +157,14 @@ impl FileDialog {
             files: Vec::new(),
             selected_file_index: 0,
             title: title.to_string(),
+            button_label: "~O~pen".to_string(), // Default to "Open"
         }
+    }
+
+    /// Set the button label (e.g., "~S~ave" for save dialogs)
+    pub fn with_button_label(mut self, label: &str) -> Self {
+        self.button_label = label.to_string();
+        self
     }
 
     pub fn build(mut self) -> Self {
@@ -176,9 +212,12 @@ impl FileDialog {
         let button_x = dialog_width - 14; // 15 = 12 (button width) + 2 (right margin) + 1 (end space)
         let mut button_y = 6;
 
+        // Create button with appropriate label (Open, Save, etc.)
+        // Pad the button label to maintain consistent button width
+        let button_text = format!("  {}  ", self.button_label);
         let open_button = Button::new(
             Rect::new(button_x, button_y, button_x + 11, button_y + 2),
-            "  ~O~pen  ",
+            &button_text,
             CM_OK,
             true,
         );
@@ -495,6 +534,7 @@ impl FileDialog {
         // Create a new dialog with updated file list
         let old_bounds = self.dialog.bounds();
         let old_title = self.title.clone();
+        let old_button_label = self.button_label.clone();
 
         *self = Self::new(
             old_bounds,
@@ -502,6 +542,7 @@ impl FileDialog {
             &self.wildcard.clone(),
             Some(self.current_path.clone()),
         )
+        .with_button_label(&old_button_label)
         .build();
 
         // Reset focus to listbox after directory navigation
