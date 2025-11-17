@@ -2,21 +2,22 @@
 // Full Demo - Turbo Vision Feature Demonstration
 // Port of the classic Borland TV demo application
 
-use std::time::SystemTime;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Instant;
+use std::time::SystemTime;
 use turbo_vision::app::Application;
 use turbo_vision::core::command::{CM_CASCADE, CM_CLOSE, CM_NEXT, CM_PREV, CM_QUIT, CM_TILE, CM_ZOOM};
 use turbo_vision::core::draw::DrawBuffer;
-use turbo_vision::core::event::{Event, EventType, KB_F1, KB_F3, KB_F10};
+use turbo_vision::core::event::{Event, EventType, KB_ALT_X, /*KB_F1, KB_F3,*/ KB_F10};
 use turbo_vision::core::geometry::Rect;
 use turbo_vision::core::menu_data::{Menu, MenuItem};
-use turbo_vision::core::palette::{Attr, TvColor, colors, Palette};
+use turbo_vision::core::palette::{Attr, Palette, TvColor, colors};
 use turbo_vision::core::state::StateFlags;
 use turbo_vision::terminal::Terminal;
 use turbo_vision::views::view::write_line_to_terminal;
 use turbo_vision::views::{
-    View, IdleView,
+    IdleView, View,
     button::ButtonBuilder,
     chdir_dialog::ChDirDialog,
     dialog::DialogBuilder,
@@ -25,7 +26,6 @@ use turbo_vision::views::{
     status_line::{StatusItem, StatusLine},
     window::WindowBuilder,
 };
-use std::time::Instant;
 
 // Custom commands
 const CM_ABOUT: u16 = 100;
@@ -157,10 +157,10 @@ impl View for ClockView {
 struct CrabWidget {
     bounds: Rect,
     state: StateFlags,
-    position: usize,      // Current position (0-9)
-    direction: i8,        // 1 for right, -1 for left
+    position: usize, // Current position (0-9)
+    direction: i8,   // 1 for right, -1 for left
     last_update: Instant,
-    paused: bool,         // Animation paused state
+    paused: bool, // Animation paused state
 }
 
 impl CrabWidget {
@@ -356,16 +356,16 @@ fn create_status_line(width: u16, height: u16) -> StatusLine {
     StatusLine::new(
         Rect::new(0, height as i16 - 1, width as i16, height as i16),
         vec![
-            StatusItem::new("~F1~ Help", KB_F1, CM_ABOUT),
-            StatusItem::new("~F3~ Open", KB_F3, CM_OPEN),
+            // StatusItem::new("~F1~ Help", KB_F1, CM_ABOUT),
+            StatusItem::new("~Alt-X~ Exit", KB_ALT_X, CM_QUIT),
+            // StatusItem::new("~F3~ Open", KB_F3, CM_OPEN),
             StatusItem::new("~F10~ Menu", KB_F10, 0),
-            StatusItem::new("~Alt-X~ Exit", 0x2D00, CM_QUIT),
         ],
     )
 }
 
 fn show_about_dialog(app: &mut Application) {
-    use turbo_vision::helpers::msgbox::{message_box, MF_ABOUT, MF_OK_BUTTON};
+    use turbo_vision::helpers::msgbox::{MF_ABOUT, MF_OK_BUTTON, message_box};
 
     let message = "Turbo Vision Demo\n\
                    Version 1.0\n\
@@ -1346,9 +1346,7 @@ fn show_open_file_dialog(app: &mut Application, crab: &Rc<RefCell<CrabWidget>>) 
 
     if let Some(path) = file_dialog.execute(app) {
         // Show selected file in a message box
-        let filename = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("(unknown)");
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("(unknown)");
         let msg = format!("Selected file:\n{}\n\nFull path:\n{}", filename, path.display());
         use turbo_vision::helpers::msgbox::{MF_INFORMATION, MF_OK_BUTTON, message_box};
         message_box(app, &msg, MF_INFORMATION | MF_OK_BUTTON);
@@ -1426,7 +1424,16 @@ fn main() -> turbo_vision::core::error::Result<()> {
     app.running = true;
 
     // Draw desktop first, then show about dialog on top
-    app.draw();
+    // app.draw();
+    app.desktop.draw(&mut app.terminal);
+    if let Some(ref mut menu_bar) = app.menu_bar {
+        menu_bar.draw(&mut app.terminal);
+    }
+    if let Some(ref mut status_line) = app.status_line {
+        status_line.draw(&mut app.terminal);
+    }
+    let _ = app.terminal.flush();
+
     clock.draw(&mut app.terminal);
     app.terminal.flush()?;
 
@@ -1435,11 +1442,12 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
     while app.running {
         app.draw();
-
+        if let Some(ref mut menu_bar) = app.menu_bar {
+            menu_bar.draw(&mut app.terminal);
+        }
         // Draw clock on top (like Borland's idle() update)
         // Matches Borland: tvdemo3.cc:173-174
         clock.draw(&mut app.terminal);
-
         app.terminal.flush()?;
 
         if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
@@ -1474,31 +1482,31 @@ fn main() -> turbo_vision::core::error::Result<()> {
                     }
                     CM_ABOUT => {
                         show_about_dialog(&mut app);
-                        true  // Modal dialog - need to redraw and update cursor
+                        true // Modal dialog - need to redraw and update cursor
                     }
                     CM_ASCII_TABLE => {
                         show_ascii_table(&mut app);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_CALCULATOR => {
                         show_calculator_placeholder(&mut app);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_CALENDAR => {
                         show_calendar_placeholder(&mut app);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_PUZZLE => {
                         show_puzzle_placeholder(&mut app);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_OPEN => {
                         show_open_file_dialog(&mut app, &crab_widget);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_CHDIR => {
                         show_chdir_dialog(&mut app);
-                        true  // Modal dialog
+                        true // Modal dialog
                     }
                     CM_START_CRAB => {
                         crab_widget.borrow_mut().start();
@@ -1532,7 +1540,7 @@ fn main() -> turbo_vision::core::error::Result<()> {
                         app.desktop.zoom_top_window();
                         false
                     }
-                    _ => false
+                    _ => false,
                 };
 
                 // After modal dialogs, redraw to update cursor position
