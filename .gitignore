@@ -16,9 +16,10 @@ CLAUDE.md
 *.swo
 *~
 
-# log files
+# log files & screen dump
 mouse_test.txt
 event_test.txt
+screen-dump.txt
 
 # tooling
 sync-fork.ps1
