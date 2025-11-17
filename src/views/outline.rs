@@ -220,18 +220,14 @@ impl<T: 'static> OutlineViewer<T> {
             drop(node_borrow); // Release borrow before recursing
 
             // Track which parent levels have more siblings
-            if level > 0 {
-                parent_continues.push(!is_last);
-            }
+            parent_continues.push(!is_last);
 
             for (i, child) in node.borrow().children.iter().enumerate() {
                 let child_is_last = i == children_len - 1;
                 self.flatten_node(child.clone(), level + 1, child_is_last, parent_continues);
             }
 
-            if level > 0 {
-                parent_continues.pop();
-            }
+            parent_continues.pop();
         }
     }
 
@@ -324,7 +320,7 @@ impl<T: 'static> View for OutlineViewer<T> {
                 buf.move_str(0, &text, color);
 
                 // Fill rest of line with spaces
-                let text_len = text.len();
+                let text_len = text.chars().count();
                 if text_len < width {
                     buf.move_char(text_len, ' ', color, width - text_len);
                 }
