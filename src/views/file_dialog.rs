@@ -54,6 +54,32 @@
 //! performance, but could alternatively use direct child access if needed for more
 //! complex scenarios.
 
+/// FileDialog - A file selection dialog for opening files
+///
+/// ## Dialog Close Behavior
+///
+/// The FileDialog closes (returns a file path) for exactly 3 reasons:
+/// 1. **File is double-clicked** in the ListBox → Dialog closes, returns file path
+/// 2. **File is selected and Enter/OK is pressed** → Dialog closes, returns file path
+/// 3. **User cancels** (close button, Cancel button, or double ESC) → Dialog closes, returns None
+///
+/// ## Folder Navigation
+///
+/// When a folder is selected and opened (double-click or Enter while focused on folder):
+/// - The dialog stays OPEN
+/// - Current directory is updated
+/// - File list is refreshed with new directory contents
+/// - Selection moves to first item in new directory
+///
+/// This applies to: "..", regular folders "[dirname]", and folder paths like "subdir/*.rs"
+///
+/// ## Known Limitations
+///
+/// **Wildcard Pattern Filtering**: When typing a wildcard pattern (*.rs) and pressing OK,
+/// the code correctly clears end_state and stays open, but the ListBox view is not properly
+/// refreshed on screen. The underlying data is updated, but the visual display doesn't update.
+/// TODO: Need to investigate why set_items() on the downcast ListBox doesn't trigger a redraw.
+
 use super::View;
 use super::button::Button;
 use super::dialog::Dialog;
@@ -82,6 +108,7 @@ pub struct FileDialog {
     file_name_data: Rc<RefCell<String>>,
     files: Vec<String>,
     selected_file_index: usize, // Track ListBox selection
+    title: String, // Store title for rebuilds
 }
 
 impl FileDialog {
@@ -100,6 +127,7 @@ impl FileDialog {
             file_name_data,
             files: Vec::new(),
             selected_file_index: 0,
+            title: title.to_string(),
         }
     }
 
@@ -221,7 +249,7 @@ impl FileDialog {
                     // Event received - handle it immediately without calling idle()
                     // Matches magiblot: idle() is NOT called when events are present
 
-                    // Handle double ESC to close
+                    // Handle double ESC to close (Cancel operation)
                     if event.what == EventType::Keyboard
                         && event.key_code == crate::core::event::KB_ESC_ESC
                     {
@@ -235,8 +263,14 @@ impl FileDialog {
                     // Dialog::handle_event() calls end_modal() which sets the end_state
                     // Matches Borland: TDialog::execute() checks endState after handleEvent
                     let end_state = self.dialog.get_end_state();
-                    if end_state != 0 {
-                        // Dialog closed via close button or ESC - return None (cancel)
+
+                    // IMPORTANT: Only close dialog for CM_CANCEL and CM_CLOSE
+                    // For CM_OK, we need to check if it's a wildcard pattern FIRST
+                    // If it's a wildcard, we stay open and update the filter
+                    // Only close if it's actually a file selection (after wildcard check)
+                    if end_state == crate::core::command::CM_CANCEL
+                        || end_state == crate::core::command::CM_CLOSE {
+                        // CLOSE CONDITION 3: User cancels via cancel button or close button
                         return None;
                     }
 
@@ -245,23 +279,44 @@ impl FileDialog {
                     // We read the ListBox selection after it has processed navigation events
                     self.sync_inputline_with_listbox();
 
-                    // Check if dialog should close
+                    // Check if dialog should close based on command
                     if event.what == EventType::Command {
                         match event.command {
                             CM_OK => {
-                                // Get file name from input field
+                                // User clicked OK button or pressed Enter (while not in listbox)
+                                // Matches Borland: TFileDialog::valid(cmFileOpen) (tfiledia.cc:251-302)
                                 let file_name = self.file_name_data.borrow().clone();
                                 if !file_name.is_empty() {
-                                    // Matches Borland: TFileDialog::valid() checks wildcards and directories
-                                    // (tfiledia.cc:98-124)
-
-                                    // Check if input contains wildcards
+                                    // Check if input contains wildcards (*.txt, *.rs, etc)
                                     if self.contains_wildcards(&file_name) {
-                                        // Update wildcard filter and reload list
+                                        // Borland pattern: Update wildcard and reload list, keep dialog open
+                                        // Matches: strcpy(wildCard, name); fileList->readDirectory()
                                         self.wildcard = file_name.clone();
                                         self.read_directory();
-                                        self.rebuild_and_redraw(&mut app.terminal);
-                                        // Stay open - don't return
+
+                                        // Update ListBox items directly (don't rebuild entire dialog)
+                                        // Downcast to ListBox to call set_items()
+                                        if CHILD_LISTBOX < self.dialog.child_count() {
+                                            let view = self.dialog.child_at_mut(CHILD_LISTBOX);
+                                            if let Some(listbox) =
+                                                view.as_any_mut().downcast_mut::<ListBox>()
+                                            {
+                                                listbox.set_items(self.files.clone());
+                                                listbox.set_list_selection(0);
+                                            }
+                                        }
+
+                                        // Update input field to show the wildcard pattern
+                                        *self.file_name_data.borrow_mut() = self.wildcard.clone();
+
+                                        // Reset selection tracking
+                                        self.selected_file_index = 0;
+
+                                        // CRITICAL: Clear the end_state that was set by Dialog.handle_event()
+                                        // Dialog called end_modal(CM_OK) but we're staying open for wildcard filter
+                                        self.dialog.set_end_state(0);
+
+                                        // Stay open - continue event loop
                                         continue;
                                     }
 
@@ -269,37 +324,41 @@ impl FileDialog {
                                     if let Some(path) =
                                         self.handle_selection(&file_name, &mut app.terminal)
                                     {
-                                        // File selected - return it
+                                        // CLOSE CONDITION 2: File selected and OK pressed
                                         return Some(path);
                                     }
-                                    // Directory navigation - continue loop (handle_selection returns None)
+                                    // Directory/folder selected - navigate into it (stay open)
+                                    // CRITICAL: Clear the end_state so the loop continues
+                                    // Dialog called end_modal(CM_OK) but we're navigating into folder
+                                    self.dialog.set_end_state(0);
+                                    // Loop continues with new directory contents
+                                } else {
+                                    // If input is empty, do nothing (don't close dialog)
+                                    // This effectively disables the OK button when input is empty
+                                    // Clear end_state so dialog stays open
+                                    self.dialog.set_end_state(0);
                                 }
-                                // If input is empty, do nothing (don't close dialog)
-                                // This effectively disables the OK button when input is empty
                             }
                             CM_CANCEL | crate::core::command::CM_CLOSE => {
+                                // CLOSE CONDITION 3: User cancels via Cancel button
                                 return None;
                             }
                             CMD_FILE_SELECTED => {
-                                // User double-clicked or pressed Enter on a file in the list
-                                // Matches Borland: cmFileDoubleClicked is converted to cmOK,
-                                // which triggers valid() that reads from the input field
-
-                                // The input field has ALREADY been updated by the cmFileFocused broadcast
-                                // when the item was focused (see track_listbox_events)
+                                // User double-clicked or pressed Enter on an item in the listbox
+                                // The input field has ALREADY been updated by sync_inputline_with_listbox()
                                 // So we just read what's already there and handle it
                                 let file_name = self.file_name_data.borrow().clone();
 
                                 if !file_name.is_empty() {
-                                    // Handle the selection (navigate dirs or return file)
-                                    // Matches Borland: TFileDialog::valid() reads from input field
+                                    // Handle the selection (navigate into folder or return file)
                                     if let Some(path) =
                                         self.handle_selection(&file_name, &mut app.terminal)
                                     {
-                                        // File selected - return it
+                                        // CLOSE CONDITION 1: File double-clicked or Enter pressed on file
                                         return Some(path);
                                     }
-                                    // Directory navigation - continue loop (valid() returns False)
+                                    // Folder/directory selected - navigate into it (stay open)
+                                    // Loop continues with new directory contents
                                 }
                             }
                             _ => {}
@@ -363,8 +422,16 @@ impl FileDialog {
     }
 
     fn handle_selection(&mut self, file_name: &str, terminal: &mut Terminal) -> Option<PathBuf> {
-        // Check if input contains directory/wildcard format (e.g., "dirname/*.txt")
+        // Determines whether a selection is:
+        // - A folder to navigate into (returns None, dialog stays open)
+        // - A file to return (returns Some(path), closes dialog)
+        //
+        // Returns None when a folder is selected → dialog stays open and refreshes
+        // Returns Some(path) when a file is selected → closes dialog with file path
+
         // Matches Borland: TFileDialog::valid() parsing (tfiledia.cc:98-124)
+
+        // Check if input contains directory/wildcard format (e.g., "dirname/*.txt")
         if let Some(slash_pos) = file_name.rfind('/') {
             let dir_part = &file_name[..slash_pos];
             let file_part = &file_name[slash_pos + 1..];
@@ -379,30 +446,28 @@ impl FileDialog {
                 self.wildcard = file_part.to_string();
             }
 
-            // rebuild_and_redraw will call read_directory() internally
+            // rebuild_and_redraw will refresh the dialog with new directory contents
             self.rebuild_and_redraw(terminal);
-            return None;
+            return None; // Stay open after navigating
         }
 
         if file_name == ".." {
-            // Go to parent directory
+            // Parent directory selected - navigate up one level
             if let Some(parent) = self.current_path.parent() {
                 self.current_path = parent.to_path_buf();
-                // rebuild_and_redraw will call read_directory() internally
                 self.rebuild_and_redraw(terminal);
             }
-            None
+            None // Stay open after navigating
         } else if file_name.starts_with('[') && file_name.ends_with(']') {
-            // Directory selected - navigate into it
+            // Folder selected ([dirname]) - navigate into it
             let dir_name = &file_name[1..file_name.len() - 1];
             self.current_path.push(dir_name);
-            // rebuild_and_redraw will call read_directory() internally
             self.rebuild_and_redraw(terminal);
-            None
+            None // Stay open after navigating
         } else {
-            // File selected - update input and return
+            // Regular file selected - close dialog with path
             *self.file_name_data.borrow_mut() = file_name.to_string();
-            Some(self.current_path.join(file_name))
+            Some(self.current_path.join(file_name)) // Close dialog, return file path
         }
     }
 
@@ -429,11 +494,11 @@ impl FileDialog {
     fn rebuild_and_redraw(&mut self, _terminal: &mut Terminal) {
         // Create a new dialog with updated file list
         let old_bounds = self.dialog.bounds();
-        let old_title = "Open File"; // TODO: Store title
+        let old_title = self.title.clone();
 
         *self = Self::new(
             old_bounds,
-            old_title,
+            &old_title,
             &self.wildcard.clone(),
             Some(self.current_path.clone()),
         )
@@ -461,6 +526,10 @@ impl FileDialog {
             let first_item = self.files[0].clone();
 
             // Format the display text for the input field
+            // IMPORTANT: After applying a wildcard filter, keep the wildcard pattern
+            // in the input field so the user can see what filter is active.
+            // This matches user expectations: when they press OK with "*.txt",
+            // the dialog applies the filter and shows "*.txt" in the input field.
             let display_text = if first_item.starts_with('[') && first_item.ends_with(']') {
                 // Directory selected - show "dirname/*.txt" format
                 let dir_name = &first_item[1..first_item.len() - 1];
@@ -469,8 +538,16 @@ impl FileDialog {
                 // Parent directory - just show ".."
                 first_item.clone()
             } else {
-                // Regular file - show just the filename
-                first_item.clone()
+                // Regular file - show the wildcard pattern if one was explicitly set
+                // (user typed a wildcard and pressed OK to apply the filter)
+                // Otherwise show the filename
+                if self.wildcard.contains('*') || self.wildcard.contains('?') {
+                    // Wildcard is active - show it in the input field
+                    self.wildcard.clone()
+                } else {
+                    // Regular file selection mode - show the filename
+                    first_item.clone()
+                }
             };
 
             // Update the shared data field
@@ -480,8 +557,12 @@ impl FileDialog {
             let mut broadcast = Event::broadcast(CM_FILE_FOCUSED);
             self.dialog.handle_event(&mut broadcast);
         } else {
-            // No files - clear the input
-            *self.file_name_data.borrow_mut() = String::new();
+            // No files - show the wildcard pattern if one was applied
+            if self.wildcard.contains('*') || self.wildcard.contains('?') {
+                *self.file_name_data.borrow_mut() = self.wildcard.clone();
+            } else {
+                *self.file_name_data.borrow_mut() = String::new();
+            }
         }
     }
 

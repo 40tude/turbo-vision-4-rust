@@ -243,6 +243,8 @@ impl View for Dialog {
 
         // Handle command events
         // Dialogs intercept cmCancel and cmOK/cmYes/cmNo to end the modal loop
+        // IMPORTANT: Custom commands from child views (like ListBox) should NOT close the dialog
+        // Only the standard dialog commands should close the modal loop
         // IMPORTANT: Only intercept commands when dialog is actually modal!
         // Non-modal dialogs (added to desktop) should let commands pass through
         // Matches Borland: TDialog::handleEvent() checks for these commands
@@ -268,11 +270,13 @@ impl View for Dialog {
                         event.clear();
                     }
                     _ => {
-                        // Other commands (including custom button commands)
-                        // End the modal loop with the command so it can be processed by the caller
-                        // Matches Borland: buttons with custom commands close the dialog
-                        self.window.end_modal(event.command);
-                        event.clear();
+                        // Other commands (custom commands from child views like ListBox)
+                        // These should NOT close the dialog - let them pass through to be handled
+                        // by the caller (e.g., FileDialog)
+                        // CRITICAL: The old code incorrectly called end_modal() for all commands,
+                        // which broke custom commands from ListBox (cmFileSelected)
+                        // Now we only close the dialog for standard dialog commands above
+                        // Custom commands are left alone - the caller handles them
                     }
                 }
             }
