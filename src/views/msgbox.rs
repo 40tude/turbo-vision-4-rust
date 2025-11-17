@@ -67,10 +67,10 @@ pub fn message_box_rect(app: &mut Application, bounds: Rect, message: &str, opti
 
     // Determine which buttons to show
     let button_configs = [
-        (MF_YES_BUTTON, "~Y~es", CM_YES),
-        (MF_NO_BUTTON, "~N~o", CM_NO),
-        (MF_OK_BUTTON, "  ~O~K  ", CM_OK),
-        (MF_CANCEL_BUTTON, " ~C~ancel ", CM_CANCEL),
+        (MF_YES_BUTTON, " ~Y~es", CM_YES),
+        (MF_NO_BUTTON, " ~N~o", CM_NO),
+        (MF_OK_BUTTON, " ~O~K", CM_OK),
+        (MF_CANCEL_BUTTON, " ~C~ancel", CM_CANCEL),
     ];
 
     let mut buttons = Vec::new();
@@ -206,12 +206,12 @@ pub fn input_box_rect(app: &mut Application, bounds: Rect, title: &str, label: &
     let button_y = bounds.height() - 4;
     let ok_x = bounds.width() / 2 - 11;
     let ok_bounds = Rect::new(ok_x, button_y, ok_x + 10, button_y + 2);
-    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+    dialog.add(Box::new(Button::new(ok_bounds, " ~O~K", CM_OK, true)));
 
     // Add Cancel button
     let cancel_x = ok_x + 12;
     let cancel_bounds = Rect::new(cancel_x, button_y, cancel_x + 10, button_y + 2);
-    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+    dialog.add(Box::new(Button::new(cancel_bounds, " ~C~ancel", CM_CANCEL, false)));
 
     dialog.set_initial_focus();
 
@@ -259,11 +259,11 @@ pub fn search_box(app: &mut Application, title: &str) -> Option<String> {
 
     // Add OK button
     let ok_bounds = Rect::new(15, 5, 25, 7);
-    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+    dialog.add(Box::new(Button::new(ok_bounds, " ~O~K", CM_OK, true)));
 
     // Add Cancel button
     let cancel_bounds = Rect::new(27, 5, 37, 7);
-    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+    dialog.add(Box::new(Button::new(cancel_bounds, " ~C~ancel", CM_CANCEL, false)));
 
     dialog.set_initial_focus();
 
@@ -325,11 +325,11 @@ pub fn search_replace_box(app: &mut Application, title: &str) -> Option<(String,
 
     // Add OK button
     let ok_bounds = Rect::new(15, 9, 25, 11);
-    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+    dialog.add(Box::new(Button::new(ok_bounds, " ~O~K", CM_OK, true)));
 
     // Add Cancel button
     let cancel_bounds = Rect::new(27, 9, 37, 11);
-    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+    dialog.add(Box::new(Button::new(cancel_bounds, " ~C~ancel", CM_CANCEL, false)));
 
     dialog.set_initial_focus();
 
@@ -379,7 +379,7 @@ pub fn goto_line_box(app: &mut Application, title: &str) -> Option<usize> {
 
     // Add label
     let label_bounds = Rect::new(2, 2, 20, 3);
-    dialog.add(Box::new(Label::new(label_bounds, "~L~ine number:")));
+    dialog.add(Box::new(Label::new(label_bounds, " ~L~ine number:")));
 
     // Add input line
     let input_bounds = Rect::new(2, 3, width - 4, 4);
@@ -387,11 +387,11 @@ pub fn goto_line_box(app: &mut Application, title: &str) -> Option<usize> {
 
     // Add OK button
     let ok_bounds = Rect::new(10, 5, 20, 7);
-    dialog.add(Box::new(Button::new(ok_bounds, "  ~O~K  ", CM_OK, true)));
+    dialog.add(Box::new(Button::new(ok_bounds, " ~O~K", CM_OK, true)));
 
     // Add Cancel button
     let cancel_bounds = Rect::new(22, 5, 32, 7);
-    dialog.add(Box::new(Button::new(cancel_bounds, " Cancel ", CM_CANCEL, false)));
+    dialog.add(Box::new(Button::new(cancel_bounds, " ~C~ancel", CM_CANCEL, false)));
 
     dialog.set_initial_focus();
 
