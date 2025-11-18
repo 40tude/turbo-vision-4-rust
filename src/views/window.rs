@@ -463,27 +463,19 @@ impl View for Window {
                 // Shadows take 1 additional row at the bottom
                 let shadow_offset = if (self.state & SF_SHADOW) != 0 { 1 } else { 0 };
 
-                // Apply basic constraints (allows partial off-screen dragging)
-                // Borland: p.x = min(max(p.x, limits.a.x - s.x+1), limits.b.x-1);
-                new_x = new_x.max(limits.a.x - width + 1).min(limits.b.x - 1);
-                new_y = new_y.max(limits.a.y - height + 1).min(limits.b.y - 1);
+                // Apply drag constraints to keep window fully within parent bounds
+                // Matches Borland: dmLimitLoX | dmLimitLoY | dmLimitHiX | dmLimitHiY (full containment)
 
-                // Apply dmLimitLoX constraint - prevent dragging too far left
-                // Borland: if( (mode & dmLimitLoX) != 0 ) p.x = max(p.x, limits.a.x);
+                // dmLimitLoX: keep left edge within bounds (prevent negative x)
                 new_x = new_x.max(limits.a.x);
 
-                // Apply dmLimitLoY constraint (Borland default dragMode)
-                // Prevents window from being dragged above the top edge of limits
-                // Borland: if( (mode & dmLimitLoY) != 0 ) p.y = max(p.y, limits.a.y);
+                // dmLimitLoY: keep top edge within bounds (prevent negative y)
                 new_y = new_y.max(limits.a.y);
 
-                // Apply dmLimitHiX constraint - prevent dragging too far right
-                // Borland: if( (mode & dmLimitHiX) != 0 ) p.x = min(p.x, limits.b.x-s.x);
+                // dmLimitHiX: keep right edge within bounds
                 new_x = new_x.min(limits.b.x - width);
 
-                // Apply dmLimitHiY constraint to prevent dragging below bottom edge
-                // Prevents window bottom (including shadow) from extending below status line
-                // Borland: if( (mode & dmLimitHiY) != 0 ) p.y = min(p.y, limits.b.y-s.y);
+                // dmLimitHiY: keep bottom edge (including shadow) within bounds
                 new_y = new_y.min(limits.b.y - height - shadow_offset);
 
                 // Save previous bounds for union rect calculation (Borland's locate pattern)

@@ -76,6 +76,17 @@ fn main() -> turbo_vision::core::error::Result<()> {
     let mut app = Application::new()?;
     let (width, height) = app.terminal.size();
 
+    // Initialize command states - disable window commands at startup
+    // Matches Borland: TEditorApp constructor disables window commands initially
+    command_set::disable_command(CM_TILE);
+    command_set::disable_command(CM_CASCADE);
+    command_set::disable_command(CM_CLOSE);
+    command_set::disable_command(CM_ZOOM);
+    command_set::disable_command(CM_NEXT);
+    command_set::disable_command(CM_PREV);
+    command_set::disable_command(CM_SAVE);
+    command_set::disable_command(CM_SAVE_AS);
+
     // Create menu bar (matching Borland's TEditorApp::initMenuBar)
     let menu_bar = init_menu_bar(Rect::new(0, 0, width as i16, 1));
     app.set_menu_bar(menu_bar);
@@ -90,6 +101,25 @@ fn main() -> turbo_vision::core::error::Result<()> {
         // Update menu states based on current file editor state
         update_menu_states(&app);
 
+        // Broadcast command set changes to all views (especially menu bar)
+        // Matches Borland: TProgram::idle() broadcasts command set changes
+        if command_set::command_set_changed() {
+            let mut event = turbo_vision::core::event::Event::broadcast(turbo_vision::core::command::CM_COMMAND_SET_CHANGED);
+
+            // Broadcast to desktop (which propagates to all children)
+            app.desktop.handle_event(&mut event);
+
+            // Also send to menu bar and status line
+            if let Some(ref mut menu_bar) = app.menu_bar {
+                menu_bar.handle_event(&mut event);
+            }
+            if let Some(ref mut status_line) = app.status_line {
+                status_line.handle_event(&mut event);
+            }
+
+            command_set::clear_command_set_changed();
+        }
+
         // Draw everything in proper order
         app.desktop.draw(&mut app.terminal);
         if let Some(ref mut menu_bar) = app.menu_bar {
@@ -101,7 +131,8 @@ fn main() -> turbo_vision::core::error::Result<()> {
         let _ = app.terminal.flush();
 
         // Poll for events
-        if let Ok(Some(mut event)) = app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+        match app.terminal.poll_event(std::time::Duration::from_millis(50)) {
+            Ok(Some(mut event)) => {
             // Status line handles events first (pre-process phase)
             // Matches Borland: TStatusLine has ofPreProcess flag
             if let Some(ref mut status_line) = app.status_line {
@@ -158,7 +189,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
 
                     if should_close {
                         // User chose Yes or No - allow the close
-                        app.desktop.remove_child(0);
+                        // Close the top window (last child in z-order)
+                        let top_window_idx = app.desktop.child_count() - 1;
+                        app.desktop.remove_child(top_window_idx);
                     }
                     // Clear event whether cancelled or completed
                     event.clear();
@@ -258,8 +291,30 @@ fn main() -> turbo_vision::core::error::Result<()> {
                         // Show errors from last analysis
                         show_message(&mut app, "Analysis", "No errors found");
                     }
+                    CM_TILE => {
+                        // Tile all editor windows
+                        app.tile();
+                    }
+                    CM_CASCADE => {
+                        // Cascade all editor windows
+                        app.cascade();
+                    }
                     _ => {}
                 }
+            }
+
+            // Call idle after event/command processing to update command states
+            // This updates tile/cascade/window commands based on current desktop state
+            // Matches showcase pattern: idle() called after event processing
+            app.idle();
+            }
+            Ok(None) => {
+                // Timeout with no events - idle was NOT called yet, call it now
+                // Matches Borland: TProgram::idle() called when truly idle
+                app.idle();
+            }
+            Err(_) => {
+                // Error polling for events - continue
             }
         }
     }
@@ -271,6 +326,9 @@ fn main() -> turbo_vision::core::error::Result<()> {
 ///
 /// - SAVE is disabled if no window is open OR the current window is "Untitled"
 /// - SAVE_AS is disabled if no window is open
+/// - CLOSE, ZOOM, NEXT, PREV are disabled if no window is open
+///
+/// Note: TILE and CASCADE are managed by Application::idle()
 ///
 /// Matches Borland: TEditorApp::updateMenuItems() pattern
 fn update_menu_states(app: &Application) {
@@ -290,6 +348,20 @@ fn update_menu_states(app: &Application) {
         command_set::enable_command(CM_SAVE_AS);
     } else {
         command_set::disable_command(CM_SAVE_AS);
+    }
+
+    // Window management commands: enabled only if window exists
+    // Matches Borland: TVDemo::idle() pattern
+    if has_window {
+        command_set::enable_command(CM_CLOSE);
+        command_set::enable_command(CM_ZOOM);
+        command_set::enable_command(CM_NEXT);
+        command_set::enable_command(CM_PREV);
+    } else {
+        command_set::disable_command(CM_CLOSE);
+        command_set::disable_command(CM_ZOOM);
+        command_set::disable_command(CM_NEXT);
+        command_set::disable_command(CM_PREV);
     }
 }
 

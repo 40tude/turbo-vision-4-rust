@@ -4,7 +4,7 @@
 //! Manages the main application window, menu bar, status line, and desktop.
 //! Provides the central event loop and command dispatching system.
 
-use crate::core::command::{CM_CANCEL, CM_COMMAND_SET_CHANGED, CM_QUIT, CommandId};
+use crate::core::command::{CM_CANCEL, CM_CASCADE, CM_COMMAND_SET_CHANGED, CM_QUIT, CM_TILE, CommandId};
 use crate::core::command_set;
 use crate::core::error::Result;
 use crate::core::event::{Event, EventType, KB_ALT_X};
@@ -433,9 +433,22 @@ impl Application {
         }
 
         // Application-level command handling
-        if event.what == EventType::Command && event.command == CM_QUIT {
-            self.running = false;
-            event.clear();
+        if event.what == EventType::Command {
+            match event.command {
+                CM_QUIT => {
+                    self.running = false;
+                    event.clear();
+                }
+                CM_TILE => {
+                    self.tile();
+                    event.clear();
+                }
+                CM_CASCADE => {
+                    self.cascade();
+                    event.clear();
+                }
+                _ => {}
+            }
         }
 
         // Handle Alt+X (or ESC+X) at application level
@@ -444,6 +457,31 @@ impl Application {
             *event = Event::command(CM_QUIT);
             self.running = false;
         }
+    }
+
+    // Window Management Methods
+    // Matches Borland: TApplication tile/cascade methods (tapplica.cpp:75-127)
+
+    /// Tile all tileable windows in a grid pattern
+    /// Matches Borland: TApplication::tile() (tapplica.cpp:123-127)
+    pub fn tile(&mut self) {
+        let rect = self.get_tile_rect();
+        self.desktop.tile_with_rect(rect);
+    }
+
+    /// Cascade all tileable windows in a staircase pattern
+    /// Matches Borland: TApplication::cascade() (tapplica.cpp:75-79)
+    pub fn cascade(&mut self) {
+        let rect = self.get_tile_rect();
+        self.desktop.cascade_with_rect(rect);
+    }
+
+    /// Get the rectangle to use for tiling/cascading operations
+    /// Matches Borland: TApplication::getTileRect() (tapplica.cpp:94-97)
+    /// Default implementation returns the full desktop extent
+    /// Can be overridden to customize the tile area
+    pub fn get_tile_rect(&self) -> Rect {
+        self.desktop.get_bounds()
     }
 
     // Command Set Management
@@ -507,13 +545,23 @@ impl Application {
         Ok(())
     }
 
-    /// Idle processing - broadcasts command set changes
+    /// Idle processing - broadcasts command set changes and updates command states
     /// Matches Borland: TProgram::idle() (tprogram.cc:248-257)
     pub fn idle(&mut self) {
         // Update overlay widgets (animations, etc.)
         // These continue running even during modal dialogs
         for widget in &mut self.overlay_widgets {
             widget.idle();
+        }
+
+        // Update tile/cascade command states based on desktop state
+        // Matches Borland: TVDemo::idle() checks deskTop->firstThat(isTileable, 0)
+        if self.desktop.has_tileable_windows() {
+            command_set::enable_command(CM_TILE);
+            command_set::enable_command(CM_CASCADE);
+        } else {
+            command_set::disable_command(CM_TILE);
+            command_set::disable_command(CM_CASCADE);
         }
 
         // Check if command set changed and broadcast to all views

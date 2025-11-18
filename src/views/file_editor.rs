@@ -176,6 +176,14 @@ impl View for FileEditor {
         self.edit_window.can_focus()
     }
 
+    fn options(&self) -> u16 {
+        self.edit_window.options()
+    }
+
+    fn set_options(&mut self, options: u16) {
+        self.edit_window.set_options(options);
+    }
+
     fn state(&self) -> StateFlags {
         self.edit_window.state()
     }
@@ -186,6 +194,10 @@ impl View for FileEditor {
 
     fn get_palette(&self) -> Option<crate::core::palette::Palette> {
         self.edit_window.get_palette()
+    }
+
+    fn set_owner(&mut self, owner: *const dyn View) {
+        self.edit_window.set_owner(owner);
     }
 }
 

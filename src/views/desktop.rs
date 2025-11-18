@@ -194,9 +194,46 @@ impl Desktop {
         self.bounds
     }
 
-    /// Cascade windows in a staircase pattern
+    /// Check if any child window is tileable
+    /// Used for enabling/disabling tile/cascade commands
+    /// Matches Borland: deskTop->firstThat(isTileable, 0) != 0
+    pub fn has_tileable_windows(&self) -> bool {
+        use crate::core::state::OF_TILEABLE;
+
+        // Skip background (index 0)
+        for i in 1..self.children.len() {
+            let child = self.children.child_at(i);
+            if (child.options() & OF_TILEABLE) != 0 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Count tileable windows on desktop
+    /// Used for tile/cascade algorithms
+    pub fn count_tileable_windows(&self) -> usize {
+        use crate::core::state::OF_TILEABLE;
+
+        let mut count = 0;
+        for i in 1..self.children.len() {
+            let child = self.children.child_at(i);
+            if (child.options() & OF_TILEABLE) != 0 {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Cascade windows in a staircase pattern (using full desktop bounds)
     /// Matches Borland: TDesktop::cascade(const TRect &r)
     pub fn cascade(&mut self) {
+        self.cascade_with_rect(self.bounds);
+    }
+
+    /// Cascade windows in a staircase pattern within specified rect
+    /// Matches Borland: TDesktop::cascade(const TRect &r)
+    pub fn cascade_with_rect(&mut self, rect: Rect) {
         use crate::core::state::OF_TILEABLE;
 
         // Count tileable windows (skip background at index 0)
@@ -214,11 +251,12 @@ impl Desktop {
         }
 
         // Calculate cascade bounds (leave room for offset)
-        let cascade_bounds = self.bounds;
+        let cascade_bounds = rect;
 
         // Position windows in cascade (staircase) pattern
-        // Each window is offset by its index from the base position
-        let mut cascade_index: usize = count - 1;
+        // Bottom window (first in z-order) has no offset (leftmost)
+        // Top window (last in z-order) has maximum offset (rightmost)
+        let mut cascade_index: usize = 0;
         for i in 1..self.children.len() {
             let child = self.children.child_at(i);
             let options = child.options();
@@ -233,14 +271,20 @@ impl Desktop {
                 new_bounds.b.y -= (count - 1 - cascade_index) as i16;
 
                 self.children.child_at_mut(i).set_bounds(new_bounds);
-                cascade_index = cascade_index.saturating_sub(1);
+                cascade_index += 1;
             }
         }
     }
 
-    /// Tile windows in a grid pattern
+    /// Tile windows in a grid pattern (using full desktop bounds)
     /// Matches Borland: TDesktop::tile(const TRect &r)
     pub fn tile(&mut self) {
+        self.tile_with_rect(self.bounds);
+    }
+
+    /// Tile windows in a grid pattern within specified rect
+    /// Matches Borland: TDesktop::tile(const TRect &r)
+    pub fn tile_with_rect(&mut self, rect: Rect) {
         use crate::core::state::OF_TILEABLE;
 
         // Count tileable windows (skip background at index 0)
@@ -260,7 +304,7 @@ impl Desktop {
         // Calculate grid dimensions (most square layout)
         let (cols, rows) = Self::calculate_grid_layout(count);
 
-        let tile_bounds = self.bounds;
+        let tile_bounds = rect;
         let cell_width = tile_bounds.width() / cols as i16;
         let cell_height = tile_bounds.height() / rows as i16;
 
@@ -484,6 +528,59 @@ impl View for Desktop {
                         // Note: We don't return here - let the event propagate to the window
                     }
                 }
+            }
+        }
+
+        // Handle desktop-level commands
+        // Matches Borland: TDesktop::handleEvent (tdesktop.cc:103-133)
+        if event.what == EventType::Command {
+            use crate::core::command::{CM_NEXT, CM_PREV};
+            use crate::core::state::SF_FOCUSED;
+
+            match event.command {
+                CM_NEXT => {
+                    // Cycle to next window (send top window to back)
+                    // Matches Borland: cmNext command calls selectNext(False)
+                    if self.children.len() > 2 {
+                        // Clear focus from current top window
+                        let old_top_idx = self.children.len() - 1;
+                        let old_state = self.children.child_at(old_top_idx).state();
+                        if (old_state & SF_FOCUSED) != 0 {
+                            self.children.child_at_mut(old_top_idx).set_focus(false);
+                        }
+
+                        // Move top window to back
+                        self.children.send_to_back(old_top_idx);
+
+                        // Focus the new top window
+                        let new_top_idx = self.children.len() - 1;
+                        self.children.child_at_mut(new_top_idx).set_focus(true);
+                    }
+                    event.clear();
+                    return;
+                }
+                CM_PREV => {
+                    // Cycle to previous window (bring bottom window to front)
+                    // Matches Borland: cmPrev calls current->putInFrontOf(background)
+                    if self.children.len() > 2 {
+                        // Clear focus from current top window
+                        let old_top_idx = self.children.len() - 1;
+                        let old_state = self.children.child_at(old_top_idx).state();
+                        if (old_state & SF_FOCUSED) != 0 {
+                            self.children.child_at_mut(old_top_idx).set_focus(false);
+                        }
+
+                        // Bring bottom window (after background) to front
+                        self.children.bring_to_front(1);
+
+                        // Focus the new top window
+                        let new_top_idx = self.children.len() - 1;
+                        self.children.child_at_mut(new_top_idx).set_focus(true);
+                    }
+                    event.clear();
+                    return;
+                }
+                _ => {}
             }
         }
 

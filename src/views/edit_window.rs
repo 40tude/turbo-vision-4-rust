@@ -473,6 +473,14 @@ impl View for EditWindow {
         true
     }
 
+    fn options(&self) -> u16 {
+        self.window.options()
+    }
+
+    fn set_options(&mut self, options: u16) {
+        self.window.set_options(options);
+    }
+
     fn state(&self) -> StateFlags {
         self.window.state()
     }
@@ -491,6 +499,10 @@ impl View for EditWindow {
 
     fn set_end_state(&mut self, command: crate::core::command::CommandId) {
         self.window.set_end_state(command);
+    }
+
+    fn set_owner(&mut self, owner: *const dyn View) {
+        self.window.set_owner(owner);
     }
 }
 
