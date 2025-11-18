@@ -145,9 +145,8 @@ For practical application development:
 If you're familiar with Borland Turbo Vision:
 
 1. **[Architecture Overview](docs/user-guide/Chapter-07-Architecture-Overview.md)** - Understand Rust adaptations
-2. **[CLAUDE.md](CLAUDE.md)** - Deep architectural mappings (C++ → Rust)
-3. **[Rust Implementation Reference](docs/RUST-IMPLEMENTATION-REFERENCE.md)** - Technical details
-4. **[Turbo Vision Design](docs/TURBO-VISION-DESIGN.md)** - Complete design document
+2. **[Rust Implementation Reference](docs/RUST-IMPLEMENTATION-REFERENCE.md)** - Technical details
+3. **[Turbo Vision Design](docs/TURBO-VISION-DESIGN.md)** - Complete design document
 
 **Key Differences**: The Rust port uses composition over inheritance, but maintains the same event loop patterns, drawing system, and API structure as Borland's original.
 
@@ -177,17 +176,15 @@ For API lookups and function signatures:
 
 If you want to modify or extend the codebase:
 
-1. **[CLAUDE.md](CLAUDE.md)** - Essential architecture guide and design patterns
-2. **[Rust Coding Guidelines](docs/RUST-CODING-GUIDELINES.md)** - Code style and best practices
-3. **[Chapter 8 - Views and Groups](docs/user-guide/Chapter-08-Views-and-Groups.md)** - Understanding the view hierarchy
-4. Study existing tests in `src/views/*/tests` modules
+1. **[Rust Coding Guidelines](docs/RUST-CODING-GUIDELINES.md)** - Code style and best practices
+2. **[Chapter 8 - Views and Groups](docs/user-guide/Chapter-08-Views-and-Groups.md)** - Understanding the view hierarchy
+3. Study existing tests in `src/views/*/tests` modules
 
 ### 📂 Complete Documentation Structure
 
 ```
 docs/
 ├── DOCUMENTATION-INDEX.md              # Master index
-├── CLAUDE.md                           # Architecture deep-dive (in project root)
 ├── RUST-CODING-GUIDELINES.md          # Code style guide
 ├── CUSTOM-APPLICATION-RUST-EXAMPLE.md  # Complete app walkthrough
 ├── BIORHYTHM-CALCULATOR-TUTORIAL.md    # Step-by-step tutorial
