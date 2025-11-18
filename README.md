@@ -4,7 +4,7 @@
 
 A Rust implementation of the classic Borland Turbo Vision text user interface framework.
 
-**Version 0.10.6 - CODE COMPLETE** ✅
+**Version 0.10.7 - CODE COMPLETE** ✅
 
 Based on
 kloczek Borland Turbo Vision C++ port [here](https://github.com/kloczek/tvision)
@@ -81,7 +81,6 @@ The color palette system accurately replicates Borland Turbo Vision's behavior:
 - **Owner Type Support**: Each view tracks its owner type for correct palette inheritance
 - **Borland-Accurate Colors**: All UI elements (menus, buttons, labels, dialogs) match original Borland colors
 - **Runtime Customization**: Change the entire application palette at runtime with `app.set_palette()` for custom themes
-- **Regression Testing**: 9 comprehensive palette tests ensure color stability across changes
 
 The palette system uses a three-level mapping chain:
 1. View palette (e.g., Button, Label) → indices 1-31
@@ -280,7 +279,7 @@ This implementation closely follows Borland Turbo Vision's architecture, adapted
 
 Generated with [tokei](https://github.com/XAMPPRocky/tokei) - includes inline documentation
 
-**204 unit tests** - all passing ✅
+**210 unit tests** - all passing ✅
 
 ## License
 
